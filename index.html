@@ -458,9 +458,24 @@ function toggleHidden(){showHidden=$('showHiddenCheck').checked;render();}
 async function hideAccount(id){await client.from('investment_accounts').update({hidden:true}).eq('id',id);toast('已隐藏','success');await loadData();}
 async function unhideAccount(id){await client.from('investment_accounts').update({hidden:false}).eq('id',id);toast('已取消隐藏','success');await loadData();}
 function openAddAccount(){$('accountModalTitle').textContent='新建账户';$('saveAccountBtn').textContent='创建';$('accountName').value='';$('accountType').value='investment';openModal('accountModal');}
+async function getUserPlan(){
+  try{
+    const{data}=await client.from('subscriptions').select('plan').eq('user_id',currentUser.id).maybeSingle();
+    return data?.plan||'free';
+  }catch(e){return 'free';}
+}
 async function saveAccount(){
   const name=$('accountName').value.trim();if(!name){toast('请输入账户名称','error');return;}
-  const{error}=await client.from('investment_accounts').insert({user_id:currentUser.id,name,account_type:$('accountType').value});
+  const type=$('accountType').value;
+  // 检查账户数量限制
+  const plan=await getUserPlan();
+  if(plan!=='pro'){
+    const cashCount=accounts.filter(a=>a.account_type==='cash').length;
+    const investCount=accounts.filter(a=>a.account_type==='investment').length;
+    if(type==='cash'&&cashCount>=1){toast('免费用户只能拥有1个现金账户','error');return;}
+    if(type==='investment'&&investCount>=5){toast('免费用户最多5个投资账户，升级Pro可解锁无限','error');return;}
+  }
+  const{error}=await client.from('investment_accounts').insert({user_id:currentUser.id,name,account_type:type});
   if(error){toast(error.message,'error');return;}closeModal('accountModal');toast('账户已创建','success');await loadData();
 }
 
