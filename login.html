@@ -88,7 +88,7 @@
       client.auth.getSession().then(({ data: { session } }) => {
         if (session) {
           showMsg('您已登录，正在跳转到看板...', 'success');
-          setTimeout(() => { window.location.href = 'dashboard.html'; }, 500);
+          setTimeout(() => { window.location.href = '/'; }, 500);
         }
       });
 
@@ -111,7 +111,7 @@
           showMsg(error.message, 'error');
         } else {
           showMsg('登录成功，正在跳转...', 'success');
-          setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);
+          setTimeout(() => { window.location.href = '/'; }, 1000);
         }
       });
     })();
