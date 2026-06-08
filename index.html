@@ -364,7 +364,7 @@ const client=window.__supabaseClient||supabase.createClient(SUPABASE_URL,SUPABAS
 if(!window.__supabaseClient)window.__supabaseClient=client;
 
 let currentUser=null,accounts=[],allRecords={},settings=null,showHidden=false;
-let chartInstance=null,drawerAccountId=null,chartMode='assets',drawerChartMode='assets',csi300Map=null,chartRange='all',privacyMode=false;
+let chartInstance=null,drawerAccountId=null,chartMode='assets',drawerChartMode='assets',csi300Map=null,csi500Map=null,chartRange='all',privacyMode=false;
 // 内存缓存
 const queryCache={};
 function cachedQuery(key,fn){
@@ -440,15 +440,38 @@ function calcXIRR(records, accountType, currentValue){
   return null;
 }
 
-// 获取沪深300指数历史收盘价
-async function fetchCSI300(){
-  try{
-    const r=await fetch('https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=1.000300&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=101&fqt=1&end=20500101&lmt=5000');
-    const d=await r.json();
-    const map={};
-    (d.data?.klines||[]).forEach(k=>{const p=k.split(',');map[p[0]]=parseFloat(p[2]);});
-    csi300Map=map;
-  }catch(e){csi300Map={};}
+// 获取指数数据（沪深300/中证500），多个API兜底
+const INDEX_APIS={
+  hs300:[
+    'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=1.000300&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=101&fqt=1&end=20500101&lmt=5000',
+    'https://push2.eastmoney.com/api/qt/stock/kline/get?secid=1.000300&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=101&fqt=1&end=20500101&lmt=5000',
+    'https://push1his.eastmoney.com/api/qt/stock/kline/get?secid=1.000300&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=101&fqt=1&end=20500101&lmt=5000'
+  ],
+  zz500:[
+    'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=1.000905&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=101&fqt=1&end=20500101&lmt=5000',
+    'https://push2.eastmoney.com/api/qt/stock/kline/get?secid=1.000905&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=101&fqt=1&end=20500101&lmt=5000',
+    'https://push1his.eastmoney.com/api/qt/stock/kline/get?secid=1.000905&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=101&fqt=1&end=20500101&lmt=5000'
+  ]
+};
+async function fetchIndexData(urls){
+  for(let i=0;i<urls.length;i++){
+    try{
+      const r=await fetch(urls[i],{cache:'no-store'});
+      if(!r.ok)continue;
+      const d=await r.json();
+      if(d.data?.klines?.length){
+        const map={};
+        d.data.klines.forEach(k=>{const p=k.split(',');map[p[0]]=parseFloat(p[2]);});
+        if(i>0)console.log('📈 指数API切换到备用'+i+':',urls[i].slice(0,60));
+        return map;
+      }
+    }catch(e){/* 继续下一个 */}  }
+  console.warn('⚠️ 所有指数API均不可用');
+  return {};
+}
+async function fetchIndexes(){
+  csi300Map=await fetchIndexData(INDEX_APIS.hs300);
+  csi500Map=await fetchIndexData(INDEX_APIS.zz500);
 }
 async function loadData(){
   const{data:{session}}=await client.auth.getSession();
@@ -464,7 +487,7 @@ async function loadData(){
   allRecords={};
   for(const a of accounts){const{data:recs}=await cachedQuery('recs_'+a.id,()=>client.from('investment_records').select('*').eq('account_id',a.id).order('record_date',{ascending:true}));allRecords[a.id]=recs||[];}
   clearCache();
-  fetchCSI300();
+  fetchIndexes();
   render();
 }
 
@@ -778,14 +801,25 @@ function renderChart(){
     const hs300Data=hs300Raw.map(v=>v!=null?v:(firstGood||null));
     const baseVal=firstGood||1;
     const hs300Nav=hs300Data.map(v=>v!=null?v/baseVal:null);
+    // 中证500归一化
+    let lastV5=null;
+    const zz500Raw=dates.map(d=>{
+      const v=csi500Map&&csi500Map[d]?csi500Map[d]:null;
+      if(v!=null)lastV5=v;
+      return v;
+    });
+    const firstGood5=zz500Raw.find(v=>v!=null);
+    const zz500Data=zz500Raw.map(v=>v!=null?v:(firstGood5||null));
+    const base5=firstGood5||1;
+    const zz500Nav=zz500Data.map(v=>v!=null?v/base5:null);
     option={
       tooltip:{trigger:'axis',valueFormatter:(v,idx)=>{
-        const isHs=Array.isArray(idx)?idx.seriesName==='沪深300':false;
+        const isHs=Array.isArray(idx)?idx.seriesName==='沪深300'||idx.seriesName==='中证500':false;
         return (isNaN(v)?'—':v.toFixed(3));
       },formatter:function(p){
         return p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':d.value.toFixed(3))).join('<br/>');
       }},
-      legend:{data:['净值','沪深300'],icon:'rect',itemWidth:14,itemHeight:2.5,bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
+      legend:{data:['净值','沪深300','中证500'],selected:{'净值':true,'沪深300':true,'中证500':false},icon:'rect',itemWidth:14,itemHeight:2.5,bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
       grid:{left:40,right:16,top:16,bottom:36},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',axisLabel:{fontSize:10,color:'#94a3b8'},splitLine:{lineStyle:{color:'#f1f5f9'}}},
@@ -796,7 +830,9 @@ function renderChart(){
             data:[[{xAxis:dates[0]},{xAxis:dates[dates.length-1]}]]}
         },
         {name:'沪深300',type:'line',data:hs300Nav,smooth:true,symbol:'none',color:'#f97316',
-          lineStyle:{width:1,color:'#f97316'}}
+          lineStyle:{width:1,color:'#f97316'}},
+        {name:'中证500',type:'line',data:zz500Nav,smooth:true,symbol:'none',color:'#22c55e',
+          lineStyle:{width:1,color:'#22c55e'}}
       ]
     };
     // 在option上叠加drawdown标记
@@ -1142,12 +1178,23 @@ function renderDrawerChart(accountId,acct,filteredRecs){
     const hs300Drawer=hs300RawD.map(v=>v!=null?v:(firstGoodD||null));
     const baseD=firstGoodD||1;
     const hs300NavD=hs300Drawer.map(v=>v!=null?v/baseD:null);
+    // 中证500归一化
+    let lastVD=null;
+    const zz500RawD=dates.map(d=>{
+      const v=csi500Map&&csi500Map[d]?csi500Map[d]:null;
+      if(v!=null)lastVD=v;
+      return v;
+    });
+    const firstGood5D=zz500RawD.find(v=>v!=null);
+    const zz500Drawer=zz500RawD.map(v=>v!=null?v:(firstGood5D||null));
+    const base5D=firstGood5D||1;
+    const zz500NavD=zz500Drawer.map(v=>v!=null?v/base5D:null);
     const isInvest=acct.account_type==='investment';
     option={
       tooltip:{trigger:'axis',formatter:function(p){
         return p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':d.value.toFixed(3))).join('<br/>');
       }},
-      legend:{data:['净值','沪深300'],icon:'rect',itemWidth:12,itemHeight:2,top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
+      legend:{data:['净值','沪深300','中证500'],selected:{'净值':true,'沪深300':true,'中证500':false},icon:'rect',itemWidth:12,itemHeight:2,top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
       grid:{left:42,right:10,top:18,bottom:28},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8',margin:4},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(1)+'万':v}},
@@ -1158,7 +1205,9 @@ function renderDrawerChart(accountId,acct,filteredRecs){
             data:[[{xAxis:dates[ddStartIdx],label:{show:true,formatter:'最大回撤 '+(maxDd*100).toFixed(2)+'%',fontSize:9,color:'#2563eb',position:'insideTop'}},{xAxis:dates[ddEndIdx]}]]}:undefined
         },
         {name:'沪深300',type:'line',data:hs300NavD,smooth:true,symbol:'none',color:'#f97316',
-          lineStyle:{width:1,color:'#f97316'}}
+          lineStyle:{width:1,color:'#f97316'}},
+        {name:'中证500',type:'line',data:zz500NavD,smooth:true,symbol:'none',color:'#22c55e',
+          lineStyle:{width:1,color:'#22c55e'}}
       ]
     };
   }else{ // return
