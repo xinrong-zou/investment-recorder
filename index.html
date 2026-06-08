@@ -205,10 +205,10 @@
           <button class="chart-range-btn" data-range="3y" onclick="setChartRange('3y')">近3年</button>
           <button class="chart-range-btn" data-range="custom" onclick="setChartRange('custom')">自定义</button>
         </div>
-        <div class="chart-range-custom" id="chartRangeCustom" style="display:none;margin-bottom:6px;"><div style="display:flex;gap:6px;align-items:center;">
-          <input type="date" id="chartRangeStart" onchange="applyChartCustomRange()">
-          <span style="color:var(--text-muted);font-size:0.8rem;">至</span>
-          <input type="date" id="chartRangeEnd" onchange="applyChartCustomRange()">
+        <div id="chartRangeCustom" style="display:none;margin-bottom:6px;">
+          <input type="date" id="chartRangeStart" onchange="applyChartCustomRange()" style="font-size:0.8rem;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);">
+          <span style="color:var(--text-muted);font-size:0.78rem;margin:0 2px;">至</span>
+          <input type="date" id="chartRangeEnd" onchange="applyChartCustomRange()" style="font-size:0.8rem;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);">
           <button class="btn btn-ghost btn-sm" onclick="document.getElementById('chartRangeStart').value='';document.getElementById('chartRangeEnd').value='';setChartRange('all')">✕ 清除</button>
         </div>
         <div id="totalChart" class="chart-area"></div>
@@ -574,13 +574,10 @@ function computeRangeStart(range){
 function setChartRange(range){
   chartRange=range;
   document.querySelectorAll('.chart-range-btn').forEach(b=>b.classList.toggle('active',b.dataset.range===range));
-  if(range==='custom'){
-    $('chartRangeCustom').style.display='flex';
-    renderChart(); // 不设日期范围时展示全部
-  }else{
-    $('chartRangeCustom').style.display='none';
-    renderChart();
-  }
+  $('chartRangeCustom').style.display=range==='custom'?'block':'none';
+  // 重新设置图标实例（避免切换后图表不显示）
+  if(chartInstance){chartInstance.dispose();chartInstance=null;}
+  renderChart();
 }
 function applyChartCustomRange(){
   chartRange='custom';
