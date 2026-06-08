@@ -131,11 +131,8 @@
      .skeleton-row{display:flex;gap:12px;margin-bottom:16px;}
      .skeleton-card{height:56px;flex:1;}
      .skeleton-chart{height:200px;margin-bottom:16px;}
-     .skeleton-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;}
      .skeleton-acct{height:80px;}
-     .pie-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; }
-    .pie-legend-item { display: flex; align-items: center; gap: 4px; font-size: 0.76rem; color: var(--text-secondary); }
-    .pie-legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+     .skeleton-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;}
     /* Drawer filter */
     .drawer-filter { display: flex; gap: 6px; padding: 8px 0; }
     .drawer-filter select, .drawer-filter input { font-size: 0.78rem; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
@@ -550,7 +547,7 @@ function renderChart(){
         if(tf){const net=tf.netIn-tf.netOut;lines.push('当日净'+(net>0?'转入: +¥':'转出: -¥')+Math.abs(net).toLocaleString());}
         return lines.join('<br/>');
       }},
-      legend:{data:['总资产','净投入'],icon:'line',bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
+      legend:{data:['总资产','净投入'],icon:'path://M-4,0L4,0',bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
       grid:{left:55,right:16,top:16,bottom:48},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',axisLabel:{fontSize:10,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(0)+'万':v},splitLine:{lineStyle:{color:'#f1f5f9'}}},
@@ -563,7 +560,7 @@ function renderChart(){
   }else if(chartMode==='nav'){
     option={
       tooltip:{trigger:'axis',valueFormatter:v=>v.toFixed(3)},
-      legend:{data:['净值'],icon:'line',bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
+      legend:{data:['净值'],icon:'path://M-4,0L4,0',bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
       grid:{left:40,right:16,top:16,bottom:36},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',axisLabel:{fontSize:10,color:'#94a3b8'},splitLine:{lineStyle:{color:'#f1f5f9'}}},
@@ -583,7 +580,7 @@ function renderChart(){
   }else{ // return
     option={
       tooltip:{trigger:'axis',valueFormatter:v=>'¥'+(v||0).toLocaleString()},
-      legend:{data:['累计收益'],icon:'line',bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
+      legend:{data:['累计收益'],icon:'path://M-4,0L4,0',bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
       grid:{left:55,right:16,top:16,bottom:36},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',axisLabel:{fontSize:10,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(0)+'万':v},splitLine:{lineStyle:{color:'#f1f5f9'}}},
@@ -616,16 +613,14 @@ function renderPieChart(){
   const colors=['#3b82f6','#059669','#f59e0b','#dc2626','#8b5cf6','#ec4899','#14b8a6','#f97316'];
   pieChartInstance.setOption({
     tooltip:{trigger:'item',formatter:function(p){return p.name+'<br/>'+p.value.toLocaleString('zh-CN',{style:'currency',currency:'CNY',minimumFractionDigits:2})+' ('+p.percent+'%)';}},
+    legend:{data:data.map(d=>d.name),icon:'circle',orient:'vertical',right:10,top:'center',itemWidth:8,itemHeight:8,textStyle:{fontSize:11,color:'#94a3b8'}},
     series:[{
-      type:'pie',radius:['40%','70%'],center:['50%','55%'],
+      type:'pie',radius:['40%','70%'],center:['45%','55%'],
       data:data.map((d,i)=>({...d,itemStyle:{color:colors[i%colors.length]}})),
       label:{show:false},emphasis:{label:{show:true,fontSize:11,fontWeight:'bold'},itemStyle:{shadowBlur:10,shadowOffsetX:0,shadowColor:'rgba(0,0,0,0.2)'}},
       animationDuration:500
     }]
   });
-  const legendEl=el.parentElement.querySelector('.pie-legend')||document.createElement('div');
-  if(!legendEl.parentElement){legendEl.className='pie-legend';el.parentElement.appendChild(legendEl);}
-  legendEl.innerHTML=data.map((d,i)=>'<span class="pie-legend-item"><span class="pie-legend-dot" style="background:'+colors[i%colors.length]+'"></span>'+d.name+'</span>').join('');
   pieChartInstance._resizeHandler=()=>pieChartInstance?.resize();
   window.addEventListener('resize',pieChartInstance._resizeHandler);
 }
@@ -875,7 +870,7 @@ function renderDrawerChart(accountId,acct){
         if(tf){const net=tf.netIn-tf.netOut;lines.push('当日净'+(net>0?'转入: +¥':'转出: -¥')+Math.abs(net).toLocaleString());}
         return lines.join('<br/>');
       }},
-      legend:{data:['余额','净投入'],icon:'line',top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
+      legend:{data:['余额','净投入'],icon:'path://M-4,0L4,0',top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
       grid:{left:30,right:8,top:16,bottom:22},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8'}},
@@ -890,6 +885,7 @@ function renderDrawerChart(accountId,acct){
     const isInvest=acct.account_type==='investment';
     option={
       tooltip:{trigger:'axis',formatter:function(p){const d=p[0];return d.axisValue+'<br/>净值: '+(isNaN(d.value)?'—':d.value.toFixed(3));}},
+      legend:{data:['净值'],icon:'path://M-4,0L4,0',top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
       grid:{left:30,right:8,top:8,bottom:20},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8'}},
@@ -902,6 +898,7 @@ function renderDrawerChart(accountId,acct){
   }else{ // return
     option={
       tooltip:{trigger:'axis',formatter:function(p){const d=p[0];return d.axisValue+'<br/>累计收益: '+(isNaN(d.value)?'—':'¥'+Number(d.value).toFixed(2));}},
+      legend:{data:['累计收益'],icon:'path://M-4,0L4,0',top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
       grid:{left:30,right:8,top:8,bottom:20},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8'}},
