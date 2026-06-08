@@ -25,12 +25,15 @@
     .dash-layout { display: flex; min-height: calc(100vh - 60px); }
     .dash-main { flex: 1; padding: 20px; max-width: 1000px; margin: 0 auto; overflow-y: auto; }
     .summary-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px 20px; margin-bottom: 24px; }
-    .summary-card .row { display: flex; flex-wrap: wrap; gap: 8px 24px; }
-    .summary-card .item { flex: 1; min-width: 90px; }
-    .summary-card .item .num { font-size: 1.1rem; font-weight: 700; color: var(--text); line-height: 1.3; }
+    .summary-card .total-row { margin-bottom: 6px; }
+    .summary-card .total-row .num { font-size: 1.6rem; font-weight: 800; color: var(--text); line-height: 1.2; }
+    .summary-card .total-row .label { font-size: 0.75rem; color: var(--text-muted); }
+    .summary-card .row { display: flex; flex-wrap: wrap; gap: 6px 20px; }
+    .summary-card .item { flex: 1; min-width: 70px; }
+    .summary-card .item .num { font-size: 1rem; font-weight: 700; color: var(--text); white-space: nowrap; }
     .summary-card .item .num.profit { color: #dc2626; }
     .summary-card .item .num.loss { color: #2563eb; }
-    .summary-card .item .label { font-size: 0.7rem; color: var(--text-muted); margin-top: 1px; letter-spacing: 0.3px; }
+    .summary-card .item .label { font-size: 0.68rem; color: var(--text-muted); margin-top: 1px; letter-spacing: 0.3px; }
     .summary-card .item .sub { font-size: 0.65rem; color: var(--text-muted); }
     .account-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px; }
     .account-card { padding: 20px; position: relative; cursor: pointer; transition: border-color 0.15s; }
@@ -92,10 +95,14 @@
     .drawer-actions { display: flex; gap: 6px; padding: 12px 24px; border-bottom: 1px solid var(--border); }
     .drawer-actions .btn { font-size: 0.82rem; padding: 6px 14px; flex: 1; text-align: center; }
     .drawer-body { flex: 1; overflow-y: auto; padding: 16px 24px; }
-    .drawer-summary { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 16px; }
-    .drawer-stat { text-align: center; padding: 8px 4px; background: var(--bg); border-radius: var(--radius-sm); overflow: hidden; }
-    .drawer-stat .v { font-size: 0.95rem; font-weight: 700; overflow-wrap: break-word; word-break: break-all; }
-    .drawer-stat .l { font-size: 0.7rem; color: var(--text-muted); }
+    .drawer-summary { margin-bottom: 12px; }
+    .drawer-summary .total-row { margin-bottom: 4px; }
+    .drawer-summary .total-row .v { font-size: 1.2rem; font-weight: 800; color: var(--text); line-height: 1.2; white-space: nowrap; }
+    .drawer-summary .total-row .l { font-size: 0.68rem; color: var(--text-muted); }
+    .drawer-summary .row { display: flex; gap: 4px; flex-wrap: wrap; }
+    .drawer-summary .stat { flex: 1; min-width: 50px; text-align: center; padding: 4px 2px 0; }
+    .drawer-summary .stat .v { font-size: 0.85rem; font-weight: 700; white-space: nowrap; }
+    .drawer-summary .stat .l { font-size: 0.62rem; color: var(--text-muted); white-space: nowrap; }
     .record-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
     .record-table th { text-align: left; padding: 8px 10px; background: var(--bg-hover); color: var(--text-muted); font-weight: 600; font-size: 0.76rem; border-bottom: 2px solid var(--border); }
     .record-table td { padding: 6px 10px; border-bottom: 1px solid var(--border-light); }
@@ -124,6 +131,8 @@
       .drawer-filter { flex-wrap: nowrap; }
       .drawer-filter select, .drawer-filter input { min-width: 0; flex-shrink: 1; }
       .drawer-filter input[type=date] { width: 80px; }
+      .drawer-summary .total-row .v { font-size: 1rem; }
+      .drawer-summary .stat .v { font-size: 0.78rem; }
       .acct-stats { grid-template-columns: 1fr 1fr; gap: 4px; }
       .acct-stat .val { font-size: 0.88rem; }
       .pie-chart-area { height: 180px; }
@@ -484,12 +493,14 @@ function render(){
   const ddHtml=maxDd<0?`<div class="item"><div class="num loss">${(maxDd*100).toFixed(2)}%</div><div class="label">最大回撤</div><div class="sub">${ddStart} ~ ${ddEnd}</div></div>`:'';
   const xirrHtml=totalXirr!=null&&!isNaN(totalXirr)?`<div class="item"><div class="num ${totalXirr>=0?'profit':'loss'}">${(totalXirr*100).toFixed(2)}%</div><div class="label">年化收益率 <span class="xirr">XIRR</span></div></div>`:'';
   $('summaryRow').innerHTML=`
-    <div class="item"><div class="num">${fmt(totalVal)}</div><div class="label">总资产</div></div>
-    <div class="item"><div class="num ${retColor}">${fmt(totalRet)}</div><div class="label">总收益</div></div>
-    <div class="item"><div class="num ${retColor}">${fmtPct(totalRetPct)}</div><div class="label">总收益率</div></div>
-    <div class="item"><div class="num">${totalNavVal.toFixed(3)}</div><div class="label">总净值</div></div>
-    ${xirrHtml}
-    ${ddHtml}
+    <div class="total-row"><div class="num">${fmt(totalVal)}</div><div class="label">总资产</div></div>
+    <div class="row">
+      <div class="item"><div class="num ${retColor}">${fmt(totalRet)}</div><div class="label">总收益</div></div>
+      <div class="item"><div class="num ${retColor}">${fmtPct(totalRetPct)}</div><div class="label">总收益率</div></div>
+      <div class="item"><div class="num">${totalNavVal.toFixed(3)}</div><div class="label">总净值</div></div>
+      ${xirrHtml}
+      ${ddHtml}
+    </div>
   `;
   const hasHidden=accounts.some(a=>a.hidden);$('showHiddenToggle').style.display=hasHidden?'':'none';
   renderChart();
@@ -902,7 +913,14 @@ async function showRecords(accountId){
   const xirrVal=calcXIRR(allRecs,acct.account_type, calc.currentValue);
   const xirrStr=xirrVal!=null&&!isNaN(xirrVal)?(xirrVal*100).toFixed(2)+'%':'—';
   const xirrColor=xirrVal!=null?(xirrVal>=0?'#dc2626':'#2563eb'):'var(--text-secondary)';
-  $('drawerSummary').innerHTML=`<div class="drawer-stat"><div class="v">${fmt(calc.currentValue)}</div><div class="l">当前资产</div></div><div class="drawer-stat"><div class="v" style="color:${calc.totalReturn>=0?'#dc2626':'#2563eb'}">${fmt(calc.totalReturn)}</div><div class="l">累计收益</div></div><div class="drawer-stat"><div class="v">${calc.nav.toFixed(3)}</div><div class="l">净值</div></div><div class="drawer-stat"><div class="v" style="color:#2563eb">${ddStr}</div><div class="l">最大回撤</div></div><div class="drawer-stat"><div class="v" style="color:${xirrColor}">${xirrStr}</div><div class="l">年化 <span class="xirr">XIRR</span></div></div>`;
+  $('drawerSummary').innerHTML=`
+    <div class="total-row"><div class="v">${fmt(calc.currentValue)}</div><div class="l">当前资产</div></div>
+    <div class="row">
+      <div class="stat"><div class="v" style="color:${calc.totalReturn>=0?'#dc2626':'#2563eb'}">${fmt(calc.totalReturn)}</div><div class="l">累计收益</div></div>
+      <div class="stat"><div class="v">${calc.nav.toFixed(3)}</div><div class="l">净值</div></div>
+      <div class="stat"><div class="v" style="color:#2563eb">${ddStr}</div><div class="l">最大回撤</div></div>
+      <div class="stat"><div class="v" style="color:${xirrColor}">${xirrStr}</div><div class="l">年化 <span class="xirr">XIRR</span></div></div>
+    </div>`;
   // 默认日期范围为最早记录到今日（仅首次打开时设置）
   if(!$('filterDateStart').value){
     const earliest=allRecs.length?allRecs.reduce((a,b)=>a.record_date<b.record_date?a:b).record_date:'';
