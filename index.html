@@ -313,6 +313,7 @@
       <button class="chart-range-btn" data-range="thisYear" onclick="setDrawerRange('thisYear')">今年</button>
       <button class="chart-range-btn" data-range="1y" onclick="setDrawerRange('1y')">近1年</button>
       <button class="chart-range-btn" data-range="3y" onclick="setDrawerRange('3y')">近3年</button>
+      <button class="chart-range-btn" data-range="custom" onclick="setDrawerRange('custom')">自定义</button>
     </div>
     <div id="drawerChart" style="height:140px;margin-bottom:12px;"></div>
     <div class="drawer-filter" id="drawerFilter">
@@ -322,8 +323,8 @@
         <option value="transfer_out">转出</option>
         <option value="revalue">更新市值</option>
       </select>
-      <input type="date" id="filterDateStart" style="display:none;">
-      <input type="date" id="filterDateEnd" style="display:none;">
+      <input type="date" id="filterDateStart" onchange="onDrawerCustomDate()">
+      <input type="date" id="filterDateEnd" onchange="onDrawerCustomDate()">
     </div>
     <h3 style="font-size:0.9rem;margin-bottom:8px;">操作记录</h3>
     <table class="record-table"><thead><tr><th>日期</th><th>类型</th><th>金额</th><th>备注</th></tr></thead><tbody id="drawerRecords"></tbody></table>
@@ -645,11 +646,21 @@ function applyChartCustomRange(){
   renderChart();
 }
 function setDrawerRange(range){
+  if(range==='custom'){
+    $('filterDateStart').focus();
+    return;
+  }
   const start=computeRangeStart(range);
   $('filterDateStart').value=start;
   $('filterDateEnd').value='';
   document.querySelectorAll('#drawerRangeBtns .chart-range-btn').forEach(b=>b.classList.toggle('active',b.dataset.range===range));
   if(drawerAccountId)showRecords(drawerAccountId);
+}
+function onDrawerCustomDate(){
+  if(!drawerAccountId)return;
+  // 清除预设按钮高亮
+  document.querySelectorAll('#drawerRangeBtns .chart-range-btn').forEach(b=>b.classList.remove('active'));
+  showRecords(drawerAccountId);
 }
 function switchChartMode(mode){
   chartMode=mode;
