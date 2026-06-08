@@ -87,10 +87,10 @@
     .drawer-actions { display: flex; gap: 6px; padding: 12px 24px; border-bottom: 1px solid var(--border); }
     .drawer-actions .btn { font-size: 0.82rem; padding: 6px 14px; flex: 1; text-align: center; }
     .drawer-body { flex: 1; overflow-y: auto; padding: 16px 24px; }
-    .drawer-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
-    .drawer-stat { text-align: center; padding: 10px; background: var(--bg); border-radius: var(--radius-sm); }
-    .drawer-stat .v { font-size: 1rem; font-weight: 700; }
-    .drawer-stat .l { font-size: 0.72rem; color: var(--text-muted); }
+    .drawer-summary { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 16px; }
+    .drawer-stat { text-align: center; padding: 8px 4px; background: var(--bg); border-radius: var(--radius-sm); overflow: hidden; }
+    .drawer-stat .v { font-size: 0.95rem; font-weight: 700; overflow-wrap: break-word; word-break: break-all; }
+    .drawer-stat .l { font-size: 0.7rem; color: var(--text-muted); }
     .record-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
     .record-table th { text-align: left; padding: 8px 10px; background: var(--bg-hover); color: var(--text-muted); font-weight: 600; font-size: 0.76rem; border-bottom: 2px solid var(--border); }
     .record-table td { padding: 6px 10px; border-bottom: 1px solid var(--border-light); }
@@ -311,11 +311,18 @@ function calcAccount(acct,records){
   const sorted=[...records].sort((a,b)=>{
     const d=new Date(a.record_date)-new Date(b.record_date);
     if(d!==0)return d;
-    // 同一天按 created_at 排序
     return new Date(a.created_at||0)-new Date(b.created_at||0);
   });
   let cost=0,lastRevalue=null;
-  sorted.forEach(r=>{if(r.action_type==='transfer_in')cost+=Number(r.amount);else if(r.action_type==='transfer_out')cost-=Number(r.amount);else if(r.action_type==='revalue')lastRevalue=Number(r.amount);});
+  sorted.forEach(r=>{
+    if(r.action_type==='transfer_in'){
+      cost+=Number(r.amount);
+      if(lastRevalue!=null)lastRevalue+=Number(r.amount);
+    }else if(r.action_type==='transfer_out'){
+      cost-=Number(r.amount);
+      if(lastRevalue!=null)lastRevalue-=Number(r.amount);
+    }else if(r.action_type==='revalue')lastRevalue=Number(r.amount);
+  });
   const isCash=acct.account_type==='cash',val=isCash?cost:(lastRevalue!=null?lastRevalue:cost),ret=val-cost,retPct=cost>0?(ret/cost)*100:0,nav=cost>0?val/cost:1;
   return {costBasis:cost,currentValue:val,totalReturn:ret,returnPct:retPct,nav};
 }
@@ -816,6 +823,12 @@ async function showRecords(accountId){
   const xirrStr=xirrVal!=null&&!isNaN(xirrVal)?(xirrVal*100).toFixed(2)+'%':'—';
   const xirrColor=xirrVal!=null?(xirrVal>=0?'#dc2626':'#2563eb'):'var(--text-secondary)';
   $('drawerSummary').innerHTML=`<div class="drawer-stat"><div class="v">${fmt(calc.currentValue)}</div><div class="l">当前资产</div></div><div class="drawer-stat"><div class="v" style="color:${calc.totalReturn>=0?'#dc2626':'#2563eb'}">${fmt(calc.totalReturn)}</div><div class="l">累计收益</div></div><div class="drawer-stat"><div class="v">${calc.nav.toFixed(3)}</div><div class="l">净值</div></div><div class="drawer-stat"><div class="v" style="color:#2563eb">${ddStr}</div><div class="l">最大回撤</div></div><div class="drawer-stat"><div class="v" style="color:${xirrColor}">${xirrStr}</div><div class="l">年化 <span class="xirr">XIRR</span></div></div>`;
+  // 默认日期范围为最早记录到今日
+  const allRecs=allRecords[accountId]||[];
+  const earliest=allRecs.length?allRecs.reduce((a,b)=>a.record_date<b.record_date?a:b).record_date:'';
+  const today=new Date();const todayStr=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+  $('filterDateStart').value=earliest;
+  $('filterDateEnd').value=todayStr;
   // 迷你折线图
   renderDrawerChart(accountId,acct);
   const records=allRecords[accountId]||[];const tbody=$('drawerRecords');
