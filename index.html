@@ -144,6 +144,9 @@
       .acct-stats .total-val { font-size: 1rem; }
       .acct-stats .stat .v { font-size: 0.82rem; }
       .acct-stats .row-extra { display: none; }
+      .skeleton-total { height: 36px; }
+      .skeleton-stat { height: 26px; }
+      .skeleton-chart { height: 200px; }
       .pie-chart-area { height: 180px; }
       .empty-guide { padding: 24px 16px; }
       .empty-guide .steps { grid-template-columns: 1fr; gap: 10px; }
@@ -153,9 +156,10 @@
      /* Skeleton screen */
      @keyframes shimmer{0%{background-position:-200px 0}100%{background-position:calc(200px + 100%) 0}}
      .skeleton{background:linear-gradient(90deg,var(--bg-card) 25%,var(--border) 50%,var(--bg-card) 75%);background-size:200px 100%;animation:shimmer 1.5s infinite;border-radius:var(--radius-sm);}
-     .skeleton-row{display:flex;gap:12px;margin-bottom:16px;}
-     .skeleton-card{height:56px;flex:1;}
-     .skeleton-chart{height:200px;margin-bottom:16px;}
+     .skeleton-row{display:flex;gap:10px;margin-bottom:10px;}
+     .skeleton-total{height:48px;}
+     .skeleton-stat{height:32px;flex:1;}
+     .skeleton-chart{height:260px;margin-bottom:16px;}
      .skeleton-acct{height:80px;}
      .skeleton-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;}
     /* Drawer filter */
@@ -192,7 +196,8 @@
 
     <div id="dashContent" style="display:none;">
       <div id="dashSkeleton">
-        <div class="skeleton-row"><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div></div>
+        <div class="skeleton skeleton-total" style="margin-bottom:12px;"></div>
+        <div class="skeleton-row"><div class="skeleton skeleton-stat"></div><div class="skeleton skeleton-stat"></div><div class="skeleton skeleton-stat"></div><div class="skeleton skeleton-stat"></div><div class="skeleton skeleton-stat"></div></div>
         <div class="skeleton skeleton-chart"></div>
         <div class="skeleton-grid"><div class="skeleton skeleton-acct"></div><div class="skeleton skeleton-acct"></div><div class="skeleton skeleton-acct"></div></div>
       </div>
