@@ -72,12 +72,12 @@
       赞助后可获得 <strong>Pro 会员</strong>（在备注中填写你的注册邮箱即可自动到账）。
     </p>
     <p style="margin-bottom:16px;">
-      <a class="donate-btn primary" id="donateLink" href="https://ifdian.net/a/ashoredove" target="_blank">
+      <a class="donate-btn primary" id="donateLink" href="https://ifdian.net/order/create?plan_id=c1cea0ee615411f1a4bf52540025c377&product_type=0&remark=&affiliate_code=" target="_blank">
         ❤️ 前往爱发电赞助
       </a>
     </p>
     <p id="donateHint" style="font-size:0.78rem;color:var(--text-muted);display:none;">
-      💡 已自动填入你的邮箱，提交订单时确认备注中包含即可
+      💡 备注中已自动填入你的邮箱，提交订单即可自动到账
     </p>
   </div>
 
@@ -104,7 +104,7 @@ mountNavBar('#nav-app');
     'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiIsInJlZiI6InNwYi1jbDluMThpb2YwaTlxeGpoIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA2NjgzNzQsImV4cCI6MjA5NjI0NDM3NH0.t8MDF4zdvV9kpUz-gZpVM-OgFlAow8FlENASpqkUkwk'
   ).auth.getSession();
   if (session?.user?.email) {
-    const url = 'https://ifdian.net/a/ashoredove?remark=' + encodeURIComponent(session.user.email);
+    const url = 'https://ifdian.net/order/create?plan_id=c1cea0ee615411f1a4bf52540025c377&product_type=0&remark=' + encodeURIComponent(session.user.email) + '&affiliate_code=';
     document.getElementById('donateLink').href = url;
     document.getElementById('donateHint').style.display = 'block';
   }
