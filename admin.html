@@ -116,7 +116,7 @@
   const SUPABASE_ANON_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiIsInJlZiI6InNwYi1jbDluMThpb2YwaTlxeGpoIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA2NjgzNzQsImV4cCI6MjA5NjI0NDM3NH0.t8MDF4zdvV9kpUz-gZpVM-OgFlAow8FlENASpqkUkwk';
   const client = window.__supabaseClient || supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   if (!window.__supabaseClient) window.__supabaseClient = client;
-  const ADMIN_EMAILS = ['384402473@qq.com'];
+  const ADMIN_EMAILS = []; // 管理员验证由Worker通过auth/v1/user完成
   let currentUser = null;
 
   mountNavBar('#nav-app');
@@ -143,7 +143,15 @@
     const email = currentUser.email || '';
     document.getElementById('adminEmail').textContent = email;
 
-    if (!ADMIN_EMAILS.includes(email)) {
+    // 通过Worker验证管理员身份（auth/v1/user验签）
+    try {
+      const testReq = await fetch('/api/admin/users', {
+        headers: { 'Authorization': 'Bearer ' + session.access_token }
+      });
+      if (!testReq.ok) throw new Error('not admin');
+      const testData = await testReq.json();
+      if (!testData.users) throw new Error('not admin');
+    } catch(e) {
       document.getElementById('notAdmin').style.display = 'block';
       return;
     }
@@ -219,7 +227,7 @@
           <td>${acctCountByUser[u.id]||0}</td>
           <td>${recCountByUser[u.id]||0}</td>
           <td>${u.plan==='pro'?'<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:0.72rem;font-weight:500;background:#fef3c7;color:#d97706;">Pro</span>':'<span style="color:var(--text-muted);font-size:0.78rem;">free</span>'}</td>
-          <td>${u.email && ADMIN_EMAILS.includes(u.email) ? '<span style="color:var(--primary);font-weight:600;">管理员</span>' : '用户'}</td>
+          <td>${u.email === currentUser?.email ? '<span style="color:var(--primary);font-weight:600;">管理员</span>' : '用户'}</td>
         </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">暂无数据</td></tr>';
     } catch(e) {
       document.getElementById('adminUserList').innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);text-align:center;">加载失败: ' + e.message + '</td></tr>';

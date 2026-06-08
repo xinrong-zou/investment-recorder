@@ -3,7 +3,8 @@
 (function() {
   const SUPABASE_URL = 'https://spb-cl9n18iof0i9qxjh.supabase.opentrust.net';
   const SUPABASE_ANON_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiIsInJlZiI6InNwYi1jbDluMThpb2YwaTlxeGpoIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA2NjgzNzQsImV4cCI6MjA5NjI0NDM3NH0.t8MDF4zdvV9kpUz-gZpVM-OgFlAow8FlENASpqkUkwk';
-  const ADMIN_EMAILS = ['384402473@qq.com'];
+  const ADMIN_EMAILS = []; // Worker验证
+  const ADMIN_CHECK_CACHE = {}; // 缓存管理员状态
 
   if (typeof Vue === 'undefined') return;
 
@@ -31,6 +32,7 @@
         expiresAt: null,
         client: window.__supabaseClient,
         initializing: true,
+        _isAdmin: false,
       };
     },
     computed: {
@@ -39,7 +41,7 @@
         return this.user.email.charAt(0).toUpperCase();
       },
       isPro() { return this.plan === 'pro'; },
-      isAdmin() { return this.user?.email && ADMIN_EMAILS.includes(this.user.email); },
+      isAdmin() { return this._isAdmin; },
       proExpires() {
         if (!this.expiresAt) return '';
         const d = new Date(this.expiresAt);
@@ -67,6 +69,7 @@
             this.user = session.user;
             this.initializing = false; // 立即显示头像，不等plan加载
             this.fetchPlan();           // plan异步加载，到了再更新徽章
+            this.checkAdmin();          // 异步验证管理员
           } else {
             this.initializing = false;
           }
@@ -96,6 +99,17 @@
             this.expiresAt = data.expires_at || null;
           }
         } catch(e) {}
+      },
+      async checkAdmin() {
+        if (!this.client || !this.user) return;
+        try {
+          const { data: { session } } = await this.client.auth.getSession();
+          if (!session) return;
+          const req = await fetch('/api/admin/users', {
+            headers: { 'Authorization': 'Bearer ' + session.access_token }
+          });
+          this._isAdmin = req.ok;
+        } catch(e) { this._isAdmin = false; }
       },
       async logout() {
         this.showMenu = false;
