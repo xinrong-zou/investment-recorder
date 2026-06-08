@@ -118,6 +118,8 @@
     .tag-revalue { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 500; background: #f8fafc; color: #64748b; }
     .show-hidden { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-muted); cursor: pointer; margin-left: 12px; }
     .show-hidden:hover { color: var(--text); }
+    .eye-btn { background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:0.9rem;padding:2px 6px;color:var(--text-muted);line-height:1;margin-left:8px;vertical-align:middle; }
+    .eye-btn:hover { border-color:var(--primary);color:var(--text); }
     .auth-prompt { text-align: center; padding: 80px 20px; }
     .auth-prompt h1 { font-size: 1.8rem; margin-bottom: 8px; }
     .auth-prompt p { color: var(--text-muted); margin-bottom: 20px; }
@@ -362,7 +364,7 @@ const client=window.__supabaseClient||supabase.createClient(SUPABASE_URL,SUPABAS
 if(!window.__supabaseClient)window.__supabaseClient=client;
 
 let currentUser=null,accounts=[],allRecords={},settings=null,showHidden=false;
-let chartInstance=null,drawerAccountId=null,chartMode='assets',drawerChartMode='assets',csi300Map=null,chartRange='all';
+let chartInstance=null,drawerAccountId=null,chartMode='assets',drawerChartMode='assets',csi300Map=null,chartRange='all',privacyMode=false;
 // 内存缓存
 const queryCache={};
 function cachedQuery(key,fn){
@@ -370,6 +372,7 @@ function cachedQuery(key,fn){
   return fn().then(r=>{queryCache[key]=r;return r;});
 }
 function clearCache(){for(const k in queryCache)delete queryCache[k];}
+function fmtS(v){return privacyMode?'******':fmt(v);}
 
 const $=id=>document.getElementById(id);
 function fmt(n){return n==null?'—':'¥'+Number(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
@@ -537,10 +540,10 @@ function render(){
     html+=`<div class="account-card card" onclick="showRecords('${a.id}')">
       <div class="acct-header"><span class="acct-name">${a.name}${hiddenLabel}${warnBadge}</span><span class="acct-type ${isCash?'type-cash':'type-investment'}">${isCash?'现金':'投资'}</span></div>
       <div class="acct-stats">
-        <div class="total-val">${fmt(calc.currentValue)}</div>
+        <div class="total-val">${fmtS(calc.currentValue)}</div>
         <div class="total-lbl">当前资产</div>
         <div class="row-main">
-          <div class="stat"><div class="v" style="color:${retColor}">${fmt(calc.totalReturn)}</div><div class="l">累计收益</div></div>
+          <div class="stat"><div class="v" style="color:${retColor}">${fmtS(calc.totalReturn)}</div><div class="l">累计收益</div></div>
           <div class="stat"><div class="v" style="color:${xirrColor}">${xirrStr}</div><div class="l">年化 XIRR</div></div>
         </div>
         <div class="row-extra">
@@ -579,9 +582,9 @@ function render(){
   const ddHtml=maxDd<0?`<div class="stat"><div class="v loss">${(maxDd*100).toFixed(2)}%</div><div class="l">最大回撤</div><div class="sub">${ddStart} ~ ${ddEnd}</div></div>`:'';
   const xirrHtml=totalXirr!=null&&!isNaN(totalXirr)?`<div class="stat"><div class="v ${totalXirr>=0?'profit':'loss'}">${(totalXirr*100).toFixed(2)}%</div><div class="l">年化 <span class="xirr">XIRR</span></div></div>`:'';
   $('summaryRow').innerHTML=`
-    <div class="total-row"><div class="v">${fmt(totalVal)}</div><div class="l">总资产</div></div>
+    <div class="total-row"><div class="v">${fmtS(totalVal)} <button class="eye-btn" onclick="togglePrivacy()" title="切换隐私模式">${privacyMode?'👁':'🙈'}</button></div><div class="l">总资产</div></div>
     <div class="sub-row">
-      <div class="stat"><div class="v ${retColor}">${fmt(totalRet)}</div><div class="l">累计收益</div></div>
+      <div class="stat"><div class="v ${retColor}">${fmtS(totalRet)}</div><div class="l">累计收益</div></div>
       <div class="stat"><div class="v ${retColor}">${fmtPct(totalRetPct)}</div><div class="l">总收益率</div></div>
       <div class="stat"><div class="v">${totalNavVal.toFixed(3)}</div><div class="l">净值</div></div>
       ${xirrHtml}
@@ -847,6 +850,7 @@ function renderPieChart(){
 }
 
 // ====== 账户操作 ======
+function togglePrivacy(){privacyMode=!privacyMode;render();}
 function toggleHidden(){showHidden=$('showHiddenCheck').checked;render();}
 async function hideAccount(id){await client.from('investment_accounts').update({hidden:true}).eq('id',id);toast('已隐藏','success');await loadData();}
 async function unhideAccount(id){await client.from('investment_accounts').update({hidden:false}).eq('id',id);toast('已取消隐藏','success');await loadData();}
@@ -1007,9 +1011,9 @@ async function showRecords(accountId){
   const xirrStr=xirrVal!=null&&!isNaN(xirrVal)?(xirrVal*100).toFixed(2)+'%':'—';
   const xirrColor=xirrVal!=null?(xirrVal>=0?'#dc2626':'#2563eb'):'var(--text-secondary)';
   $('drawerSummary').innerHTML=`
-    <div class="total-row"><div class="v">${fmt(calc.currentValue)}</div><div class="l">当前资产</div></div>
+    <div class="total-row"><div class="v">${fmtS(calc.currentValue)}</div><div class="l">当前资产</div></div>
     <div class="row">
-      <div class="stat"><div class="v" style="color:${calc.totalReturn>=0?'#dc2626':'#2563eb'}">${fmt(calc.totalReturn)}</div><div class="l">累计收益</div></div>
+      <div class="stat"><div class="v" style="color:${calc.totalReturn>=0?'#dc2626':'#2563eb'}">${fmtS(calc.totalReturn)}</div><div class="l">累计收益</div></div>
       <div class="stat"><div class="v" style="color:${xirrColor}">${xirrStr}</div><div class="l">年化 <span class="xirr">XIRR</span></div></div>
       <div class="stat"><div class="v">${calc.nav.toFixed(3)}</div><div class="l">净值</div></div>
       <div class="stat"><div class="v" style="color:#2563eb">${ddStr}</div><div class="l">最大回撤</div></div>
@@ -1328,64 +1332,68 @@ function exportData(){
 }
 // ====== 分享快照图 ======
 function shareSnapshot(){
-  const c=document.createElement('canvas');c.width=540;c.height=720;
+  const c=document.createElement('canvas');c.width=540;c.height=800;
   const ctx=c.getContext('2d');
-  // 背景
-  const bg=ctx.createLinearGradient(0,0,540,720);
-  bg.addColorStop(0,'#1e293b');bg.addColorStop(1,'#0f172a');
-  ctx.fillStyle=bg;ctx.fillRect(0,0,540,720);
-  // 卡片层
-  ctx.fillStyle='rgba(255,255,255,0.06)';
-  // 圆角矩形（兼容写法）
+  // 背景渐变
+  const bg=ctx.createLinearGradient(0,0,540,800);
+  bg.addColorStop(0,'#1e293b');bg.addColorStop(0.5,'#1a2332');bg.addColorStop(1,'#0f172a');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,540,800);
+  // 装饰圆
+  ctx.fillStyle='rgba(59,130,246,0.06)';ctx.beginPath();ctx.arc(480,40,200,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(245,158,11,0.04)';ctx.beginPath();ctx.arc(60,760,160,0,Math.PI*2);ctx.fill();
+  // 圆角矩形
   const rr=(x,y,w,h,r)=>{ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();};
-  rr(24,24,492,672,16);ctx.fill();
-  // 标题
-  ctx.fillStyle='#94a3b8';ctx.font='14px sans-serif';ctx.textAlign='center';
+  rr(24,24,492,752,16);ctx.fillStyle='rgba(255,255,255,0.05)';ctx.fill();
+  // 标题区
+  ctx.fillStyle='#f8fafc';ctx.font='bold 18px sans-serif';ctx.textAlign='center';
   ctx.fillText('📊 收益账本',270,58);
+  ctx.fillStyle='#64748b';ctx.font='12px sans-serif';
+  ctx.fillText('个人投资理财追踪工具',270,78);
   // 分隔线
-  ctx.strokeStyle='rgba(148,163,184,0.2)';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(48,76);ctx.lineTo(492,76);ctx.stroke();
+  ctx.strokeStyle='rgba(148,163,184,0.15)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(48,94);ctx.lineTo(492,94);ctx.stroke();
   // 计算数据
   let tv=0,tc=0;
   accounts.forEach(a=>{const c2=calcAccount(a,allRecords[a.id]||[]);tv+=c2.currentValue;tc+=c2.costBasis;});
   const tr=tv-tc,trPct=tc>0?(tr/tc)*100:0,nav=tc>0?tv/tc:1;
   const allF=[];accounts.forEach(a=>{(allRecords[a.id]||[]).forEach(r=>allF.push(r));});
   const xirr=calcXIRR(allF,'investment',tv);
-  const fmtN=v=>'¥'+Math.abs(v).toLocaleString('zh-CN',{minimumFractionDigits:2});
+  const fmtN=v=>privacyMode?'******':'¥'+Math.abs(v).toLocaleString('zh-CN',{minimumFractionDigits:2});
   const clr=n=>n>=0?'#dc2626':'#2563eb';
+  const today=new Date();const ds=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
   // 总资产
-  ctx.fillStyle='#f8fafc';ctx.font='bold 32px sans-serif';ctx.textAlign='left';
-  ctx.fillText(fmtN(tv),48,128);
+  ctx.fillStyle='#f8fafc';ctx.font='bold 36px sans-serif';ctx.textAlign='left';
+  const tvStr=privacyMode?'******':fmtN(tv);
+  ctx.fillText(tvStr,48,140);
   ctx.fillStyle='#94a3b8';ctx.font='13px sans-serif';
-  ctx.fillText('总资产',48,152);
+  ctx.fillText('总资产',48,166);
   // 收益率
   ctx.textAlign='right';
-  ctx.fillStyle=clr(tr);ctx.font='bold 22px sans-serif';
-  ctx.fillText((tr>=0?'+':'')+trPct.toFixed(2)+'%',492,120);
+  ctx.fillStyle=clr(tr);ctx.font='bold 24px sans-serif';
+  ctx.fillText((tr>=0?'+':'')+trPct.toFixed(2)+'%',492,134);
   ctx.fillStyle='#94a3b8';ctx.font='13px sans-serif';
-  ctx.fillText('总收益率',492,152);
-  // 指标行
+  ctx.fillText('总收益率',492,166);
+  // 三指标行
   const metrics=[
-    {label:'累计收益',val:fmtN(tr),color:clr(tr)},
+    {label:'累计收益',val:privacyMode?'******':fmtN(tr),color:clr(tr)},
     {label:'净值',val:nav.toFixed(3),color:'#f8fafc'},
     {label:'年化 XIRR',val:xirr!=null?(xirr>=0?'+':'')+(xirr*100).toFixed(2)+'%':'—',color:xirr!=null?clr(xirr):'#94a3b8'},
   ];
-  const mY=200;const mW=492/3;
+  const mY=210;const mW=492/3;
   metrics.forEach((m,i)=>{
     ctx.textAlign='center';
-    ctx.fillStyle=m.color;ctx.font='bold 18px sans-serif';
+    ctx.fillStyle=m.color;ctx.font='bold 19px sans-serif';
     ctx.fillText(m.val,48+mW*i+mW/2,mY);
     ctx.fillStyle='#94a3b8';ctx.font='12px sans-serif';
     ctx.fillText(m.label,48+mW*i+mW/2,mY+22);
-    if(i<metrics.length-1){ctx.strokeStyle='rgba(148,163,184,0.15)';ctx.beginPath();ctx.moveTo(48+mW*(i+1),mY-12);ctx.lineTo(48+mW*(i+1),mY+32);ctx.stroke();}
+    if(i<metrics.length-1){ctx.strokeStyle='rgba(148,163,184,0.12)';ctx.beginPath();ctx.moveTo(48+mW*(i+1),mY-14);ctx.lineTo(48+mW*(i+1),mY+30);ctx.stroke();}
   });
-  // 分隔线
-  ctx.strokeStyle='rgba(148,163,184,0.15)';
-  ctx.beginPath();ctx.moveTo(48,252);ctx.lineTo(492,252);ctx.stroke();
+  // 分隔
+  ctx.strokeStyle='rgba(148,163,184,0.12)';ctx.beginPath();ctx.moveTo(48,260);ctx.lineTo(492,260);ctx.stroke();
   // 账户列表
   ctx.fillStyle='#94a3b8';ctx.font='14px sans-serif';ctx.textAlign='left';
-  ctx.fillText('账户概览',48,278);
-  let aY=296;
+  ctx.fillText('账户概览',48,288);
+  let aY=306;
   const visible=accounts.filter(a=>showHidden||!a.hidden);
   visible.forEach((a,i)=>{
     if(aY>640)return;
@@ -1394,24 +1402,40 @@ function shareSnapshot(){
     ctx.fillStyle='#f8fafc';ctx.font='15px sans-serif';
     ctx.fillText(a.name,48,aY);
     ctx.textAlign='right';
-    ctx.fillStyle=clr(r2);ctx.font='bold 15px sans-serif';
-    ctx.fillText((r2>=0?'+':'')+fmtN(r2)+' ('+(c2.costBasis>0?((r2/c2.costBasis)*100).toFixed(1):'0.0')+'%)',492,aY);
+    ctx.fillStyle=clr(r2);
+    const r2Str=privacyMode?'******':(r2>=0?'+':'')+fmtN(r2);
+    ctx.font='bold 15px sans-serif';
+    ctx.fillText(r2Str+' ('+(c2.costBasis>0?((r2/c2.costBasis)*100).toFixed(1):'0.0')+'%)',492,aY);
     ctx.textAlign='left';
     ctx.fillStyle='#64748b';ctx.font='12px sans-serif';
-    ctx.fillText('市值: '+fmtN(c2.currentValue)+' | 投入: '+fmtN(c2.costBasis),48,aY+18);
+    const mvStr=privacyMode?'******':fmtN(c2.currentValue);
+    const cbStr=privacyMode?'******':fmtN(c2.costBasis);
+    ctx.fillText('市值: '+mvStr+' | 投入: '+cbStr,48,aY+18);
     aY+=44;
   });
-  // 底部
-  ctx.strokeStyle='rgba(148,163,184,0.15)';
-  ctx.beginPath();ctx.moveTo(48,680);ctx.lineTo(492,680);ctx.stroke();
+  // 底部：二维码 + 标语
+  ctx.strokeStyle='rgba(148,163,184,0.12)';ctx.beginPath();ctx.moveTo(48,700);ctx.lineTo(492,700);ctx.stroke();
   ctx.fillStyle='#64748b';ctx.font='12px sans-serif';ctx.textAlign='center';
-  const today=new Date();const ds=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
-  ctx.fillText('数据截至 '+ds+' · 通过 收益账本 记录',270,698);
-  // 下载
-  c.toBlob(blob=>{
-    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='收益账本_'+ds+'.png';a.click();
-    URL.revokeObjectURL(a.href);toast('快照已保存','success');
-  },'image/png');
+  ctx.fillText('数据截至 '+ds+' · 扫码使用收益账本',270,724);
+  // 加载二维码
+  const img=new Image();
+  img.crossOrigin='anonymous';
+  img.onload=function(){
+    ctx.drawImage(img,220,736,100,100);
+    // 下载
+    c.toBlob(blob=>{
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='收益账本_'+ds+'.png';a.click();
+      URL.revokeObjectURL(a.href);toast('快照已保存','success');
+    },'image/png');
+  };
+  img.onerror=function(){
+    // 二维码加载失败，直接下载
+    c.toBlob(blob=>{
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='收益账本_'+ds+'.png';a.click();
+      URL.revokeObjectURL(a.href);toast('快照已保存','success');
+    },'image/png');
+  };
+  img.src='https://api.qrserver.com/v1/create-qr-code/?size=100&data=https://qyit.eu.org';
 }
 
 window.addEventListener('open-settings',()=>{});
