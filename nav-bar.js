@@ -15,6 +15,21 @@
     } catch(e) {}
   }
 
+  // 全局 Toast（所有页面共享，nav-bar.js 已加载到每个页面）
+  if (!window.__toastContainer) {
+    window.__toastContainer = document.createElement('div');
+    window.__toastContainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:2000;display:flex;flex-direction:column;gap:6px;pointer-events:none;';
+    document.body.appendChild(window.__toastContainer);
+  }
+  window.toast = function(text, type = 'info') {
+    const el = document.createElement('div');
+    const colors = { success: '#059669', error: '#dc2626', warning: '#d97706', info: '#3b82f6' };
+    el.style.cssText = `background:var(--bg-card);border:1px solid var(--border);border-left:4px solid ${colors[type]||colors.info};border-radius:var(--radius-sm);padding:10px 16px;font-size:0.85rem;color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,0.1);pointer-events:auto;max-width:360px;animation:slideIn 0.2s;`;
+    el.textContent = text;
+    window.__toastContainer.appendChild(el);
+    setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }, 3000);
+  };
+
   const NavBar = {
     props: {
       title: { type: String, default: '收益记录器' },

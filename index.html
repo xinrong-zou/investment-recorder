@@ -6,7 +6,7 @@
   <title>收益记录器 - 投资看板</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     .dash-layout { display: flex; min-height: calc(100vh - 60px); }
@@ -223,7 +223,6 @@ let currentUser=null,accounts=[],allRecords={},settings=null,showHidden=false;
 let chartInstance=null,drawerAccountId=null,chartMode='assets',drawerChartMode='assets';
 
 const $=id=>document.getElementById(id);
-function toast(text,type='info'){const c=$('toastContainer'),el=document.createElement('div');el.className='toast toast-'+type;el.textContent=text;c.appendChild(el);setTimeout(()=>el.remove(),3000);}
 function fmt(n){return n==null?'—':'¥'+Number(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtPct(n){return n==null?'—':(n>=0?'+':'')+Number(n).toFixed(2)+'%';}
 function openModal(id){$(id).classList.add('open');}
