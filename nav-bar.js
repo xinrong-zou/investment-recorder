@@ -143,7 +143,7 @@
                       <div class="dropdown-email">{{ user.email }}</div>
                       <div class="dropdown-plan-row">
                         <span :class="'plan-badge ' + (isPro ? 'plan-pro' : 'plan-free')">
-                          {{ isPro ? 'Pro 会员' : '免费用户' }}
+                          {{ isPro ? '赞助用户' : '访客' }}
                         </span>
                         <span v-if="isPro && expiresAt" class="dropdown-expires">
                           到期 {{ proExpires }}

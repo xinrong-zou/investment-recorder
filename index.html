@@ -7,6 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     .dash-layout { display: flex; min-height: calc(100vh - 60px); }
     .dash-main { flex: 1; padding: 20px; max-width: 1000px; margin: 0 auto; overflow-y: auto; }
@@ -131,6 +132,7 @@
             <input type="checkbox" id="showHiddenCheck" onchange="toggleHidden()"> 显示已隐藏
           </label>
           <button class="btn btn-primary btn-sm" onclick="openAddAccount()">+ 新建账户</button>
+          <button class="btn btn-ghost btn-sm" style="margin-left:4px;" onclick="exportData()">📥 导出</button>
         </div>
       </div>
 
@@ -464,7 +466,7 @@ async function getUserPlan(){
     return data?.plan||'free';
   }catch(e){return 'free';}
 }
-// 检查账户是否因超限而冻结（会员到期后超出免费限额的账户不可操作）
+// 检查账户是否因超限而冻结（赞助到期后超出免费限额的账户不可操作）
 function isFrozenAccount(accountId){
   const sorted=[...accounts].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
   let cashCount=0,investCount=0;
@@ -487,7 +489,7 @@ async function saveAccount(){
     const cashCount=accounts.filter(a=>a.account_type==='cash').length;
     const investCount=accounts.filter(a=>a.account_type==='investment').length;
     if(type==='cash'&&cashCount>=1){toast('免费用户只能拥有1个现金账户','error');return;}
-    if(type==='investment'&&investCount>=5){toast('免费用户最多5个投资账户，升级Pro可解锁无限','error');return;}
+    if(type==='investment'&&investCount>=5){toast('免费用户最多5个投资账户，赞助后可解锁无限','error');return;}
   }
   const{error}=await client.from('investment_accounts').insert({user_id:currentUser.id,name,account_type:type});
   if(error){toast(error.message,'error');return;}closeModal('accountModal');toast('账户已创建','success');await loadData();
@@ -820,6 +822,43 @@ function drawerAction(type){
   const id=drawerAccountId;
   if(!id){toast('请先选择账户','error');return;}
   openRecord(id,type); // 不关闭抽屉，弹窗浮在抽屉上方
+}
+
+// ====== 导出 Excel ======
+function exportData(){
+  if(!accounts.length){toast('没有数据可导出','error');return;}
+  try{
+    const rows=[];
+    // 表头
+    const header=['账户名称','账户类型','日期','操作类型','金额','备注'];
+    // 数据行
+    accounts.forEach(a=>{
+      const recs=allRecords[a.id]||[];
+      if(recs.length===0){
+        rows.push({账户名称:a.name,账户类型:a.account_type==='cash'?'现金':'投资',日期:'',操作类型:'',金额:'',备注:''});
+      }else{
+        recs.sort((x,y)=>new Date(y.record_date)-new Date(x.record_date)).forEach(r=>{
+          const tl=r.action_type==='transfer_in'?'转入':r.action_type==='transfer_out'?'转出':'更新市值';
+          rows.push({
+            账户名称:a.name,
+            账户类型:a.account_type==='cash'?'现金':'投资',
+            日期:r.record_date,
+            操作类型:tl,
+            金额:Number(r.amount).toFixed(2),
+            备注:r.note||''
+          });
+        });
+      }
+    });
+    const ws=XLSX.utils.json_to_sheet(rows,{header});
+    ws['!cols']=[{wch:12},{wch:8},{wch:12},{wch:8},{wch:12},{wch:20}];
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'收益记录');
+    const now=new Date();
+    const fn='收益记录_'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'.xlsx';
+    XLSX.writeFile(wb,fn);
+    toast('已导出 '+fn,'success');
+  }catch(e){toast('导出失败: '+e.message,'error');}
 }
 
 window.addEventListener('open-settings',()=>{});

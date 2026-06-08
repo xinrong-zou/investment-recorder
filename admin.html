@@ -53,7 +53,7 @@
       <h3>管理</h3>
       <a class="nav-item active" data-tab="overview" onclick="switchTab('overview')">📊 概览</a>
       <a class="nav-item" data-tab="users" onclick="switchTab('users');loadUsers()">👥 用户管理</a>
-      <a class="nav-item" data-tab="subscriptions" onclick="switchTab('subscriptions');loadSubscriptions()">⭐ 会员管理</a>
+      <a class="nav-item" data-tab="subscriptions" onclick="switchTab('subscriptions');loadSubscriptions()">🎗️ 赞助管理</a>
       <a class="nav-item" data-tab="settings" onclick="switchTab('settings')">⚙️ 设置</a>
     </div>
   </aside>
@@ -70,7 +70,7 @@
       <div style="overflow-x:auto;">
         <table class="admin-table">
           <thead><tr>
-            <th>邮箱</th><th>注册时间</th><th>账户数</th><th>总记录数</th><th>计划</th><th>角色</th>
+            <th>邮箱</th><th>注册时间</th><th>账户数</th><th>总记录数</th><th>状态</th><th>角色</th>
           </tr></thead>
           <tbody id="adminUserList"></tbody>
         </table>
@@ -81,11 +81,11 @@
     <!-- 会员管理 -->
     <div class="tab-content" id="tab-subscriptions">
       <h1>⭐ 会员管理</h1>
-      <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px;">授予或撤销用户的Pro会员，操作通过Worker执行</p>
+      <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px;">管理用户的赞助状态，仅管理员可操作</p>
       <div style="overflow-x:auto;">
         <table class="admin-table">
           <thead><tr>
-            <th>邮箱</th><th>注册时间</th><th>当前计划</th><th>到期时间</th><th>操作</th>
+            <th>邮箱</th><th>注册时间</th><th>赞助状态</th><th>到期时间</th><th>操作</th>
           </tr></thead>
           <tbody id="subMgmtList"></tbody>
         </table>
@@ -226,7 +226,7 @@
           <td>${u.created_at ? u.created_at.substring(0,10) : '—'}</td>
           <td>${acctCountByUser[u.id]||0}</td>
           <td>${recCountByUser[u.id]||0}</td>
-          <td>${u.plan==='pro'?'<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:0.72rem;font-weight:500;background:#fef3c7;color:#d97706;">Pro</span>':'<span style="color:var(--text-muted);font-size:0.78rem;">free</span>'}</td>
+          <td>${u.plan==='pro'?'<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:0.72rem;font-weight:500;background:#fef3c7;color:#d97706;">已赞助</span>':'<span style="color:var(--text-muted);font-size:0.78rem;">—</span>'}</td>
           <td>${u.email === currentUser?.email ? '<span style="color:var(--primary);font-weight:600;">管理员</span>' : '用户'}</td>
         </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">暂无数据</td></tr>';
     } catch(e) {
@@ -253,11 +253,11 @@
         const isPro = u.plan === 'pro';
         const expires = u.expires_at ? new Date(u.expires_at).toLocaleDateString('zh-CN') : '—';
         const planTag = isPro
-          ? '<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:0.72rem;font-weight:500;background:#fef3c7;color:#d97706;">Pro</span>'
+          ? '<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:0.72rem;font-weight:500;background:#fef3c7;color:#d97706;">已赞助</span>'
           : '<span style="color:var(--text-muted);font-size:0.78rem;">free</span>';
         const actionBtn = isPro
-          ? `<button class="btn btn-ghost btn-sm" onclick="setSubscription('${u.email}','revoke')">撤销Pro</button>`
-          : `<button class="btn btn-primary btn-sm" onclick="setSubscription('${u.email}','grant')">设为Pro</button>`;
+          ? `<button class="btn btn-ghost btn-sm" onclick="setSubscription('${u.email}','revoke')">取消赞助</button>`
+          : `<button class="btn btn-primary btn-sm" onclick="setSubscription('${u.email}','grant')">设为赞助</button>`;
         return `<tr>
           <td>${escapeHtml(u.email||'?')}</td>
           <td>${(u.created_at||'').substring(0,10)}</td>
@@ -275,7 +275,7 @@
   window.setSubscription = async function(email, action) {
     const resultDiv = document.getElementById('subMgmtResult');
     resultDiv.style.display = 'block';
-    resultDiv.textContent = action === 'grant' ? '正在授予 ' + email + ' Pro...' : '正在撤销 ' + email + ' Pro...';
+    resultDiv.textContent = action === 'grant' ? '正在设为赞助 ' + email + ' Pro...' : '正在取消赞助 ' + email + ' Pro...';
     try {
       const session = (await client.auth.getSession()).data.session;
       if (!session) throw new Error('未登录');
@@ -287,7 +287,7 @@
       const data = await req.json();
       if (data.ok) {
         resultDiv.style.background = '#d4edda'; resultDiv.style.color = '#155724';
-        resultDiv.textContent = '✅ ' + email + ' → ' + (data.plan === 'pro' ? 'Pro会员已开通!' : '已取消Pro');
+        resultDiv.textContent = '✅ ' + email + ' → ' + (data.plan === 'pro' ? '赞助已生效!' : '已取消赞助');
         loadSubscriptions();
       } else {
         throw new Error(data.error || '操作失败');
