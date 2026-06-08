@@ -164,18 +164,32 @@
     try {
       const session = (await client.auth.getSession()).data.session;
       if (!session) throw new Error('未登录');
-      const req = await fetch('/api/admin/users', {
-        headers: { 'Authorization': 'Bearer ' + session.access_token }
-      });
-      if (!req.ok) throw new Error('请求失败 ' + req.status);
-      const data = await req.json();
-      if (!data.users) throw new Error(data.error || '获取失败');
-      const users = data.users || [];
+      const adminEmail = session.user?.email || '';
+
+      // 先尝试 Worker 接口
+      let users = null;
+      try {
+        const req = await fetch('/api/admin/users', {
+          headers: { 'Authorization': 'Bearer ' + session.access_token }
+        });
+        if (req.ok) {
+          const data = await req.json();
+          if (data.users) users = data.users;
+        }
+      } catch(e) { /* Worker 失败则降级 */ }
+
+      if (!users) {
+        // 降级：从 investment_accounts 汇总
+        const { data: accts } = await client.from('investment_accounts').select('user_id');
+        const userIds = [...new Set((accts||[]).map(a => a.user_id))];
+        users = userIds.map(id => ({ id, email: null, created_at: null, plan: 'free' }));
+      }
+
       // 统计各用户账户数和记录数
-      const { data: accts } = await client.from('investment_accounts').select('id,user_id');
+      const { data: accts2 } = await client.from('investment_accounts').select('id,user_id');
       const uidByAcct = {};
       const acctCountByUser = {};
-      (accts||[]).forEach(a => { uidByAcct[a.id] = a.user_id; acctCountByUser[a.user_id] = (acctCountByUser[a.user_id]||0) + 1; });
+      (accts2||[]).forEach(a => { uidByAcct[a.id] = a.user_id; acctCountByUser[a.user_id] = (acctCountByUser[a.user_id]||0) + 1; });
       const { data: recs } = await client.from('investment_records').select('account_id');
       const recCountByUser = {};
       (recs||[]).forEach(r => { const uid = uidByAcct[r.account_id]; if(uid) recCountByUser[uid] = (recCountByUser[uid]||0) + 1; });
@@ -183,12 +197,12 @@
       const list = document.getElementById('adminUserList');
       list.innerHTML = users.sort((a,b) => (recCountByUser[b.id]||0) - (recCountByUser[a.id]||0)).map(u => `
         <tr>
-          <td>${escapeHtml(u.email||u.id||'?')}</td>
-          <td>${(u.created_at||'').substring(0,10)}</td>
+          <td>${escapeHtml(u.email||u.id.substring(0,12)+'...'||'?')}</td>
+          <td>${u.created_at ? u.created_at.substring(0,10) : '—'}</td>
           <td>${acctCountByUser[u.id]||0}</td>
           <td>${recCountByUser[u.id]||0}</td>
           <td>${u.plan==='pro'?'<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:0.72rem;font-weight:500;background:#fef3c7;color:#d97706;">Pro</span>':'<span style="color:var(--text-muted);font-size:0.78rem;">free</span>'}</td>
-          <td>${ADMIN_EMAILS.includes(u.email) ? '<span style="color:var(--primary);font-weight:600;">管理员</span>' : '用户'}</td>
+          <td>${u.email && ADMIN_EMAILS.includes(u.email) ? '<span style="color:var(--primary);font-weight:600;">管理员</span>' : '用户'}</td>
         </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">暂无数据</td></tr>';
     } catch(e) {
       document.getElementById('adminUserList').innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);text-align:center;">加载失败: ' + e.message + '</td></tr>';
