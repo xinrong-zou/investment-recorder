@@ -547,7 +547,7 @@ function renderChart(){
         if(tf){const net=tf.netIn-tf.netOut;lines.push('当日净'+(net>0?'转入: +¥':'转出: -¥')+Math.abs(net).toLocaleString());}
         return lines.join('<br/>');
       }},
-      legend:{data:['总资产','净投入'],icon:'path://M-4,0L4,0',bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
+      legend:{data:['总资产','净投入'],icon:'roundRect',bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
       grid:{left:55,right:16,top:16,bottom:48},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',axisLabel:{fontSize:10,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(0)+'万':v},splitLine:{lineStyle:{color:'#f1f5f9'}}},
@@ -560,7 +560,7 @@ function renderChart(){
   }else if(chartMode==='nav'){
     option={
       tooltip:{trigger:'axis',valueFormatter:v=>v.toFixed(3)},
-      legend:{data:['净值'],icon:'path://M-4,0L4,0',bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
+      legend:{data:['净值'],icon:'roundRect',bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
       grid:{left:40,right:16,top:16,bottom:36},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',axisLabel:{fontSize:10,color:'#94a3b8'},splitLine:{lineStyle:{color:'#f1f5f9'}}},
@@ -580,7 +580,7 @@ function renderChart(){
   }else{ // return
     option={
       tooltip:{trigger:'axis',valueFormatter:v=>'¥'+(v||0).toLocaleString()},
-      legend:{data:['累计收益'],icon:'path://M-4,0L4,0',bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
+      legend:{data:['累计收益'],icon:'roundRect',bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
       grid:{left:55,right:16,top:16,bottom:36},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',axisLabel:{fontSize:10,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(0)+'万':v},splitLine:{lineStyle:{color:'#f1f5f9'}}},
@@ -870,7 +870,7 @@ function renderDrawerChart(accountId,acct){
         if(tf){const net=tf.netIn-tf.netOut;lines.push('当日净'+(net>0?'转入: +¥':'转出: -¥')+Math.abs(net).toLocaleString());}
         return lines.join('<br/>');
       }},
-      legend:{data:['余额','净投入'],icon:'path://M-4,0L4,0',top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
+      legend:{data:['余额','净投入'],icon:'roundRect',top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
       grid:{left:30,right:8,top:16,bottom:22},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8'}},
@@ -885,7 +885,7 @@ function renderDrawerChart(accountId,acct){
     const isInvest=acct.account_type==='investment';
     option={
       tooltip:{trigger:'axis',formatter:function(p){const d=p[0];return d.axisValue+'<br/>净值: '+(isNaN(d.value)?'—':d.value.toFixed(3));}},
-      legend:{data:['净值'],icon:'path://M-4,0L4,0',top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
+      legend:{data:['净值'],icon:'roundRect',top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
       grid:{left:30,right:8,top:8,bottom:20},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8'}},
@@ -898,7 +898,7 @@ function renderDrawerChart(accountId,acct){
   }else{ // return
     option={
       tooltip:{trigger:'axis',formatter:function(p){const d=p[0];return d.axisValue+'<br/>累计收益: '+(isNaN(d.value)?'—':'¥'+Number(d.value).toFixed(2));}},
-      legend:{data:['累计收益'],icon:'path://M-4,0L4,0',top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
+      legend:{data:['累计收益'],icon:'roundRect',top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
       grid:{left:30,right:8,top:8,bottom:20},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8'}},
