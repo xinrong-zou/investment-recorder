@@ -118,7 +118,7 @@
     .tag-revalue { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 500; background: #f8fafc; color: #64748b; }
     .show-hidden { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-muted); cursor: pointer; margin-left: 12px; }
     .show-hidden:hover { color: var(--text); }
-    .eye-btn { background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:0.9rem;padding:2px 6px;color:var(--text-muted);line-height:1;margin-left:8px;vertical-align:middle; }
+    .eye-btn { background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:0.75rem;padding:1px 8px;color:var(--text-muted);line-height:1.6;margin-left:8px;vertical-align:middle; }
     .eye-btn:hover { border-color:var(--primary);color:var(--text); }
     .auth-prompt { text-align: center; padding: 80px 20px; }
     .auth-prompt h1 { font-size: 1.8rem; margin-bottom: 8px; }
@@ -582,7 +582,7 @@ function render(){
   const ddHtml=maxDd<0?`<div class="stat"><div class="v loss">${(maxDd*100).toFixed(2)}%</div><div class="l">最大回撤</div><div class="sub">${ddStart} ~ ${ddEnd}</div></div>`:'';
   const xirrHtml=totalXirr!=null&&!isNaN(totalXirr)?`<div class="stat"><div class="v ${totalXirr>=0?'profit':'loss'}">${(totalXirr*100).toFixed(2)}%</div><div class="l">年化 <span class="xirr">XIRR</span></div></div>`:'';
   $('summaryRow').innerHTML=`
-    <div class="total-row"><div class="v">${fmtS(totalVal)} <button class="eye-btn" onclick="togglePrivacy()" title="切换隐私模式">${privacyMode?'👁':'🙈'}</button></div><div class="l">总资产</div></div>
+    <div class="total-row"><div class="v">${fmtS(totalVal)} <button class="eye-btn" onclick="togglePrivacy()" title="切换隐私模式">${privacyMode?'显示':'隐藏'}</button></div><div class="l">总资产</div></div>
     <div class="sub-row">
       <div class="stat"><div class="v ${retColor}">${fmtS(totalRet)}</div><div class="l">累计收益</div></div>
       <div class="stat"><div class="v ${retColor}">${fmtPct(totalRetPct)}</div><div class="l">总收益率</div></div>
