@@ -824,7 +824,6 @@ async function showRecords(accountId){
   const xirrColor=xirrVal!=null?(xirrVal>=0?'#dc2626':'#2563eb'):'var(--text-secondary)';
   $('drawerSummary').innerHTML=`<div class="drawer-stat"><div class="v">${fmt(calc.currentValue)}</div><div class="l">当前资产</div></div><div class="drawer-stat"><div class="v" style="color:${calc.totalReturn>=0?'#dc2626':'#2563eb'}">${fmt(calc.totalReturn)}</div><div class="l">累计收益</div></div><div class="drawer-stat"><div class="v">${calc.nav.toFixed(3)}</div><div class="l">净值</div></div><div class="drawer-stat"><div class="v" style="color:#2563eb">${ddStr}</div><div class="l">最大回撤</div></div><div class="drawer-stat"><div class="v" style="color:${xirrColor}">${xirrStr}</div><div class="l">年化 <span class="xirr">XIRR</span></div></div>`;
   // 默认日期范围为最早记录到今日
-  const allRecs=allRecords[accountId]||[];
   const earliest=allRecs.length?allRecs.reduce((a,b)=>a.record_date<b.record_date?a:b).record_date:'';
   const today=new Date();const todayStr=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
   $('filterDateStart').value=earliest;
