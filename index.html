@@ -43,10 +43,13 @@
     .account-card .acct-type { font-size: 0.72rem; padding: 1px 8px; border-radius: 10px; font-weight: 500; }
     .type-cash { background: #f0fdf4; color: #059669; }
     .type-investment { background: #eff6ff; color: #1e40af; }
-    .acct-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; pointer-events: none; }
-    .acct-stat { text-align: center; }
-    .acct-stat .val { font-size: 1rem; font-weight: 700; }
-    .acct-stat .lbl { font-size: 0.7rem; color: var(--text-muted); }
+    .acct-stats { margin-bottom: 10px; pointer-events: none; }
+    .acct-stats .total-val { font-size: 1.2rem; font-weight: 800; color: var(--text); }
+    .acct-stats .total-lbl { font-size: 0.7rem; color: var(--text-muted); margin-bottom: 4px; }
+    .acct-stats .row { display: flex; gap: 4px; }
+    .acct-stats .stat { flex: 1; min-width: 40px; text-align: center; }
+    .acct-stats .stat .v { font-size: 0.9rem; font-weight: 700; white-space: nowrap; }
+    .acct-stats .stat .l { font-size: 0.65rem; color: var(--text-muted); white-space: nowrap; }
     .acct-actions { display: flex; gap: 4px; position: relative; pointer-events: none; }
     .acct-actions .btn { font-size: 0.78rem; padding: 4px 10px; flex: 1; pointer-events: auto; }
     .dot-menu { position: relative; pointer-events: auto; }
@@ -134,8 +137,8 @@
       .drawer-filter input[type=date] { width: 80px; }
       .drawer-summary .total-row .v { font-size: 1rem; }
       .drawer-summary .stat .v { font-size: 0.78rem; }
-      .acct-stats { grid-template-columns: 1fr 1fr; gap: 4px; }
-      .acct-stat .val { font-size: 0.88rem; }
+      .acct-stats .total-val { font-size: 1rem; }
+      .acct-stats .stat .v { font-size: 0.82rem; }
       .pie-chart-area { height: 180px; }
       .empty-guide { padding: 24px 16px; }
       .empty-guide .steps { grid-template-columns: 1fr; gap: 10px; }
@@ -460,9 +463,21 @@ function render(){
     const hideLabel=a.hidden?'👁 取消隐藏':'🙈 隐藏';
     const neg=checkNegativeBalance(a.id);
     const warnBadge=neg?' <span title="'+neg.date+' 余额 '+fmt(neg.balance)+'，查看折线图定位问题" style="display:inline-flex;align-items:center;gap:3px;font-size:0.72rem;color:#d97706;background:#fef3c7;padding:1px 8px;border-radius:10px;font-weight:500;cursor:help;">⚠ 余额异常</span>':'';
+    // 计算该账户XIRR
+    const acctRecs=(allRecords[a.id]||[]).slice().sort((x,y)=>{const d=new Date(x.record_date)-new Date(y.record_date);return d!==0?d:new Date(x.created_at||0)-new Date(y.created_at||0);});
+    const acctXirr=calcXIRR(acctRecs,a.account_type,calc.currentValue);
+    const xirrStr=acctXirr!=null&&!isNaN(acctXirr)?(acctXirr*100).toFixed(2)+'%':'—';
+    const xirrColor=acctXirr!=null?(acctXirr>=0?'#dc2626':'#2563eb'):'var(--text-secondary)';
     html+=`<div class="account-card card" onclick="showRecords('${a.id}')">
       <div class="acct-header"><span class="acct-name">${a.name}${hiddenLabel}${warnBadge}</span><span class="acct-type ${isCash?'type-cash':'type-investment'}">${isCash?'现金':'投资'}</span></div>
-      <div class="acct-stats"><div class="acct-stat"><div class="val">${fmt(calc.currentValue)}</div><div class="lbl">当前资产</div></div><div class="acct-stat"><div class="val" style="color:${retColor}">${fmtPct(calc.returnPct)}</div><div class="lbl">收益率</div></div><div class="acct-stat"><div class="val" style="color:${retColor}">${fmt(calc.totalReturn)}</div><div class="lbl">累计收益</div></div><div class="acct-stat"><div class="val">${calc.nav.toFixed(3)}</div><div class="lbl">净值</div></div></div>
+      <div class="acct-stats">
+        <div class="total-val">${fmt(calc.currentValue)}</div>
+        <div class="total-lbl">当前资产</div>
+        <div class="row">
+          <div class="stat"><div class="v" style="color:${retColor}">${fmt(calc.totalReturn)}</div><div class="l">累计收益</div></div>
+          <div class="stat"><div class="v" style="color:${xirrColor}">${xirrStr}</div><div class="l">年化 XIRR</div></div>
+        </div>
+      </div>
       <div class="acct-actions">
         <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();openRecord('${a.id}','transfer_in')">转入</button>
         <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openRecord('${a.id}','transfer_out')">转出</button>
