@@ -162,19 +162,7 @@
   window.loadUsers = async function() {
     document.getElementById('adminUsersLoading').style.display = 'block';
     try {
-      const session = (await client.auth.getSession()).data.session;
-      if (!session) throw new Error('未登录');
-      const req = await fetch('/api/admin/users', {
-        headers: { 'Authorization': 'Bearer ' + session.access_token }
-      });
-      if (!req.ok) {
-        const errData = await req.json().catch(()=>({}));
-        throw new Error(errData.error + ' ' + JSON.stringify(errData.debug||'') || 'HTTP ' + req.status);
-      }
-      const data = await req.json();
-      if (!data.users) throw new Error(data.error || '获取失败');
-      const users = data.users || [];
-      // 统计各用户账户数和记录数
+      // 从 investment_accounts 汇总各用户的账户数和记录数
       const { data: accts } = await client.from('investment_accounts').select('id,user_id');
       const uidByAcct = {};
       const acctCountByUser = {};
@@ -183,16 +171,23 @@
       const recCountByUser = {};
       (recs||[]).forEach(r => { const uid = uidByAcct[r.account_id]; if(uid) recCountByUser[uid] = (recCountByUser[uid]||0) + 1; });
 
+      // 当前管理员邮箱从 session 获取
+      const session = (await client.auth.getSession()).data.session;
+      const adminEmail = session?.user?.email || '';
+
+      const userIds = Object.keys(acctCountByUser);
       const list = document.getElementById('adminUserList');
-      list.innerHTML = users.sort((a,b) => (recCountByUser[b.id]||0) - (recCountByUser[a.id]||0)).map(u => `
-        <tr>
-          <td>${escapeHtml(u.email||u.id||'?')}</td>
-          <td>${(u.created_at||'').substring(0,10)}</td>
-          <td>${acctCountByUser[u.id]||0}</td>
-          <td>${recCountByUser[u.id]||0}</td>
-          <td>${u.plan==='pro'?'<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:0.72rem;font-weight:500;background:#fef3c7;color:#d97706;">Pro</span>':'<span style="color:var(--text-muted);font-size:0.78rem;">free</span>'}</td>
-          <td>${ADMIN_EMAILS.includes(u.email) ? '<span style="color:var(--primary);font-weight:600;">管理员</span>' : '用户'}</td>
-        </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">暂无数据</td></tr>';
+      list.innerHTML = userIds.sort((a,b) => (recCountByUser[b]||0) - (recCountByUser[a]||0)).map(uid => {
+        const isAdmin = ADMIN_EMAILS.includes(adminEmail) && session?.user?.id === uid;
+        return `<tr>
+          <td style="font-family:monospace;font-size:0.8rem;">${escapeHtml(uid.substring(0,8))}...</td>
+          <td>—</td>
+          <td>${acctCountByUser[uid]||0}</td>
+          <td>${recCountByUser[uid]||0}</td>
+          <td><span style="color:var(--text-muted);font-size:0.78rem;">—</span></td>
+          <td>${isAdmin ? '<span style="color:var(--primary);font-weight:600;">管理员</span>' : '用户'}</td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">暂无数据</td></tr>';
     } catch(e) {
       document.getElementById('adminUserList').innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);text-align:center;">加载失败: ' + e.message + '</td></tr>';
     }
