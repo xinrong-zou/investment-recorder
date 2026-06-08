@@ -417,9 +417,6 @@ function render(){
   const totalRet=totalVal-totalCost,totalRetPct=totalCost>0?(totalRet/totalCost)*100:0;
   const totalNavVal=totalCost>0?(totalVal/totalCost):1;
   const {maxDd,ddStart,ddEnd}=calcMaxDrawdown();
-  const totalRet=totalVal-totalCost,totalRetPct=totalCost>0?(totalRet/totalCost)*100:0;
-  const totalNavVal=totalCost>0?(totalVal/totalCost):1;
-  const {maxDd,ddStart,ddEnd}=calcMaxDrawdown();
   // 汇总 XIRR
   const allFlows=[];
   accounts.forEach(a=>{(allRecords[a.id]||[]).filter(r=>r.action_type!=='revalue').forEach(r=>{allFlows.push({amount:r.action_type==='transfer_in'?-Number(r.amount):Number(r.amount),date:new Date(r.record_date)});});});
