@@ -116,7 +116,9 @@
       .chart-container .chart-area { height: 200px; }
       .record-table { font-size: 0.78rem; }
       .record-table th, .record-table td { padding: 5px 6px; }
-      .drawer-filter { flex-wrap: wrap; }
+      .drawer-filter { flex-wrap: nowrap; }
+      .drawer-filter select, .drawer-filter input { min-width: 0; flex-shrink: 1; }
+      .drawer-filter input[type=date] { width: 80px; }
       .acct-stats { grid-template-columns: 1fr 1fr; gap: 4px; }
       .acct-stat .val { font-size: 0.88rem; }
       .pie-chart-area { height: 180px; }
@@ -134,9 +136,10 @@
      .skeleton-acct{height:80px;}
      .skeleton-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;}
     /* Drawer filter */
-    .drawer-filter { display: flex; gap: 6px; padding: 8px 0; }
-    .drawer-filter select, .drawer-filter input { font-size: 0.78rem; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
-    .drawer-filter .btn-sm { font-size: 0.75rem; padding: 4px 10px; }
+    .drawer-filter { display: flex; gap: 6px; padding: 8px 0; flex-wrap: nowrap; }
+    .drawer-filter select, .drawer-filter input { font-size: 0.78rem; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); min-width: 0; }
+    .drawer-filter input[type=date] { width: 110px; }
+    .drawer-filter .btn-sm { font-size: 0.75rem; padding: 4px 10px; flex-shrink: 0; }
     /* Empty state guide */
     .empty-guide { text-align: center; padding: 40px 20px; }
     .empty-guide .icon-big { font-size: 2.5rem; margin-bottom: 10px; }
@@ -569,10 +572,12 @@ function renderChart(){
           lineStyle:{width:1,color:'#f59e0b'}}]
     };
   }else if(chartMode==='nav'){
-    // 构建沪深300归一化数据
+    // 构建沪深300归一化数据（无数据日向前填充，避免断线）
+    let lastVal=null;
     const hs300Data=dates.map(d=>{
-      if(!csi300Map||!csi300Map[d])return null;
-      return csi300Map[d];
+      const v=csi300Map&&csi300Map[d]?csi300Map[d]:lastVal;
+      if(v!=null)lastVal=v;
+      return v;
     });
     const firstIdx=hs300Data.findIndex(v=>v!==null);
     const baseVal=firstIdx>=0?hs300Data[firstIdx]:1;
@@ -907,10 +912,12 @@ function renderDrawerChart(accountId,acct){
       ]
     };
   }else if(mode==='nav'){
-    // 构建沪深300归一化数据
+    // 构建沪深300归一化数据（无数据日向前填充，避免断线）
+    let lastV=null;
     const hs300Drawer=dates.map(d=>{
-      if(!csi300Map||!csi300Map[d])return null;
-      return csi300Map[d];
+      const v=csi300Map&&csi300Map[d]?csi300Map[d]:lastV;
+      if(v!=null)lastV=v;
+      return v;
     });
     const firstDIdx=hs300Drawer.findIndex(v=>v!==null);
     const baseD=firstDIdx>=0?hs300Drawer[firstDIdx]:1;
