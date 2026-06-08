@@ -256,6 +256,7 @@
           </label>
           <button class="btn btn-primary btn-sm" onclick="openAddAccount()">+ 新建账户</button>
           <button class="btn btn-ghost btn-sm" style="margin-left:4px;" onclick="exportData()">📥 导出</button>
+          <button class="btn btn-ghost btn-sm" style="margin-left:4px;" onclick="shareSnapshot()">📸 分享</button>
         </div>
       </div>
 
@@ -362,6 +363,13 @@ if(!window.__supabaseClient)window.__supabaseClient=client;
 
 let currentUser=null,accounts=[],allRecords={},settings=null,showHidden=false;
 let chartInstance=null,drawerAccountId=null,chartMode='assets',drawerChartMode='assets',csi300Map=null,chartRange='all';
+// 内存缓存
+const queryCache={};
+function cachedQuery(key,fn){
+  if(queryCache[key]!==undefined)return Promise.resolve(queryCache[key]);
+  return fn().then(r=>{queryCache[key]=r;return r;});
+}
+function clearCache(){for(const k in queryCache)delete queryCache[k];}
 
 const $=id=>document.getElementById(id);
 function fmt(n){return n==null?'—':'¥'+Number(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
@@ -443,15 +451,16 @@ async function loadData(){
   const{data:{session}}=await client.auth.getSession();
   if(!session){$('loginPrompt').style.display='block';$('dashContent').style.display='none';return;}
   currentUser=session.user;$('loginPrompt').style.display='none';$('dashContent').style.display='block';$('dashSkeleton').style.display='block';
-  const{data:s}=await client.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle();settings=s;
-  const{data:accts}=await client.from('investment_accounts').select('*').eq('user_id',currentUser.id).order('created_at');accounts=accts||[];
+  const{data:s}=await cachedQuery('settings_'+currentUser.id,()=>client.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle());settings=s;
+  const{data:accts}=await cachedQuery('accts_'+currentUser.id,()=>client.from('investment_accounts').select('*').eq('user_id',currentUser.id).order('created_at'));accounts=accts||[];
   const hasCash=accounts.some(a=>a.account_type==='cash');
   if(!hasCash){
     const{data:newAcct}=await client.from('investment_accounts').insert({user_id:currentUser.id,name:'现金账户',account_type:'cash'}).select().single();
     if(newAcct){accounts.push(newAcct);await client.from('user_settings').upsert({user_id:currentUser.id,default_cash_account_id:newAcct.id},{onConflict:'user_id'});settings={...(settings||{}),default_cash_account_id:newAcct.id};}
   }
   allRecords={};
-  for(const a of accounts){const{data:recs}=await client.from('investment_records').select('*').eq('account_id',a.id).order('record_date',{ascending:true});allRecords[a.id]=recs||[];}
+  for(const a of accounts){const{data:recs}=await cachedQuery('recs_'+a.id,()=>client.from('investment_records').select('*').eq('account_id',a.id).order('record_date',{ascending:true}));allRecords[a.id]=recs||[];}
+  clearCache();
   fetchCSI300();
   render();
 }
@@ -844,7 +853,7 @@ async function unhideAccount(id){await client.from('investment_accounts').update
 function openAddAccount(){$('accountModalTitle').textContent='新建账户';$('saveAccountBtn').textContent='创建';$('accountName').value='';$('accountType').value='investment';openModal('accountModal');}
 async function getUserPlan(){
   try{
-    const{data}=await client.from('subscriptions').select('plan').eq('user_id',currentUser.id).maybeSingle();
+    const{data}=await cachedQuery('plan_'+currentUser.id,()=>client.from('subscriptions').select('plan').eq('user_id',currentUser.id).maybeSingle());
     return data?.plan||'free';
   }catch(e){return 'free';}
 }
@@ -1316,6 +1325,93 @@ function exportData(){
     XLSX.writeFile(wb,fn);
     toast('已导出 '+fn,'success');
   }catch(e){toast('导出失败: '+e.message,'error');}
+}
+// ====== 分享快照图 ======
+function shareSnapshot(){
+  const c=document.createElement('canvas');c.width=540;c.height=720;
+  const ctx=c.getContext('2d');
+  // 背景
+  const bg=ctx.createLinearGradient(0,0,540,720);
+  bg.addColorStop(0,'#1e293b');bg.addColorStop(1,'#0f172a');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,540,720);
+  // 卡片层
+  ctx.fillStyle='rgba(255,255,255,0.06)';
+  // 圆角矩形（兼容写法）
+  const rr=(x,y,w,h,r)=>{ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();};
+  rr(24,24,492,672,16);ctx.fill();
+  // 标题
+  ctx.fillStyle='#94a3b8';ctx.font='14px sans-serif';ctx.textAlign='center';
+  ctx.fillText('📊 收益账本',270,58);
+  // 分隔线
+  ctx.strokeStyle='rgba(148,163,184,0.2)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(48,76);ctx.lineTo(492,76);ctx.stroke();
+  // 计算数据
+  let tv=0,tc=0;
+  accounts.forEach(a=>{const c2=calcAccount(a,allRecords[a.id]||[]);tv+=c2.currentValue;tc+=c2.costBasis;});
+  const tr=tv-tc,trPct=tc>0?(tr/tc)*100:0,nav=tc>0?tv/tc:1;
+  const allF=[];accounts.forEach(a=>{(allRecords[a.id]||[]).forEach(r=>allF.push(r));});
+  const xirr=calcXIRR(allF,'investment',tv);
+  const fmtN=v=>'¥'+Math.abs(v).toLocaleString('zh-CN',{minimumFractionDigits:2});
+  const clr=n=>n>=0?'#dc2626':'#2563eb';
+  // 总资产
+  ctx.fillStyle='#f8fafc';ctx.font='bold 32px sans-serif';ctx.textAlign='left';
+  ctx.fillText(fmtN(tv),48,128);
+  ctx.fillStyle='#94a3b8';ctx.font='13px sans-serif';
+  ctx.fillText('总资产',48,152);
+  // 收益率
+  ctx.textAlign='right';
+  ctx.fillStyle=clr(tr);ctx.font='bold 22px sans-serif';
+  ctx.fillText((tr>=0?'+':'')+trPct.toFixed(2)+'%',492,120);
+  ctx.fillStyle='#94a3b8';ctx.font='13px sans-serif';
+  ctx.fillText('总收益率',492,152);
+  // 指标行
+  const metrics=[
+    {label:'累计收益',val:fmtN(tr),color:clr(tr)},
+    {label:'净值',val:nav.toFixed(3),color:'#f8fafc'},
+    {label:'年化 XIRR',val:xirr!=null?(xirr>=0?'+':'')+(xirr*100).toFixed(2)+'%':'—',color:xirr!=null?clr(xirr):'#94a3b8'},
+  ];
+  const mY=200;const mW=492/3;
+  metrics.forEach((m,i)=>{
+    ctx.textAlign='center';
+    ctx.fillStyle=m.color;ctx.font='bold 18px sans-serif';
+    ctx.fillText(m.val,48+mW*i+mW/2,mY);
+    ctx.fillStyle='#94a3b8';ctx.font='12px sans-serif';
+    ctx.fillText(m.label,48+mW*i+mW/2,mY+22);
+    if(i<metrics.length-1){ctx.strokeStyle='rgba(148,163,184,0.15)';ctx.beginPath();ctx.moveTo(48+mW*(i+1),mY-12);ctx.lineTo(48+mW*(i+1),mY+32);ctx.stroke();}
+  });
+  // 分隔线
+  ctx.strokeStyle='rgba(148,163,184,0.15)';
+  ctx.beginPath();ctx.moveTo(48,252);ctx.lineTo(492,252);ctx.stroke();
+  // 账户列表
+  ctx.fillStyle='#94a3b8';ctx.font='14px sans-serif';ctx.textAlign='left';
+  ctx.fillText('账户概览',48,278);
+  let aY=296;
+  const visible=accounts.filter(a=>showHidden||!a.hidden);
+  visible.forEach((a,i)=>{
+    if(aY>640)return;
+    const c2=calcAccount(a,allRecords[a.id]||[]);
+    const r2=c2.totalReturn;
+    ctx.fillStyle='#f8fafc';ctx.font='15px sans-serif';
+    ctx.fillText(a.name,48,aY);
+    ctx.textAlign='right';
+    ctx.fillStyle=clr(r2);ctx.font='bold 15px sans-serif';
+    ctx.fillText((r2>=0?'+':'')+fmtN(r2)+' ('+(c2.costBasis>0?((r2/c2.costBasis)*100).toFixed(1):'0.0')+'%)',492,aY);
+    ctx.textAlign='left';
+    ctx.fillStyle='#64748b';ctx.font='12px sans-serif';
+    ctx.fillText('市值: '+fmtN(c2.currentValue)+' | 投入: '+fmtN(c2.costBasis),48,aY+18);
+    aY+=44;
+  });
+  // 底部
+  ctx.strokeStyle='rgba(148,163,184,0.15)';
+  ctx.beginPath();ctx.moveTo(48,680);ctx.lineTo(492,680);ctx.stroke();
+  ctx.fillStyle='#64748b';ctx.font='12px sans-serif';ctx.textAlign='center';
+  const today=new Date();const ds=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+  ctx.fillText('数据截至 '+ds+' · 通过 收益账本 记录',270,698);
+  // 下载
+  c.toBlob(blob=>{
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='收益账本_'+ds+'.png';a.click();
+    URL.revokeObjectURL(a.href);toast('快照已保存','success');
+  },'image/png');
 }
 
 window.addEventListener('open-settings',()=>{});
