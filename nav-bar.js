@@ -155,6 +155,9 @@
                   <a href="/about.html" class="dropdown-item">
                     <span class="dropdown-icon">📖</span> 关于
                   </a>
+                  <button onclick="if(window.openFeedback)openFeedback();else window.location.href='/about.html'" class="dropdown-item">
+                    <span class="dropdown-icon">💬</span> 反馈
+                  </button>
                   <a v-if="isAdmin" :href="adminUrl" class="dropdown-item">
                     <span class="dropdown-icon">⭐</span> 后台管理
                   </a>
