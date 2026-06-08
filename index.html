@@ -462,10 +462,14 @@ async function loadData(){
     if(newAcct){accounts.push(newAcct);await client.from('user_settings').upsert({user_id:currentUser.id,default_cash_account_id:newAcct.id},{onConflict:'user_id'});settings={...(settings||{}),default_cash_account_id:newAcct.id};}
   }
   allRecords={};
-  for(const a of accounts){const{data:recs}=await cachedQuery('recs_'+a.id,()=>client.from('investment_records').select('*').eq('account_id',a.id).order('record_date',{ascending:true}));allRecords[a.id]=recs||[];}
-  clearCache();
-  csi300Map=await fetchIndexData('hs300');
-  csi500Map=await fetchIndexData('zz500');
+  // 并行加载所有账户记录（比串行快N倍）
+  await Promise.all(accounts.map(async a=>{
+    const{data:recs}=await cachedQuery('recs_'+a.id,()=>client.from('investment_records').select('id,account_id,record_date,action_type,amount,note,paired_id').eq('account_id',a.id).order('record_date',{ascending:true}));
+    allRecords[a.id]=recs||[];
+  }));
+  // don't clearCache — 保留缓存，同页面内切tab不重复请求
+  // 并行加载指数数据
+  [csi300Map,csi500Map]=await Promise.all([fetchIndexData('hs300'),fetchIndexData('zz500')]);
   render();
 }
 
