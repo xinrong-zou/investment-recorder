@@ -167,6 +167,10 @@
       const req = await fetch('/api/admin/users', {
         headers: { 'Authorization': 'Bearer ' + session.access_token }
       });
+      if (!req.ok) {
+        const errData = await req.json().catch(()=>({}));
+        throw new Error(errData.error + ' ' + JSON.stringify(errData.debug||'') || 'HTTP ' + req.status);
+      }
       const data = await req.json();
       if (!data.users) throw new Error(data.error || '获取失败');
       const users = data.users || [];
