@@ -1,0 +1,170 @@
+// 理财收益记录器 - 导航栏 Vue3 组件 (头像+下拉菜单)
+// 用法: 在HTML中引入后，执行 mountNavBar('#nav-app')
+(function() {
+  const SUPABASE_URL = 'https://spb-cl9n18iof0i9qxjh.supabase.opentrust.net';
+  const SUPABASE_ANON_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiIsInJlZiI6InNwYi1jbDluMThpb2YwaTlxeGpoIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA2NjgzNzQsImV4cCI6MjA5NjI0NDM3NH0.t8MDF4zdvV9kpUz-gZpVM-OgFlAow8FlENASpqkUkwk';
+  const ADMIN_EMAILS = ['384402473@qq.com'];
+
+  if (typeof Vue === 'undefined') return;
+
+  // 共享Supabase客户端（避免多页面多个实例的警告）
+  if (!window.__supabaseClient) {
+    try {
+      window.__supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch(e) {}
+  }
+
+  const NavBar = {
+    props: {
+      title: { type: String, default: '收益记录器' },
+      logoUrl: { type: String, default: '/' },
+      loginUrl: { type: String, default: 'login.html' },
+      registerUrl: { type: String, default: 'register.html' },
+      dashboardUrl: { type: String, default: '/' },
+      adminUrl: { type: String, default: 'admin.html' },
+    },
+    data() {
+      return {
+        user: null,
+        showMenu: false,
+        plan: 'free',
+        expiresAt: null,
+        client: window.__supabaseClient,
+        initializing: true,
+      };
+    },
+    computed: {
+      avatarLetter() {
+        if (!this.user?.email) return '?';
+        return this.user.email.charAt(0).toUpperCase();
+      },
+      isPro() { return this.plan === 'pro'; },
+      isAdmin() { return this.user?.email && ADMIN_EMAILS.includes(this.user.email); },
+      proExpires() {
+        if (!this.expiresAt) return '';
+        const d = new Date(this.expiresAt);
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      },
+    },
+    async mounted() {
+      document.addEventListener('click', this.closeMenu);
+      await this.initAuth();
+    },
+    beforeUnmount() {
+      document.removeEventListener('click', this.closeMenu);
+    },
+    methods: {
+      closeMenu() { this.showMenu = false; },
+      toggleMenu(e) {
+        if (e) e.stopPropagation();
+        this.showMenu = !this.showMenu;
+      },
+      async initAuth() {
+        if (!this.client) return;
+        try {
+          const { data: { session } } = await this.client.auth.getSession();
+          if (session?.user) {
+            this.user = session.user;
+            this.initializing = false; // 立即显示头像，不等plan加载
+            this.fetchPlan();           // plan异步加载，到了再更新徽章
+          } else {
+            this.initializing = false;
+          }
+          // 监听登录状态变化
+          this.client.auth.onAuthStateChange((event, session) => {
+            if (session?.user) {
+              this.user = session.user;
+              this.fetchPlan();
+            } else {
+              this.user = null;
+              this.plan = 'free';
+              this.expiresAt = null;
+            }
+          });
+        } catch(e) { this.initializing = false; console.log('nav auth err:', e.message); }
+      },
+      async fetchPlan() {
+        // 新项目无订阅体系，保持默认
+        this.plan = 'free';
+      },
+      async logout() {
+        this.showMenu = false;
+        if (this.client) await this.client.auth.signOut();
+        window.location.href = '/';
+      },
+      openSettings() {
+        this.showMenu = false;
+        // 如果首页，跳转到看板并携带参数自动打开设置
+        if (!window.location.pathname.includes('dashboard')) {
+          window.location.href = 'dashboard.html?settings=1';
+          return;
+        }
+        window.dispatchEvent(new CustomEvent('open-settings'));
+      },
+    },
+    template: `
+      <nav class="navbar">
+        <div class="container">
+          <a :href="logoUrl" class="navbar-brand">
+            <span class="logo-icon">🕊</span>
+            <span>{{ title }}</span>
+          </a>
+          <div class="navbar-right">
+            <div v-if="initializing" class="nav-skeleton"></div>
+            <template v-else-if="!user">
+              <a :href="loginUrl" class="btn btn-ghost">登录</a>
+              <a :href="registerUrl" class="btn btn-primary btn-sm">免费注册</a>
+            </template>
+            <div v-else class="avatar-dropdown" @click="toggleMenu">
+              <button class="avatar-btn" :class="{ 'avatar-pro': isPro }">
+                <span class="avatar-letter">{{ avatarLetter }}</span>
+                <span v-if="isPro" class="avatar-pro-star">⭐</span>
+              </button>
+              <transition name="dropdown-fade">
+                <div v-if="showMenu" class="dropdown-menu" @click.stop>
+                  <div class="dropdown-header">
+                    <div class="dropdown-avatar">{{ avatarLetter }}</div>
+                    <div class="dropdown-info">
+                      <div class="dropdown-email">{{ user.email }}</div>
+                      <div class="dropdown-plan-row">
+                        <span :class="'plan-badge ' + (isPro ? 'plan-pro' : 'plan-free')">
+                          {{ isPro ? 'Pro 会员' : '免费用户' }}
+                        </span>
+                        <span v-if="isPro && expiresAt" class="dropdown-expires">
+                          到期 {{ proExpires }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="dropdown-divider"></div>
+                  <a :href="dashboardUrl" class="dropdown-item">
+                    <span class="dropdown-icon">📋</span> 看板
+                  </a>
+                  <button @click="openSettings" class="dropdown-item">
+                    <span class="dropdown-icon">⚙️</span> 设置
+                  </button>
+                  <a v-if="isAdmin" :href="adminUrl" class="dropdown-item">
+                    <span class="dropdown-icon">⭐</span> 后台管理
+                  </a>
+                  <div class="dropdown-divider"></div>
+                  <button @click="logout" class="dropdown-item dropdown-item-danger">
+                    <span class="dropdown-icon">🚪</span> 退出登录
+                  </button>
+                </div>
+              </transition>
+            </div>
+          </div>
+        </div>
+      </nav>
+    `,
+  };
+
+  // 注册全局组件 + 暴露挂载函数
+  window.NavBarComponent = NavBar;
+  window.mountNavBar = function(selector) {
+    const app = Vue.createApp({});
+    app.component('nav-bar', NavBar);
+    app.mount(selector);
+    return app;
+  };
+})();

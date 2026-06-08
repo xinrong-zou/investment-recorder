@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>收益记录器 - 投资看板</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <style>
+    .dash-layout { display: flex; min-height: calc(100vh - 60px); }
+    .dash-main { flex: 1; padding: 20px; max-width: 1000px; margin: 0 auto; overflow-y: auto; }
+    .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+    .summary-card { padding: 20px; text-align: center; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+    .summary-card .num { font-size: 1.6rem; font-weight: 800; color: var(--primary); }
+    .summary-card .num.profit { color: #dc2626; }
+    .summary-card .num.loss { color: #2563eb; }
+    .summary-card .label { font-size: 0.82rem; color: var(--text-muted); margin-top: 4px; }
+    .account-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .account-card { padding: 20px; position: relative; cursor: pointer; transition: border-color 0.15s; }
+    .account-card:hover { border-color: var(--primary-light); }
+    .account-card .acct-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .account-card .acct-name { font-size: 1.05rem; font-weight: 700; }
+    .account-card .acct-type { font-size: 0.72rem; padding: 1px 8px; border-radius: 10px; font-weight: 500; }
+    .type-cash { background: #f0fdf4; color: #059669; }
+    .type-investment { background: #eff6ff; color: #1e40af; }
+    .acct-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; pointer-events: none; }
+    .acct-stat { text-align: center; }
+    .acct-stat .val { font-size: 1rem; font-weight: 700; }
+    .acct-stat .lbl { font-size: 0.7rem; color: var(--text-muted); }
+    .acct-actions { display: flex; gap: 4px; position: relative; pointer-events: none; }
+    .acct-actions .btn { font-size: 0.78rem; padding: 4px 10px; flex: 1; pointer-events: auto; }
+    .dot-menu { position: relative; pointer-events: auto; }
+    .dot-btn { width: 32px; height: 32px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: var(--text-muted); line-height: 1; padding: 0; flex: none !important; }
+    .dot-btn:hover { background: var(--bg-hover); }
+    .dot-dropdown { display: none; position: absolute; right: 0; top: 100%; min-width: 120px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 100; margin-top: 2px; }
+    .dot-dropdown.open { display: block; }
+    .dot-dropdown div { padding: 8px 14px; font-size: 0.85rem; cursor: pointer; color: var(--text-secondary); }
+    .dot-dropdown div:hover { background: var(--bg-hover); color: var(--text); }
+    .dot-dropdown .danger { color: #dc2626; }
+    .dot-dropdown .danger:hover { background: #fef2f2; }
+    .chart-container { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 24px; }
+    .chart-container .chart-area { width: 100%; height: 260px; }
+    .chart-tabs { display: flex; gap: 0; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .chart-tab { padding: 2px 8px 3px 8px; font-size: 0.76rem; border: none; background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.15s; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .chart-tab:hover { color: var(--text); }
+    .chart-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+    .chart-empty { text-align: center; padding: 80px 20px; color: var(--text-muted); font-size: 0.9rem; }
+    .dd-label { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+    .drawer-chart-tabs { display: flex; gap: 0; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .drawer-chart-tab { padding: 2px 8px 3px 8px; font-size: 0.72rem; border: none; background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.15s; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .drawer-chart-tab:hover { color: var(--text); }
+    .drawer-chart-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal-box { background: var(--bg-card); border-radius: var(--radius); padding: 28px; max-width: 420px; width: 90%; max-height: 80vh; overflow-y: auto; }
+    .modal-box h2 { font-size: 1.1rem; margin-bottom: 16px; }
+    .modal-box .input-group { margin-bottom: 12px; }
+    .modal-box .input-group label { display: block; font-size: 0.85rem; margin-bottom: 4px; color: var(--text-secondary); }
+    .form-actions { display: flex; gap: 8px; margin-top: 16px; }
+    .form-actions .btn { flex: 1; }
+    .btn-danger { background: #dc2626; color: white; border: none; flex: 1; }
+    .btn-danger:hover { background: #b91c1c; }
+    .drawer-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 900; }
+    .drawer-overlay.open { display: block; }
+    .drawer { position: fixed; top: 0; right: -100%; width: 100%; max-width: 520px; height: 100vh; background: var(--bg-card); z-index: 901; transition: right 0.25s; display: flex; flex-direction: column; }
+    .drawer.open { right: 0; }
+    .drawer-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--border); }
+    .drawer-header h2 { font-size: 1.05rem; }
+    .drawer-close { width: 32px; height: 32px; border: none; background: none; cursor: pointer; font-size: 1.3rem; color: var(--text-muted); display: flex; align-items: center; justify-content: center; }
+    .drawer-actions { display: flex; gap: 6px; padding: 12px 24px; border-bottom: 1px solid var(--border); }
+    .drawer-actions .btn { font-size: 0.82rem; padding: 6px 14px; flex: 1; text-align: center; }
+    .drawer-body { flex: 1; overflow-y: auto; padding: 16px 24px; }
+    .drawer-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+    .drawer-stat { text-align: center; padding: 10px; background: var(--bg); border-radius: var(--radius-sm); }
+    .drawer-stat .v { font-size: 1rem; font-weight: 700; }
+    .drawer-stat .l { font-size: 0.72rem; color: var(--text-muted); }
+    .record-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+    .record-table th { text-align: left; padding: 8px 10px; background: var(--bg-hover); color: var(--text-muted); font-weight: 600; font-size: 0.76rem; border-bottom: 2px solid var(--border); }
+    .record-table td { padding: 6px 10px; border-bottom: 1px solid var(--border-light); }
+    .tag-in { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 500; background: #fef2f2; color: #dc2626; }
+    .tag-out { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 500; background: #eff6ff; color: #2563eb; }
+    .tag-revalue { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 500; background: #f8fafc; color: #64748b; }
+    .show-hidden { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-muted); cursor: pointer; margin-left: 12px; }
+    .show-hidden:hover { color: var(--text); }
+    .auth-prompt { text-align: center; padding: 80px 20px; }
+    .auth-prompt h1 { font-size: 1.8rem; margin-bottom: 8px; }
+    .auth-prompt p { color: var(--text-muted); margin-bottom: 20px; }
+    @media (max-width: 768px) {
+      .summary-grid { grid-template-columns: repeat(2, 1fr); }
+      .account-grid { grid-template-columns: 1fr; }
+      .drawer { width: 100vw; }
+    }
+  </style>
+</head>
+<body>
+<div id="nav-app"><nav-bar title="收益记录器" logo-url="/"></nav-bar></div>
+
+<div class="dash-layout" id="appContent">
+  <div class="dash-main">
+    <div class="auth-prompt" id="loginPrompt" style="display:none;">
+      <h1>📊 收益记录器</h1>
+      <p>管理多账户、追踪收益率、可视化资产走势</p>
+      <a href="login.html" class="btn btn-primary">登录</a>
+      <a href="register.html" class="btn btn-ghost" style="margin-left:8px;">免费注册</a>
+    </div>
+
+    <div id="dashContent" style="display:none;">
+      <div class="summary-grid" id="summaryGrid">
+        <div class="summary-card"><div class="num" id="totalAssets">—</div><div class="label">总资产</div></div>
+        <div class="summary-card"><div class="num" id="totalReturn">—</div><div class="label">总收益</div></div>
+        <div class="summary-card"><div class="num" id="totalReturnPct">—</div><div class="label">总收益率</div></div>
+        <div class="summary-card"><div class="num" id="totalNav">—</div><div class="label">总净值</div></div>
+        <div class="summary-card" id="maxDrawdownCard" style="display:none;"><div class="num" id="totalMaxDd">—</div><div class="label">最大回撤</div><div class="dd-label" id="totalMaxDdRange"></div></div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-tabs">
+          <button class="chart-tab active" data-mode="assets" onclick="switchChartMode('assets')">总资产</button>
+          <button class="chart-tab" data-mode="nav" onclick="switchChartMode('nav')">净值</button>
+          <button class="chart-tab" data-mode="return" onclick="switchChartMode('return')">累计收益</button>
+        </div>
+        <div id="totalChart" class="chart-area"></div>
+        <div class="chart-empty" id="chartEmpty" style="display:none;">暂无数据</div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+        <h2 style="font-size:1.1rem;">我的账户</h2>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <label class="show-hidden" id="showHiddenToggle" style="display:none;">
+            <input type="checkbox" id="showHiddenCheck" onchange="toggleHidden()"> 显示已隐藏
+          </label>
+          <button class="btn btn-primary btn-sm" onclick="openAddAccount()">+ 新建账户</button>
+        </div>
+      </div>
+
+      <div class="account-grid" id="accountGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：新建账户 -->
+<div class="modal-overlay" id="accountModal">
+  <div class="modal-box">
+    <h2 id="accountModalTitle">新建账户</h2>
+    <div class="input-group"><label>账户名称</label><input type="text" class="input" id="accountName" placeholder="如：股票账户" maxlength="20"></div>
+    <div class="input-group"><label>账户类型</label><select class="input" id="accountType"><option value="investment">投资账户</option><option value="cash">现金账户</option></select></div>
+    <div class="form-actions"><button class="btn btn-ghost" onclick="closeModal('accountModal')">取消</button><button class="btn btn-primary" id="saveAccountBtn" onclick="saveAccount()">创建</button></div>
+  </div>
+</div>
+
+<!-- 弹窗：录入操作 -->
+<div class="modal-overlay" id="recordModal">
+  <div class="modal-box">
+    <h2 id="recordModalTitle">录入操作</h2>
+    <p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:12px;" id="recordModalAccount"></p>
+    <div class="input-group"><label>操作类型</label><select class="input" id="recordType" onchange="onRecordTypeChange()"><option value="transfer_in">转入</option><option value="transfer_out">转出</option><option value="revalue">更新市值</option></select></div>
+    <div class="input-group" id="srcGroup" style="display:none;"><label>来源账户</label><select class="input" id="srcAccount"><option value="">外部资金（从外部转入）</option></select></div>
+    <div class="input-group" id="destGroup" style="display:none;"><label>转出至</label><select class="input" id="destAccount"><option value="">消费支出（不转入任何账户）</option></select></div>
+    <div class="input-group"><label>金额</label><input type="number" class="input" id="recordAmount" placeholder="0.00" step="0.01" min="0"></div>
+    <div class="input-group"><label>日期</label><input type="date" class="input" id="recordDate"></div>
+    <div class="input-group"><label>备注</label><input type="text" class="input" id="recordNote" placeholder="选填" maxlength="50"></div>
+    <div class="form-actions"><button class="btn btn-ghost" onclick="closeModal('recordModal')">取消</button><button class="btn btn-primary" onclick="saveRecord()">保存</button></div>
+  </div>
+</div>
+
+<!-- 抽屉：账户详情 -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <h2 id="drawerTitle">账户详情</h2>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-actions" id="drawerActions">
+    <button class="btn btn-primary" id="drawerBtnIn" onclick="drawerAction('transfer_in')">💰 转入</button>
+    <button class="btn btn-ghost" id="drawerBtnOut" onclick="drawerAction('transfer_out')">💸 转出</button>
+    <button class="btn btn-ghost" id="drawerBtnRevalue" onclick="drawerAction('revalue')" style="display:none;">📊 更新市值</button>
+  </div>
+  <div class="drawer-body" id="drawerBody">
+    <div class="drawer-summary" id="drawerSummary"></div>
+    <div class="drawer-chart-tabs" id="drawerChartTabs" style="display:none;">
+      <button class="drawer-chart-tab active" data-mode="assets" onclick="switchDrawerChartMode('assets')">资产</button>
+      <button class="drawer-chart-tab" data-mode="nav" onclick="switchDrawerChartMode('nav')">净值</button>
+      <button class="drawer-chart-tab" data-mode="return" onclick="switchDrawerChartMode('return')">收益</button>
+    </div>
+    <div id="drawerChart" style="height:140px;margin-bottom:12px;"></div>
+    <h3 style="font-size:0.9rem;margin-bottom:8px;">操作记录</h3>
+    <table class="record-table"><thead><tr><th>日期</th><th>类型</th><th>金额</th><th>备注</th></tr></thead><tbody id="drawerRecords"></tbody></table>
+    <div id="drawerEmpty" style="text-align:center;padding:32px;color:var(--text-muted);display:none;">暂无记录</div>
+  </div>
+</div>
+
+<!-- 弹窗：编辑记录 -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal-box">
+    <h2 id="editModalTitle">编辑记录</h2>
+    <div class="input-group"><label>操作类型</label><div style="font-size:0.9rem;font-weight:600;color:var(--text);" id="editType"></div></div>
+    <div class="input-group"><label>金额</label><input type="number" class="input" id="editAmount" step="0.01" min="0"></div>
+    <div class="input-group"><label>日期</label><input type="date" class="input" id="editDate"></div>
+    <div class="input-group"><label>备注</label><input type="text" class="input" id="editNote" placeholder="选填" maxlength="50"></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('editModal')">取消</button>
+      <button class="btn btn-danger" id="editDeleteBtn">🗑 删除</button>
+      <button class="btn btn-primary" id="editSaveBtn">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastContainer" style="position:fixed;bottom:20px;right:20px;z-index:2000;"></div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="nav-bar.js"></script>
+<script>
+mountNavBar('#nav-app');
+const SUPABASE_URL='https://spb-cl9n18iof0i9qxjh.supabase.opentrust.net', SUPABASE_ANON_KEY='eyJ0eX...Ukwk';
+const client=window.__supabaseClient||supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+if(!window.__supabaseClient)window.__supabaseClient=client;
+
+let currentUser=null,accounts=[],allRecords={},settings=null,showHidden=false;
+let chartInstance=null,drawerAccountId=null,chartMode='assets',drawerChartMode='assets';
+
+const $=id=>document.getElementById(id);
+function toast(text,type='info'){const c=$('toastContainer'),el=document.createElement('div');el.className='toast toast-'+type;el.textContent=text;c.appendChild(el);setTimeout(()=>el.remove(),3000);}
+function fmt(n){return n==null?'—':'¥'+Number(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtPct(n){return n==null?'—':(n>=0?'+':'')+Number(n).toFixed(2)+'%';}
+function openModal(id){$(id).classList.add('open');}
+function closeModal(id){$(id).classList.remove('open');}
+document.querySelectorAll('.modal-overlay').forEach(el=>{el.addEventListener('mousedown',e=>{if(e.target===el)el.classList.remove('open');});});
+
+function calcAccount(acct,records){
+  const sorted=[...records].sort((a,b)=>{
+    const d=new Date(a.record_date)-new Date(b.record_date);
+    if(d!==0)return d;
+    // 同一天按 created_at 排序
+    return new Date(a.created_at||0)-new Date(b.created_at||0);
+  });
+  let cost=0,lastRevalue=null;
+  sorted.forEach(r=>{if(r.action_type==='transfer_in')cost+=Number(r.amount);else if(r.action_type==='transfer_out')cost-=Number(r.amount);else if(r.action_type==='revalue')lastRevalue=Number(r.amount);});
+  const isCash=acct.account_type==='cash',val=isCash?cost:(lastRevalue!=null?lastRevalue:cost),ret=val-cost,retPct=cost>0?(ret/cost)*100:0,nav=cost>0?val/cost:1;
+  return {costBasis:cost,currentValue:val,totalReturn:ret,returnPct:retPct,nav};
+}
+
+async function loadData(){
+  const{data:{session}}=await client.auth.getSession();
+  if(!session){$('loginPrompt').style.display='block';$('dashContent').style.display='none';return;}
+  currentUser=session.user;$('loginPrompt').style.display='none';$('dashContent').style.display='block';
+  const{data:s}=await client.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle();settings=s;
+  const{data:accts}=await client.from('investment_accounts').select('*').eq('user_id',currentUser.id).order('created_at');accounts=accts||[];
+  const hasCash=accounts.some(a=>a.account_type==='cash');
+  if(!hasCash){
+    const{data:newAcct}=await client.from('investment_accounts').insert({user_id:currentUser.id,name:'现金账户',account_type:'cash'}).select().single();
+    if(newAcct){accounts.push(newAcct);await client.from('user_settings').upsert({user_id:currentUser.id,default_cash_account_id:newAcct.id},{onConflict:'user_id'});settings={...(settings||{}),default_cash_account_id:newAcct.id};}
+  }
+  allRecords={};
+  for(const a of accounts){const{data:recs}=await client.from('investment_records').select('*').eq('account_id',a.id).order('record_date',{ascending:true});allRecords[a.id]=recs||[];}
+  render();
+}
+
+// 检查现金账户历史中是否有余额为负的情况
+function checkNegativeBalance(accountId){
+  const acct=accounts.find(a=>a.id===accountId);
+  if(!acct||acct.account_type!=='cash')return null;
+  const records=(allRecords[accountId]||[]).slice().sort((a,b)=>{
+    const d=new Date(a.record_date)-new Date(b.record_date);
+    return d!==0?d:new Date(a.created_at||0)-new Date(b.created_at||0);
+  });
+  let bal=0;
+  for(const r of records){
+    if(r.action_type==='transfer_in')bal+=Number(r.amount);
+    else if(r.action_type==='transfer_out')bal-=Number(r.amount);
+    if(bal<0)return {date:r.record_date,balance:bal};
+  }
+  return null;
+}
+
+function render(){
+  // 汇总用全部账户（含隐藏）
+  let totalVal=0,totalCost=0;
+  accounts.forEach(a=>{const c=calcAccount(a,allRecords[a.id]||[]);totalVal+=c.currentValue;totalCost+=c.costBasis;});
+
+  const filtered=accounts.filter(a=>showHidden||!a.hidden);
+  let html='';
+  filtered.forEach(a=>{
+    const calc=calcAccount(a,allRecords[a.id]||[]);
+    const isCash=a.account_type==='cash',retColor=calc.totalReturn>=0?'#dc2626':'#2563eb';
+    const updateBtn=isCash?'':'<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openRecord(\''+a.id+'\',\'revalue\')">更新</button>';
+    const hiddenLabel=a.hidden?' <span style="font-size:0.7rem;color:var(--text-muted);">(已隐藏)</span>':'';
+    const hideAction=a.hidden?'unhideAccount(\''+a.id+'\')':'hideAccount(\''+a.id+'\')';
+    const hideLabel=a.hidden?'👁 取消隐藏':'🙈 隐藏';
+    const neg=checkNegativeBalance(a.id);
+    const warnBadge=neg?' <span title="'+neg.date+' 余额 '+fmt(neg.balance)+'，查看折线图定位问题" style="display:inline-flex;align-items:center;gap:3px;font-size:0.72rem;color:#d97706;background:#fef3c7;padding:1px 8px;border-radius:10px;font-weight:500;cursor:help;">⚠ 余额异常</span>':'';
+    html+=`<div class="account-card card" onclick="showRecords('${a.id}')">
+      <div class="acct-header"><span class="acct-name">${a.name}${hiddenLabel}${warnBadge}</span><span class="acct-type ${isCash?'type-cash':'type-investment'}">${isCash?'现金':'投资'}</span></div>
+      <div class="acct-stats"><div class="acct-stat"><div class="val">${fmt(calc.currentValue)}</div><div class="lbl">当前资产</div></div><div class="acct-stat"><div class="val" style="color:${retColor}">${fmtPct(calc.returnPct)}</div><div class="lbl">收益率</div></div><div class="acct-stat"><div class="val" style="color:${retColor}">${fmt(calc.totalReturn)}</div><div class="lbl">累计收益</div></div><div class="acct-stat"><div class="val">${calc.nav.toFixed(3)}</div><div class="lbl">净值</div></div></div>
+      <div class="acct-actions">
+        <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();openRecord('${a.id}','transfer_in')">转入</button>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openRecord('${a.id}','transfer_out')">转出</button>
+        ${updateBtn}
+        <div class="dot-menu"><button class="dot-btn" onclick="event.stopPropagation();toggleDotMenu(this)">⋮</button><div class="dot-dropdown"><div onclick="event.stopPropagation();showRecords('${a.id}')">📋 查看记录</div><div onclick="event.stopPropagation();${hideAction}">${hideLabel}</div><div class="danger" onclick="event.stopPropagation();deleteAccount('${a.id}')">🗑 删除</div></div></div>
+      </div></div>`;
+  });
+  if(filtered.length===0)html='<div class="card" style="padding:48px;text-align:center;color:var(--text-muted);grid-column:1/-1;">还没有账户，点击上方「+ 新建账户」开始</div>';
+  $('accountGrid').innerHTML=html;
+  const totalRet=totalVal-totalCost,totalRetPct=totalCost>0?(totalRet/totalCost)*100:0;
+  $('totalAssets').textContent=fmt(totalVal);$('totalReturn').textContent=fmt(totalRet);$('totalReturn').style.color=totalRet>=0?'#dc2626':'#2563eb';
+  $('totalReturnPct').textContent = fmtPct(totalRetPct);$('totalReturnPct').style.color=totalRetPct>=0?'#dc2626':'#2563eb';
+  const totalNavVal=totalCost>0?(totalVal/totalCost):1;
+  $('totalNav').textContent=totalNavVal.toFixed(3);
+  // 计算最大回撤
+  const {maxDd,ddStart,ddEnd}=calcMaxDrawdown();
+  if(maxDd<0){$('maxDrawdownCard').style.display='block';$('totalMaxDd').textContent=(maxDd*100).toFixed(2)+'%';$('totalMaxDd').style.color='#2563eb';$('totalMaxDdRange').textContent=ddStart+' ~ '+ddEnd;}
+  else{$('maxDrawdownCard').style.display='none';}
+  const hasHidden=accounts.some(a=>a.hidden);$('showHiddenToggle').style.display=hasHidden?'':'none';
+  renderChart();
+  // 如果抽屉开着，刷新其数据
+  if(drawerAccountId&&$('drawer').classList.contains('open')){
+    const acct=accounts.find(a=>a.id===drawerAccountId);
+    if(acct)showRecords(drawerAccountId);
+  }
+}
+
+document.addEventListener('click',()=>{document.querySelectorAll('.dot-dropdown.open').forEach(d=>d.classList.remove('open'));});
+function toggleDotMenu(btn){btn.nextElementSibling.classList.toggle('open');}
+
+// ====== ECharts 图表 ======
+// 构建时间序列数据
+function buildSeries(){
+  const dset=new Set();
+  accounts.forEach(a=>{(allRecords[a.id]||[]).forEach(r=>dset.add(r.record_date));});
+  const dates=[...dset].sort();
+  if(dates.length<2)return null;
+  const totalVal=[],totalCost=[],nav=[],cumRet=[];
+  const dailyTransfers={}; // date -> {netIn, netOut}
+  for(const d of dates){
+    let v=0,c=0;
+    let dayNetIn=0,dayNetOut=0;
+    accounts.forEach(a=>{
+      const upTo=(allRecords[a.id]||[]).filter(r=>r.record_date<=d);
+      const cal=calcAccount(a,upTo);
+      v+=cal.currentValue;c+=cal.costBasis;
+      // 统计当天净转入/净转出
+      (allRecords[a.id]||[]).filter(r=>r.record_date===d).forEach(r=>{
+        if(r.action_type==='transfer_in')dayNetIn+=Number(r.amount);
+        else if(r.action_type==='transfer_out')dayNetOut+=Number(r.amount);
+      });
+    });
+    totalVal.push(v);totalCost.push(c);
+    nav.push(c>0?v/c:1);cumRet.push(v-c);
+    if(dayNetIn>0||dayNetOut>0)dailyTransfers[d]={netIn:dayNetIn,netOut:dayNetOut};
+  }
+  return {dates,totalVal,totalCost,nav,cumRet,dailyTransfers};
+}
+
+// 计算最大回撤
+function calcMaxDrawdown(){
+  const data=buildSeries();
+  if(!data||data.nav.length<2)return {maxDd:0,ddStart:'',ddEnd:''};
+  let peak=data.nav[0],peakIdx=0,maxDd=0,ddStart=0,ddEnd=0;
+  for(let i=1;i<data.nav.length;i++){
+    if(data.nav[i]>peak){peak=data.nav[i];peakIdx=i;}
+    const dd=(data.nav[i]-peak)/peak;
+    if(dd<maxDd){maxDd=dd;ddStart=peakIdx;ddEnd=i;}
+  }
+  return {maxDd,ddStart:data.dates[ddStart],ddEnd:data.dates[ddEnd]};
+}
+
+// 切换主页图表模式
+function switchChartMode(mode){
+  chartMode=mode;
+  document.querySelectorAll('.chart-tab').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+  renderChart();
+}
+
+function renderChart(){
+  const data=buildSeries();
+  if(!data){if(chartInstance){chartInstance.dispose();chartInstance=null;}$('chartEmpty').style.display='block';return;}
+  $('chartEmpty').style.display='none';
+  const {dates,totalVal,totalCost,nav,cumRet,dailyTransfers}=data;
+  
+  if(!chartInstance){chartInstance=echarts.init($('totalChart'));}
+  
+  let option;
+  if(chartMode==='assets'){
+    // 构建总资产数据点：有资金变动的日期用红/蓝圆点标注
+    const assetData=totalVal.map((v,i)=>{
+      const dt=dates[i];
+      const tf=dailyTransfers[dt];
+      if(!tf)return v;
+      if(tf.netIn>tf.netOut)return {value:v,symbol:'circle',symbolSize:7,itemStyle:{color:'#dc2626',borderColor:'#dc2626'}};
+      if(tf.netOut>0)return {value:v,symbol:'circle',symbolSize:7,itemStyle:{color:'#2563eb',borderColor:'#2563eb'}};
+      return v;
+    });
+    option={
+      tooltip:{trigger:'axis',formatter:function(p){
+        const idx=p[0].dataIndex,date=dates[idx];
+        const av=typeof p[0].value==='object'?p[0].value.value:p[0].value;
+        const cv=typeof p[1].value==='object'?p[1].value.value:p[1].value;
+        let lines=[date,'总资产: ¥'+av.toLocaleString(),'净投入: ¥'+cv.toLocaleString()];
+        const tf=dailyTransfers[date];
+        if(tf){if(tf.netIn>0)lines.push('当日转入: +¥'+tf.netIn.toLocaleString());if(tf.netOut>0)lines.push('当日转出: -¥'+tf.netOut.toLocaleString());}
+        return lines.join('<br/>');
+      }},
+      legend:{data:['总资产','净投入'],bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
+      grid:{left:55,right:16,top:16,bottom:36},
+      xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
+      yAxis:{type:'value',axisLabel:{fontSize:10,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(0)+'万':v},splitLine:{lineStyle:{color:'#f1f5f9'}}},
+      series:[
+        {name:'总资产',type:'line',data:assetData,smooth:true,symbol:'none',lineStyle:{width:2,color:'#3b82f6'},
+          areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(59,130,246,0.15)'},{offset:1,color:'rgba(59,130,246,0)'}]}}},
+        {name:'净投入',type:'line',data:totalCost,smooth:true,symbol:'none',
+          lineStyle:{width:1,color:'#f59e0b'}}
+      ]
+    };
+  }else if(chartMode==='nav'){
+    option={
+      tooltip:{trigger:'axis',valueFormatter:v=>v.toFixed(3)},
+      legend:{data:['净值'],bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
+      grid:{left:40,right:16,top:16,bottom:36},
+      xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
+      yAxis:{type:'value',axisLabel:{fontSize:10,color:'#94a3b8'},splitLine:{lineStyle:{color:'#f1f5f9'}}},
+      series:[{name:'净值',type:'line',data:nav,smooth:true,symbol:'none',lineStyle:{width:2,color:'#059669'},
+        areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(5,150,105,0.15)'},{offset:1,color:'rgba(5,150,105,0)'}]}},
+        // 标记最大回撤区间
+        markArea:{
+          silent:true,itemStyle:{color:'rgba(37,99,235,0.08)'},
+          data:[[{xAxis:dates[0]},{xAxis:dates[dates.length-1]}]] // 占位，由calcMaxDrawdown填充
+        }
+      }]
+    };
+    // 在option上叠加drawdown标记
+    const {maxDd,ddStart,ddEnd}=calcMaxDrawdown();
+    if(maxDd<0&&ddStart&&ddEnd){
+      option.series[0].markArea.data=[[{xAxis:ddStart,label:{show:true,formatter:'最大回撤 '+(maxDd*100).toFixed(2)+'%',fontSize:10,color:'#2563eb',position:'insideTop'}},{xAxis:ddEnd}]]};
+  }else{ // return
+    option={
+      tooltip:{trigger:'axis',valueFormatter:v=>'¥'+(v||0).toLocaleString()},
+      legend:{data:['累计收益'],bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
+      grid:{left:55,right:16,top:16,bottom:36},
+      xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
+      yAxis:{type:'value',axisLabel:{fontSize:10,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(0)+'万':v},splitLine:{lineStyle:{color:'#f1f5f9'}}},
+      series:[{name:'累计收益',type:'line',data:cumRet,smooth:true,symbol:'none',lineStyle:{width:2,color:'#dc2626'},
+        areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(220,38,38,0.15)'},{offset:1,color:'rgba(220,38,38,0)'}]}}}]
+    };
+  }
+  chartInstance.setOption(option,true);
+  const onResize=()=>chartInstance?.resize();
+  window.removeEventListener('resize',chartInstance._resizeHandler);
+  chartInstance._resizeHandler=onResize;
+  window.addEventListener('resize',onResize);
+}
+
+// ====== 账户操作 ======
+function toggleHidden(){showHidden=$('showHiddenCheck').checked;render();}
+async function hideAccount(id){await client.from('investment_accounts').update({hidden:true}).eq('id',id);toast('已隐藏','success');await loadData();}
+async function unhideAccount(id){await client.from('investment_accounts').update({hidden:false}).eq('id',id);toast('已取消隐藏','success');await loadData();}
+function openAddAccount(){$('accountModalTitle').textContent='新建账户';$('saveAccountBtn').textContent='创建';$('accountName').value='';$('accountType').value='investment';openModal('accountModal');}
+async function saveAccount(){
+  const name=$('accountName').value.trim();if(!name){toast('请输入账户名称','error');return;}
+  const{error}=await client.from('investment_accounts').insert({user_id:currentUser.id,name,account_type:$('accountType').value});
+  if(error){toast(error.message,'error');return;}closeModal('accountModal');toast('账户已创建','success');await loadData();
+}
+
+let recordAccountId=null;
+function openRecord(accountId,type){
+  recordAccountId=accountId;const acct=accounts.find(a=>a.id===accountId);
+  $('recordModalTitle').textContent=(acct?acct.name:'')+' — 录入操作';
+  $('recordType').value=type||'transfer_in';$('recordAmount').value='';$('recordDate').value=new Date().toISOString().substring(0,10);$('recordNote').value='';
+  onRecordTypeChange();openModal('recordModal');
+}
+function onRecordTypeChange(){
+  const type=$('recordType').value,srcGroup=$('srcGroup'),destGroup=$('destGroup');
+  srcGroup.style.display=type==='transfer_in'?'':'none';
+  destGroup.style.display=type==='transfer_out'?'':'none';
+  if(type==='transfer_in'){
+    const sel=$('srcAccount');sel.innerHTML='<option value="">外部资金（从外部转入）</option>';
+    let defaultSelected=false;
+    accounts.forEach(a=>{
+      if(a.id!==recordAccountId&&!a.hidden){
+        const opt=document.createElement('option');opt.value=a.id;opt.textContent=a.name+(a.account_type==='cash'?' (现金)':' (投资)');sel.appendChild(opt);
+        if((settings?.default_cash_account_id===a.id)||(!defaultSelected&&a.account_type==='cash')){opt.selected=true;defaultSelected=true;}
+      }
+    });
+  }else if(type==='transfer_out'){
+    const sel=$('destAccount');sel.innerHTML='<option value="">消费支出（不转入任何账户）</option>';
+    let defaultSelected=false;
+    accounts.forEach(a=>{
+      if(a.id!==recordAccountId&&!a.hidden){
+        const opt=document.createElement('option');opt.value=a.id;opt.textContent=a.name+(a.account_type==='cash'?' (现金)':' (投资)');sel.appendChild(opt);
+        if((settings?.default_cash_account_id===a.id)||(!defaultSelected&&a.account_type==='cash')){opt.selected=true;defaultSelected=true;}
+      }
+    });
+  }
+}
+async function saveRecord(){
+  const amount=parseFloat($('recordAmount').value);const type=$('recordType').value;
+  if(type==='revalue'){if(isNaN(amount)||amount<0){toast('请输入有效市值','error');return;}
+  }else{if(!amount||amount<=0){toast('请输入有效金额','error');return;}}
+  const date=$('recordDate').value||new Date().toISOString().substring(0,10),note=$('recordNote').value.trim()||'';
+  const recs=[];
+
+  if(!recordAccountId){toast('系统错误：缺少账户信息','error');return;}
+
+  if(type==='transfer_in'){
+    const srcId=$('srcAccount').value;
+    if(srcId){
+      // 检查来源账户在指定日期的余额（仅警告，不阻止）
+      const srcCalc=calcAccount(accounts.find(a=>a.id===srcId),(allRecords[srcId]||[]).filter(r=>r.record_date<=date));
+      if(srcCalc.currentValue<amount)toast('警告：来源账户在 '+date+' 余额不足（'+fmt(srcCalc.currentValue)+'），已保存但建议检查','warning');
+      recs.push({account_id:srcId,action_type:'transfer_out',amount,record_date:date,note:(note||'转至 '+(accounts.find(a=>a.id===recordAccountId)?.name||'其他账户'))});
+      recs.push({account_id:recordAccountId,action_type:'transfer_in',amount,record_date:date,note:note||'来自 '+(accounts.find(a=>a.id===srcId)?.name||'其他账户')});
+    }else{
+      recs.push({account_id:recordAccountId,action_type:'transfer_in',amount,record_date:date,note:note||'外部转入'});
+    }
+  }else if(type==='transfer_out'){
+    // 检查账户在指定日期的余额（仅警告，不阻止）
+    const outCalc=calcAccount(accounts.find(a=>a.id===recordAccountId),(allRecords[recordAccountId]||[]).filter(r=>r.record_date<=date));
+    if(outCalc.currentValue<amount)toast('警告：账户在 '+date+' 余额不足（'+fmt(outCalc.currentValue)+'），已保存但建议检查','warning');
+    recs.push({account_id:recordAccountId,action_type:'transfer_out',amount,record_date:date,note:note||'转出'});
+    const destId=$('destAccount').value;
+    if(destId){recs.push({account_id:destId,action_type:'transfer_in',amount,record_date:date,note:note||'来自 '+(accounts.find(a=>a.id===recordAccountId)?.name||'其他账户')});}
+  }else{
+    recs.push({account_id:recordAccountId,action_type:'revalue',amount,record_date:date,note});
+  }
+
+  // 先插入第一条拿到 id
+  const firstRec=recs[0];
+  const{data:r1}=await client.from('investment_records').insert(firstRec).select().single();
+  if(!r1){toast('保存失败','error');return;}
+  // 如果有多条（成对交易），设置 paired_id
+  if(recs.length>1){
+    const{data:r2}=await client.from('investment_records').insert({...recs[1],paired_id:r1.id}).select().single();
+    if(!r2){toast('保存失败','error');return;}
+    // 更新第一条的 paired_id
+    const{error:pairErr}=await client.from('investment_records').update({paired_id:r2.id}).eq('id',r1.id);
+    if(pairErr)toast('配对关联失败:'+pairErr.message,'error');
+  }
+  closeModal('recordModal');toast('记录已保存','success');await loadData();
+}
+async function deleteAccount(id){
+  if(!confirm('确定删除此账户？所有流水也会一并删除'))return;
+  await client.from('investment_records').delete().eq('account_id',id);await client.from('investment_accounts').delete().eq('id',id);
+  toast('已删除','success');await loadData();
+}
+
+// ====== 抽屉（账户详情） ======
+async function showRecords(accountId){
+  drawerAccountId=accountId;const acct=accounts.find(a=>a.id===accountId);if(!acct)return;
+  $('drawerTitle').textContent=acct.name;
+  // 显示/隐藏"更新"按钮
+  $('drawerBtnRevalue').style.display=acct.account_type==='investment'?'':'none';
+  const calc=calcAccount(acct,allRecords[accountId]||[]);
+  // 计算该账户的最大回撤
+  const allRecs=(allRecords[accountId]||[]).slice().sort((a,b)=>{const d=new Date(a.record_date)-new Date(b.record_date);return d!==0?d:new Date(a.created_at||0)-new Date(b.created_at||0);});
+  let ddPeak=1,ddVal=0,ddStart='',ddEnd='',maxDd=0;
+  if(allRecs.length>=2){
+    let val=0,cost=0,peak=1,peakIdx=0;
+    for(let i=0;i<allRecs.length;i++){
+      const r=allRecs[i];
+      if(r.action_type==='transfer_in'){val+=Number(r.amount);cost+=Number(r.amount);}
+      else if(r.action_type==='transfer_out'){val-=Number(r.amount);cost-=Number(r.amount);}
+      else if(r.action_type==='revalue'){val=Number(r.amount);}
+      const nav=acct.account_type==='investment'?(cost>0?val/cost:val):val;
+      if(nav>peak){peak=nav;peakIdx=i;}
+      const dd=(nav-peak)/peak;
+      if(dd<ddVal){ddVal=dd;ddStart=peakIdx;ddEnd=i;}
+    }
+    if(ddVal<0){maxDd=ddVal;ddStart=allRecs[ddStart].record_date;ddEnd=allRecs[ddEnd].record_date;}
+  }
+  const ddStr=maxDd<0?((maxDd*100).toFixed(2)+'%'):'—';
+  $('drawerSummary').innerHTML=`<div class="drawer-stat"><div class="v">${fmt(calc.currentValue)}</div><div class="l">当前资产</div></div><div class="drawer-stat"><div class="v" style="color:${calc.totalReturn>=0?'#dc2626':'#2563eb'}">${fmt(calc.totalReturn)}</div><div class="l">累计收益</div></div><div class="drawer-stat"><div class="v">${calc.nav.toFixed(3)}</div><div class="l">净值</div></div><div class="drawer-stat"><div class="v" style="color:#2563eb">${ddStr}</div><div class="l">最大回撤</div></div>`;
+  // 迷你折线图
+  renderDrawerChart(accountId,acct);
+  const records=allRecords[accountId]||[];const tbody=$('drawerRecords');
+  if(records.length===0){tbody.innerHTML='';$('drawerEmpty').style.display='block';}
+  else{$('drawerEmpty').style.display='none';
+    tbody.innerHTML=[...records].sort((a,b)=>{const d=new Date(b.record_date)-new Date(a.record_date);if(d!==0)return d;return new Date(b.created_at||0)-new Date(a.created_at||0);}).map(r=>{
+      const tl=r.action_type==='transfer_in'?'<span class="tag-in">转入</span>':r.action_type==='transfer_out'?'<span class="tag-out">转出</span>':'<span class="tag-revalue">更新</span>';
+      const amtStyle=r.action_type==='transfer_in'?'color:#dc2626;font-weight:600;':r.action_type==='transfer_out'?'color:#2563eb;font-weight:600;':'color:#64748b;font-weight:600;';
+      const prefix=r.action_type==='transfer_out'?'-':'';
+      return '<tr onclick="editRecord(\''+r.id+'\',\''+r.account_id+'\',\''+r.action_type+'\','+r.amount+',\''+r.record_date+'\',\''+(r.note||'')+'\')" style="cursor:pointer;">'
+        +'<td>'+r.record_date+'</td><td>'+tl+'</td><td style="'+amtStyle+'">'+prefix+fmt(r.amount)+'</td>'
+        +'<td style="color:var(--text-muted);font-size:0.8rem;">'+(r.note||'')+'</td></tr>';
+    }).join('');
+  }
+  $('drawerOverlay').classList.add('open');$('drawer').classList.add('open');
+}
+
+// ====== 抽屉迷你折线图 ======
+let drawerChartInstance=null;
+function renderDrawerChart(accountId,acct){
+  const el=$('drawerChart');if(!el)return;
+  if(drawerChartInstance){drawerChartInstance.dispose();drawerChartInstance=null;}
+  const records=(allRecords[accountId]||[]).slice().sort((a,b)=>{
+    const d=new Date(a.record_date)-new Date(b.record_date);
+    return d!==0?d:new Date(a.created_at||0)-new Date(b.created_at||0);
+  });
+  if(records.length<2){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.8rem;">至少2条记录才能显示趋势</div>';$('drawerChartTabs').style.display='none';return;}
+  $('drawerChartTabs').style.display='flex';
+  // 构建该账户的时间序列
+  let value=0,cost=0;
+  const dates=[],vals=[],costs=[],navs=[],rets=[];
+  const transferDates=new Set();
+  for(const r of records){
+    if(r.action_type==='transfer_in'){value+=Number(r.amount);cost+=Number(r.amount);transferDates.add(r.record_date);}
+    else if(r.action_type==='transfer_out'){value-=Number(r.amount);cost-=Number(r.amount);transferDates.add(r.record_date);}
+    else if(r.action_type==='revalue'){value=Number(r.amount);}
+    const isInvest=acct.account_type==='investment';
+    const navPlot=isInvest?(cost>0?value/cost:value):value;
+    dates.push(r.record_date);
+    costs.push(cost);
+    navs.push(navPlot);
+    vals.push(value);
+    rets.push(value-cost);
+  }
+  // 计算该账户的最大回撤（净值走势）
+  let ddPeak=navs[0],ddPeakIdx=0,maxDd=0,ddStartIdx=0,ddEndIdx=0;
+  for(let i=1;i<navs.length;i++){
+    if(navs[i]>ddPeak){ddPeak=navs[i];ddPeakIdx=i;}
+    const dd=(navs[i]-ddPeak)/ddPeak;
+    if(dd<maxDd){maxDd=dd;ddStartIdx=ddPeakIdx;ddEndIdx=i;}
+  }
+  
+  const chart=echarts.init(el);
+  drawerChartInstance=chart;
+  const mode=drawerChartMode;
+  let option;
+  if(mode==='assets'){
+    option={
+      tooltip:{trigger:'axis',formatter:function(p){return p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':'¥'+Number(d.value).toFixed(2))).join('<br/>');}},
+      legend:{data:['余额','净投入'],top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
+      grid:{left:30,right:8,top:16,bottom:22},
+      xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
+      yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8'}},
+      series:[
+        {name:'余额',type:'line',data:vals,smooth:true,symbol:'none',lineStyle:{width:2,color:'#3b82f6'},
+          areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(59,130,246,0.3)'},{offset:1,color:'rgba(59,130,246,0)'}]}}},
+        {name:'净投入',type:'line',data:costs,smooth:true,symbol:'none',
+          lineStyle:{width:1,color:'#f59e0b'}}
+      ]
+    };
+  }else if(mode==='nav'){
+    const isInvest=acct.account_type==='investment';
+    option={
+      tooltip:{trigger:'axis',formatter:function(p){const d=p[0];return d.axisValue+'<br/>净值: '+(isNaN(d.value)?'—':d.value.toFixed(3));}},
+      grid:{left:30,right:8,top:8,bottom:20},
+      xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
+      yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8'}},
+      series:[{name:'净值',type:'line',data:navs,smooth:true,symbol:'none',lineStyle:{width:2,color:'#059669'},
+        areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(5,150,105,0.3)'},{offset:1,color:'rgba(5,150,105,0)'}]}},
+        markArea:maxDd<0?{silent:true,itemStyle:{color:'rgba(37,99,235,0.12)'},
+          data:[[{xAxis:dates[ddStartIdx],label:{show:true,formatter:'最大回撤 '+(maxDd*100).toFixed(2)+'%',fontSize:9,color:'#2563eb',position:'insideTop'}},{xAxis:dates[ddEndIdx]}]]}:undefined
+      }]
+    };
+  }else{ // return
+    option={
+      tooltip:{trigger:'axis',formatter:function(p){const d=p[0];return d.axisValue+'<br/>累计收益: '+(isNaN(d.value)?'—':'¥'+Number(d.value).toFixed(2));}},
+      grid:{left:30,right:8,top:8,bottom:20},
+      xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
+      yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8'}},
+      series:[{name:'累计收益',type:'line',data:rets,smooth:true,symbol:'none',lineStyle:{width:2,color:'#dc2626'},
+        areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(220,38,38,0.3)'},{offset:1,color:'rgba(220,38,38,0)'}]}}}]
+    };
+  }
+  chart.setOption(option,true);
+}
+// 切换抽屉图表模式
+function switchDrawerChartMode(mode){
+  drawerChartMode=mode;
+  document.querySelectorAll('.drawer-chart-tab').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+  if(drawerAccountId){
+    const acct=accounts.find(a=>a.id===drawerAccountId);
+    if(acct)renderDrawerChart(drawerAccountId,acct);
+  }
+}
+// ====== 记录编辑 ======
+let editingRecordId=null,editingPairedId=null;
+async function editRecord(id,accountId,actionType,amount,date,note){
+  editingRecordId=id;
+  const acct=accounts.find(a=>a.id===accountId);
+  const name=acct?acct.name:'';
+  recordAccountId=accountId;
+
+  // 查询配对记录
+  editingPairedId=null;
+  const{data:recData}=await client.from('investment_records').select('paired_id').eq('id',id).single();
+  if(recData?.paired_id)editingPairedId=recData.paired_id;
+
+  // 预填editModal
+  $('editModalTitle').textContent=name+' — 编辑记录';
+  $('editType').textContent={transfer_in:'转入',transfer_out:'转出',revalue:'更新市值'}[actionType]||actionType;
+  $('editAmount').value=amount;
+  $('editDate').value=date;
+  $('editNote').value=note===''?'':note;
+
+  // 保存按钮
+  $('editSaveBtn').onclick=async function(){
+    const amt=parseFloat($('editAmount').value);
+    if(actionType==='revalue'){if(isNaN(amt)||amt<0){toast('请输入有效市值','error');return;}
+    }else{if(!amt||amt<=0){toast('请输入有效金额','error');return;}}
+    const newDate=$('editDate').value||date;
+
+    // 通用余额校验：所有账户用更新后的数据重算
+    const allTestRecords={};
+    for(const aid of Object.keys(allRecords)){
+      allTestRecords[aid]=(allRecords[aid]||[]).filter(r=>r.id!==id&&r.id!==editingPairedId);
+    }
+    // 添加当前编辑的模拟记录
+    if(!allTestRecords[accountId])allTestRecords[accountId]=[];
+    allTestRecords[accountId].push({action_type:actionType,amount:amt,record_date:newDate});
+    // 如果有配对，也添加配对端的模拟记录
+    if(editingPairedId){
+      const{data:pair}=await client.from('investment_records').select('account_id,action_type').eq('id',editingPairedId).single();
+      if(pair){
+        if(!allTestRecords[pair.account_id])allTestRecords[pair.account_id]=[];
+        const pairAction=pair.action_type==='transfer_out'?'transfer_in':'transfer_out';
+        allTestRecords[pair.account_id].push({action_type:pairAction,amount:amt,record_date:newDate});
+      }
+    }
+    // 检查所有账户余额是否非负（仅警告，不阻止）
+    for(const aid of Object.keys(allTestRecords)){
+      const acct=accounts.find(a=>a.id===aid);
+      if(acct&&acct.account_type==='cash'&&calcAccount(acct,allTestRecords[aid]).currentValue<0){
+        toast('警告：修改后现金账户「'+acct.name+'」余额将为负数，已保存但建议检查','warning');
+      }
+    }
+
+    const upd={amount:amt,record_date:newDate,note:$('editNote').value.trim()||''};
+    const{error}=await client.from('investment_records').update(upd).eq('id',editingRecordId);
+    if(error){toast(error.message,'error');return;}
+    // 同步更新配对记录
+    if(editingPairedId){
+      const{error:pairErr}=await client.from('investment_records').update({amount:amt,record_date:newDate}).eq('id',editingPairedId);
+      if(pairErr)toast('配对记录未能同步更新','error');
+    }
+    closeModal('editModal');editingRecordId=editingPairedId=null;
+    await loadData();
+    toast('已修改','success');
+  };
+
+  // 删除按钮
+  $('editDeleteBtn').onclick=async function(){
+    if(!confirm('确定删除此记录？'))return;
+    // 先删配对记录
+    if(editingPairedId)await client.from('investment_records').delete().eq('id',editingPairedId);
+    const{error}=await client.from('investment_records').delete().eq('id',id);
+    if(error){toast(error.message,'error');return;}
+    closeModal('editModal');editingRecordId=editingPairedId=null;
+    await loadData();
+    toast('已删除','success');
+  };
+
+  openModal('editModal');
+}
+
+// 刷新抽屉内容（不重新加载全部数据）
+function refreshDrawer(accountId){
+  if(drawerAccountId!==accountId)return;
+  showRecords(accountId);
+  // showRecords 会异步刷新，确保 drawer 保持打开
+}
+
+function closeDrawer(){$('drawerOverlay').classList.remove('open');$('drawer').classList.remove('open');drawerAccountId=null;}
+function drawerAction(type){
+  const id=drawerAccountId;
+  if(!id){toast('请先选择账户','error');return;}
+  openRecord(id,type); // 不关闭抽屉，弹窗浮在抽屉上方
+}
+
+window.addEventListener('open-settings',()=>{});
+loadData();
+</script>
+</body>
+</html>

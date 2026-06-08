@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>注册 - 上岸鸽</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .auth-page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: linear-gradient(135deg, #f0f4ff, #e8f0fe);
+    }
+    .auth-box {
+      width: 100%;
+      max-width: 400px;
+    }
+    .auth-header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .auth-header .logo {
+      width: 48px;
+      height: 48px;
+      background: var(--primary);
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 1.4rem;
+      margin-bottom: 12px;
+    }
+    .auth-header h1 { font-size: 1.5rem; margin-bottom: 4px; }
+    .auth-header p { color: var(--text-muted); font-size: 0.9rem; }
+    .auth-card {
+      padding: 32px;
+    }
+    .auth-footer {
+      text-align: center;
+      margin-top: 20px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    .auth-footer a { color: var(--primary-light); font-weight: 600; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-top: 20px;
+      text-align: center;
+      width: 100%;
+      justify-content: center;
+    }
+    .back-link:hover { color: var(--text-secondary); }
+    .password-hint { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <div class="auth-page">
+    <div class="auth-box">
+      <div class="auth-header">
+        <a href="index.html" class="logo">🕊</a>
+        <h1>注册上岸鸽</h1>
+        <p>创建一个账号，开始接收招考通知</p>
+      </div>
+
+      <div class="auth-card card">
+        <div id="message" class="alert"></div>
+
+        <form id="registerForm">
+          <div class="input-group">
+            <label for="email">邮箱</label>
+            <input type="email" id="email" class="input" placeholder="your@email.com" required autocomplete="email">
+          </div>
+          <!-- 反机器人 honeypot（对用户不可见，只有自动脚本会填写） -->
+          <div style="position:absolute;left:-9999px;opacity:0;height:0;overflow:hidden;" aria-hidden="true">
+            <input type="text" id="honeypot" tabindex="-1" autocomplete="off">
+            <input type="text" name="website" tabindex="-1" autocomplete="off">
+          </div>
+          <div class="input-group">
+            <label for="password">密码</label>
+            <input type="password" id="password" class="input" placeholder="至少6位" required minlength="6" autocomplete="new-password">
+            <div class="password-hint">密码至少需要6个字符</div>
+          </div>
+          <div class="input-group">
+            <label for="confirmPassword">确认密码</label>
+            <input type="password" id="confirmPassword" class="input" placeholder="再次输入密码" required autocomplete="new-password">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block btn-lg" id="submitBtn">注册</button>
+        </form>
+      </div>
+
+      <div class="auth-footer">
+        已有账号？<a href="login.html">立即登录</a>
+      </div>
+      <a href="index.html" class="back-link">← 返回首页</a>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    (function() {
+      const SUPABASE_URL = 'https://spb-cl9n18iof0i9qxjh.supabase.opentrust.net';
+      const SUPABASE_ANON_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiIsInJlZiI6InNwYi1jbDluMThpb2YwaTlxeGpoIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA2NjgzNzQsImV4cCI6MjA5NjI0NDM3NH0.t8MDF4zdvV9kpUz-gZpVM-OgFlAow8FlENASpqkUkwk';
+      const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      const form = document.getElementById('registerForm');
+      const msg = document.getElementById('message');
+      const btn = document.getElementById('submitBtn');
+
+      function showMsg(text, type) {
+        msg.textContent = text;
+        msg.className = 'alert alert-' + type;
+      }
+
+      let regAttempts = JSON.parse(localStorage.getItem('regAttempts') || '{}');
+      function checkRateLimit() {
+        const now = Date.now();
+        // 清理10分钟前的记录
+        for (const k in regAttempts) {
+          if (now - parseInt(k) > 600000) delete regAttempts[k];
+        }
+        const count = Object.keys(regAttempts).length;
+        if (count >= 3) return '注册过于频繁，请10分钟后再试';
+        return null;
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        // === 反机器人检查 ===
+        // 1. Honeypot: 如果隐藏字段填了值，是机器人
+        if (document.getElementById('honeypot').value) {
+          showMsg('注册失败，请重试', 'error');
+          return;
+        }
+        // 2. 时间检查: 如果表单加载后不到2秒就提交，可能是机器人
+        if (!form._loadTime) form._loadTime = Date.now();
+        if (Date.now() - form._loadTime < 2000) {
+          showMsg('请稍后再提交', 'error');
+          return;
+        }
+        // 3. 速率限制
+        const rateMsg = checkRateLimit();
+        if (rateMsg) {
+          showMsg(rateMsg, 'error');
+          return;
+        }
+
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const confirm = document.getElementById('confirmPassword').value;
+
+        // 邮箱格式额外验证
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+          showMsg('请输入有效的邮箱地址', 'error');
+          return;
+        }
+
+        if (password !== confirm) {
+          showMsg('两次输入的密码不一致', 'error');
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = '注册中...';
+
+        const { data, error } = await client.auth.signUp({
+          email: email,
+          password: password,
+          options: { data: { created_at: new Date().toISOString() } }
+        });
+
+        btn.disabled = false;
+        btn.textContent = '注册';
+
+        if (error) {
+          showMsg(error.message, 'error');
+        } else if (data.user) {
+          if (data.user.identities && data.user.identities.length === 0) {
+            showMsg('该邮箱已被注册', 'error');
+          } else {
+            // 记录注册尝试
+            regAttempts[Date.now()] = email;
+            localStorage.setItem('regAttempts', JSON.stringify(regAttempts));
+            showMsg('注册成功！正在跳转...', 'success');
+            form.reset();
+            setTimeout(() => { window.location.href = 'dashboard.html'; }, 1500);
+          }
+        }
+      });
+    })();
+  </script>
+<!-- 百度统计+推送 -->
+<script>
+var _hmt = _hmt || [];
+(function() {
+  var hm = document.createElement('script');
+  hm.src = 'https://hm.baidu.com/hm.js?8e1b10c422baa3b37f2ac5f766cce6b4';
+  var s = document.getElementsByTagName('script')[0];
+  s.parentNode.insertBefore(hm, s);
+})();
+(function(){
+  var bp = document.createElement('script');
+  var curProtocol = window.location.protocol.split(':')[0];
+  if (curProtocol === 'https') { bp.src = 'https://zz.bdstatic.com/linksubmit/push.js'; }
+  else { bp.src = 'http://push.zhanzhang.baidu.com/push.js'; }
+  var s = document.getElementsByTagName('script')[0];
+  s.parentNode.insertBefore(bp, s);
+})();
+</script>
+</body>
+</html>

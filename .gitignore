@@ -1,0 +1,36 @@
+# ===== 本地开发文件 =====
+_config_local.py
+_config_template.py
+_send_notifications.py
+_payment_worker.js
+__upgrade_*.sql
+__setup_*.sql
+_check_key.py
+_sql_payload.json
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+*.swp
+
+# ===== 项目文档（不上传） =====
+ARCHITECTURE.md
+CHANGELOG.md
+GOALS.md
+PLAN.md
+WORKFLOW.md
+RULES.md
+_fix_key.py
+__migrate.sql
+__migrate_v1.1.sql
+__fix_rls.sql
+__paired.sql
+__update_rls.sql
+
+# ===== 旧上岸鸽遗留脚本（本地使用） =====
+_process_feedback.py
+_verify_sponsor.py
+_parse_excel.py
+_test_excel.py
+_test_excel2.py
+1eaccbcb4c35eb801216ac77557234b5.txt

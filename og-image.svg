@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e3a8a"/>
+      <stop offset="100%" style="stop-color:#3b82f6"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <text x="80" y="220" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="72" font-weight="700" fill="white">上岸鸽</text>
+  <text x="80" y="310" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="36" fill="rgba(255,255,255,0.9)">公考·事业编·国企 招考信息</text>
+  <text x="80" y="370" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="36" fill="rgba(255,255,255,0.9)">第一时间通知你</text>
+  <text x="80" y="460" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="24" fill="rgba(255,255,255,0.6)">自动监控全国政府官网 · 724条真数据</text>
+  <rect x="80" y="500" width="200" height="8" rx="4" fill="#3b82f6"/>
+  <text x="1040" y="560" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="28" fill="rgba(255,255,255,0.8)">qyit.eu.org</text>
+</svg>
