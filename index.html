@@ -1332,26 +1332,26 @@ function exportData(){
 }
 // ====== 分享快照图 ======
 function shareSnapshot(){
-  const c=document.createElement('canvas');c.width=540;c.height=800;
+  const c=document.createElement('canvas');c.width=540;c.height=850;
   const ctx=c.getContext('2d');
-  // 背景渐变
-  const bg=ctx.createLinearGradient(0,0,540,800);
-  bg.addColorStop(0,'#1e293b');bg.addColorStop(0.5,'#1a2332');bg.addColorStop(1,'#0f172a');
-  ctx.fillStyle=bg;ctx.fillRect(0,0,540,800);
-  // 装饰圆
-  ctx.fillStyle='rgba(59,130,246,0.06)';ctx.beginPath();ctx.arc(480,40,200,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='rgba(245,158,11,0.04)';ctx.beginPath();ctx.arc(60,760,160,0,Math.PI*2);ctx.fill();
-  // 圆角矩形
+  // 浅色背景
+  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,540,850);
+  const bg=ctx.createLinearGradient(0,0,540,850);
+  bg.addColorStop(0,'#f8fafc');bg.addColorStop(1,'#f1f5f9');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,540,850);
+  // 顶部装饰条
+  ctx.fillStyle='#1e40af';ctx.fillRect(0,0,540,4);
+  // 圆角卡片
   const rr=(x,y,w,h,r)=>{ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();};
-  rr(24,24,492,752,16);ctx.fillStyle='rgba(255,255,255,0.05)';ctx.fill();
-  // 标题区
-  ctx.fillStyle='#f8fafc';ctx.font='bold 18px sans-serif';ctx.textAlign='center';
-  ctx.fillText('📊 收益账本',270,58);
-  ctx.fillStyle='#64748b';ctx.font='12px sans-serif';
-  ctx.fillText('个人投资理财追踪工具',270,78);
-  // 分隔线
-  ctx.strokeStyle='rgba(148,163,184,0.15)';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(48,94);ctx.lineTo(492,94);ctx.stroke();
+  rr(24,24,492,802,12);ctx.fillStyle='#ffffff';ctx.shadowColor='rgba(0,0,0,0.06)';ctx.shadowBlur=20;ctx.fill();ctx.shadowColor='transparent';
+  // 标题
+  ctx.fillStyle='#0f172a';ctx.font='bold 20px sans-serif';ctx.textAlign='center';
+  ctx.fillText('📊 收益账本',270,62);
+  ctx.fillStyle='#64748b';ctx.font='13px sans-serif';
+  ctx.fillText('个人投资理财追踪工具',270,84);
+  // 分隔
+  ctx.strokeStyle='#e2e8f0';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(40,100);ctx.lineTo(500,100);ctx.stroke();
   // 计算数据
   let tv=0,tc=0;
   accounts.forEach(a=>{const c2=calcAccount(a,allRecords[a.id]||[]);tv+=c2.currentValue;tc+=c2.costBasis;});
@@ -1362,74 +1362,73 @@ function shareSnapshot(){
   const clr=n=>n>=0?'#dc2626':'#2563eb';
   const today=new Date();const ds=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
   // 总资产
-  ctx.fillStyle='#f8fafc';ctx.font='bold 36px sans-serif';ctx.textAlign='left';
-  const tvStr=privacyMode?'******':fmtN(tv);
-  ctx.fillText(tvStr,48,140);
-  ctx.fillStyle='#94a3b8';ctx.font='13px sans-serif';
-  ctx.fillText('总资产',48,166);
+  ctx.fillStyle='#0f172a';ctx.font='bold 38px sans-serif';ctx.textAlign='left';
+  ctx.fillText(privacyMode?'******':fmtN(tv),44,152);
+  ctx.fillStyle='#64748b';ctx.font='14px sans-serif';
+  ctx.fillText('总资产',44,178);
   // 收益率
   ctx.textAlign='right';
-  ctx.fillStyle=clr(tr);ctx.font='bold 24px sans-serif';
-  ctx.fillText((tr>=0?'+':'')+trPct.toFixed(2)+'%',492,134);
-  ctx.fillStyle='#94a3b8';ctx.font='13px sans-serif';
-  ctx.fillText('总收益率',492,166);
+  ctx.fillStyle=clr(tr);ctx.font='bold 26px sans-serif';
+  ctx.fillText((tr>=0?'+':'')+trPct.toFixed(2)+'%',496,146);
+  ctx.fillStyle='#64748b';ctx.font='14px sans-serif';
+  ctx.fillText('总收益率',496,178);
   // 三指标行
   const metrics=[
     {label:'累计收益',val:privacyMode?'******':fmtN(tr),color:clr(tr)},
-    {label:'净值',val:nav.toFixed(3),color:'#f8fafc'},
+    {label:'净值',val:nav.toFixed(3),color:'#0f172a'},
     {label:'年化 XIRR',val:xirr!=null?(xirr>=0?'+':'')+(xirr*100).toFixed(2)+'%':'—',color:xirr!=null?clr(xirr):'#94a3b8'},
   ];
-  const mY=210;const mW=492/3;
+  const mY=224;const mW=492/3;
   metrics.forEach((m,i)=>{
     ctx.textAlign='center';
-    ctx.fillStyle=m.color;ctx.font='bold 19px sans-serif';
-    ctx.fillText(m.val,48+mW*i+mW/2,mY);
-    ctx.fillStyle='#94a3b8';ctx.font='12px sans-serif';
-    ctx.fillText(m.label,48+mW*i+mW/2,mY+22);
-    if(i<metrics.length-1){ctx.strokeStyle='rgba(148,163,184,0.12)';ctx.beginPath();ctx.moveTo(48+mW*(i+1),mY-14);ctx.lineTo(48+mW*(i+1),mY+30);ctx.stroke();}
+    ctx.fillStyle=m.color;ctx.font='bold 20px sans-serif';
+    ctx.fillText(m.val,44+mW*i+mW/2,mY);
+    ctx.fillStyle='#64748b';ctx.font='13px sans-serif';
+    ctx.fillText(m.label,44+mW*i+mW/2,mY+24);
+    if(i<metrics.length-1){ctx.strokeStyle='#e2e8f0';ctx.beginPath();ctx.moveTo(44+mW*(i+1),mY-16);ctx.lineTo(44+mW*(i+1),mY+32);ctx.stroke();}
   });
   // 分隔
-  ctx.strokeStyle='rgba(148,163,184,0.12)';ctx.beginPath();ctx.moveTo(48,260);ctx.lineTo(492,260);ctx.stroke();
+  ctx.strokeStyle='#e2e8f0';ctx.beginPath();ctx.moveTo(40,280);ctx.lineTo(500,280);ctx.stroke();
   // 账户列表
-  ctx.fillStyle='#94a3b8';ctx.font='14px sans-serif';ctx.textAlign='left';
-  ctx.fillText('账户概览',48,288);
-  let aY=306;
+  ctx.fillStyle='#64748b';ctx.font='15px sans-serif';ctx.textAlign='left';
+  ctx.fillText('账户概览',44,312);
+  let aY=332;
   const visible=accounts.filter(a=>showHidden||!a.hidden);
   visible.forEach((a,i)=>{
     if(aY>640)return;
     const c2=calcAccount(a,allRecords[a.id]||[]);
     const r2=c2.totalReturn;
-    ctx.fillStyle='#f8fafc';ctx.font='15px sans-serif';
-    ctx.fillText(a.name,48,aY);
+    ctx.fillStyle='#0f172a';ctx.font='16px sans-serif';
+    ctx.fillText(a.name,44,aY);
     ctx.textAlign='right';
     ctx.fillStyle=clr(r2);
     const r2Str=privacyMode?'******':(r2>=0?'+':'')+fmtN(r2);
-    ctx.font='bold 15px sans-serif';
-    ctx.fillText(r2Str+' ('+(c2.costBasis>0?((r2/c2.costBasis)*100).toFixed(1):'0.0')+'%)',492,aY);
+    ctx.font='bold 16px sans-serif';
+    ctx.fillText(r2Str+' ('+(c2.costBasis>0?((r2/c2.costBasis)*100).toFixed(1):'0.0')+'%)',496,aY);
     ctx.textAlign='left';
-    ctx.fillStyle='#64748b';ctx.font='12px sans-serif';
+    ctx.fillStyle='#94a3b8';ctx.font='13px sans-serif';
     const mvStr=privacyMode?'******':fmtN(c2.currentValue);
     const cbStr=privacyMode?'******':fmtN(c2.costBasis);
-    ctx.fillText('市值: '+mvStr+' | 投入: '+cbStr,48,aY+18);
-    aY+=44;
+    ctx.fillText('市值: '+mvStr+' | 投入: '+cbStr,44,aY+20);
+    aY+=48;
   });
-  // 底部：二维码 + 标语
-  ctx.strokeStyle='rgba(148,163,184,0.12)';ctx.beginPath();ctx.moveTo(48,700);ctx.lineTo(492,700);ctx.stroke();
-  ctx.fillStyle='#64748b';ctx.font='12px sans-serif';ctx.textAlign='center';
-  ctx.fillText('数据截至 '+ds+' · 扫码使用收益账本',270,724);
+  // 底部区域：二维码+标语 放一起
+  ctx.strokeStyle='#e2e8f0';ctx.beginPath();ctx.moveTo(40,710);ctx.lineTo(500,710);ctx.stroke();
+  // 二维码居中
+  const qrY=724;
+  ctx.fillStyle='#64748b';ctx.font='13px sans-serif';ctx.textAlign='center';
+  ctx.fillText('扫码使用收益账本 · 数据截至 '+ds,270,qrY);
   // 加载二维码
   const img=new Image();
   img.crossOrigin='anonymous';
   img.onload=function(){
-    ctx.drawImage(img,220,736,100,100);
-    // 下载
+    ctx.drawImage(img,220,qrY+10,100,100);
     c.toBlob(blob=>{
       const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='收益账本_'+ds+'.png';a.click();
       URL.revokeObjectURL(a.href);toast('快照已保存','success');
     },'image/png');
   };
   img.onerror=function(){
-    // 二维码加载失败，直接下载
     c.toBlob(blob=>{
       const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='收益账本_'+ds+'.png';a.click();
       URL.revokeObjectURL(a.href);toast('快照已保存','success');
