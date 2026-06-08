@@ -5,6 +5,9 @@ _send_notifications.py
 _payment_worker.js
 __upgrade_*.sql
 __setup_*.sql
+__migrate*.sql
+__fix_*.sql
+__paired.sql
 _check_key.py
 _sql_payload.json
 __pycache__/
@@ -21,13 +24,8 @@ PLAN.md
 WORKFLOW.md
 RULES.md
 _fix_key.py
-__migrate.sql
-__migrate_v1.1.sql
-__fix_rls.sql
-__paired.sql
-__update_rls.sql
 
-# ===== 旧上岸鸽遗留脚本（本地使用） =====
+# ===== 旧上岸鸽遗留脚本 =====
 _process_feedback.py
 _verify_sponsor.py
 _parse_excel.py
