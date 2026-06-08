@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>收益记录器 - 投资看板</title>
+  <title>收益账本 - 投资看板</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1e40af">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="收益记录器">
+  <meta name="apple-mobile-web-app-title" content="收益账本">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <script>
     if ('serviceWorker' in navigator) {
@@ -61,6 +61,11 @@
     .chart-tab { padding: 2px 8px 3px 8px; font-size: 0.76rem; border: none; background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.15s; border-bottom: 2px solid transparent; margin-bottom: -1px; }
     .chart-tab:hover { color: var(--text); }
     .chart-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+    .chart-range-btns { display: flex; gap: 4px; margin-bottom: 6px; flex-wrap: wrap; }
+    .chart-range-btn { padding: 1px 8px; font-size: 0.72rem; border: 1px solid var(--border); border-radius: 10px; background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.15s; }
+    .chart-range-btn:hover { border-color: var(--primary); color: var(--text); }
+    .chart-range-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .drawer-range-btns { display: flex; gap: 3px; margin-bottom: 4px; flex-wrap: wrap; }
     .chart-empty { text-align: center; padding: 80px 20px; color: var(--text-muted); font-size: 0.9rem; }
     .dd-label { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
     .drawer-chart-tabs { display: flex; gap: 0; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
@@ -155,12 +160,12 @@
   </style>
 </head>
 <body>
-<div id="nav-app"><nav-bar title="收益记录器" logo-url="/"></nav-bar></div>
+<div id="nav-app"><nav-bar title="收益账本" logo-url="/"></nav-bar></div>
 
 <div class="dash-layout" id="appContent">
   <div class="dash-main">
     <div class="auth-prompt" id="loginPrompt" style="display:none;">
-      <h1>📊 收益记录器</h1>
+      <h1>📊 收益账本</h1>
       <p>管理多账户、追踪收益率、可视化资产走势</p>
       <a href="login.html" class="btn btn-primary">登录</a>
       <a href="register.html" class="btn btn-ghost" style="margin-left:8px;">免费注册</a>
@@ -183,6 +188,12 @@
           <button class="chart-tab" data-mode="nav" onclick="switchChartMode('nav')">净值</button>
           <button class="chart-tab" data-mode="return" onclick="switchChartMode('return')">累计收益</button>
           <button class="chart-tab" data-mode="pie" onclick="switchChartMode('pie')">配置</button>
+        </div>
+        <div class="chart-range-btns">
+          <button class="chart-range-btn active" data-range="all" onclick="setChartRange('all')">全部</button>
+          <button class="chart-range-btn" data-range="thisYear" onclick="setChartRange('thisYear')">今年</button>
+          <button class="chart-range-btn" data-range="1y" onclick="setChartRange('1y')">近1年</button>
+          <button class="chart-range-btn" data-range="3y" onclick="setChartRange('3y')">近3年</button>
         </div>
         <div id="totalChart" class="chart-area"></div>
         <div id="pieChartContainer" class="chart-area" style="display:none;">
@@ -252,6 +263,12 @@
       <button class="drawer-chart-tab" data-mode="nav" onclick="switchDrawerChartMode('nav')">净值</button>
       <button class="drawer-chart-tab" data-mode="return" onclick="switchDrawerChartMode('return')">收益</button>
     </div>
+    <div class="drawer-range-btns" id="drawerRangeBtns" style="display:none;">
+      <button class="chart-range-btn active" data-range="all" onclick="setDrawerRange('all')">全部</button>
+      <button class="chart-range-btn" data-range="thisYear" onclick="setDrawerRange('thisYear')">今年</button>
+      <button class="chart-range-btn" data-range="1y" onclick="setDrawerRange('1y')">近1年</button>
+      <button class="chart-range-btn" data-range="3y" onclick="setDrawerRange('3y')">近3年</button>
+    </div>
     <div id="drawerChart" style="height:140px;margin-bottom:12px;"></div>
     <div class="drawer-filter" id="drawerFilter">
       <select id="filterType" onchange="applyDrawerFilter()">
@@ -298,7 +315,7 @@ const client=window.__supabaseClient||supabase.createClient(SUPABASE_URL,SUPABAS
 if(!window.__supabaseClient)window.__supabaseClient=client;
 
 let currentUser=null,accounts=[],allRecords={},settings=null,showHidden=false;
-let chartInstance=null,drawerAccountId=null,chartMode='assets',drawerChartMode='assets',csi300Map=null;
+let chartInstance=null,drawerAccountId=null,chartMode='assets',drawerChartMode='assets',csi300Map=null,chartRange='all';
 
 const $=id=>document.getElementById(id);
 function fmt(n){return n==null?'—':'¥'+Number(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
@@ -439,7 +456,7 @@ function render(){
   });
   if(filtered.length===0)html=`<div class="empty-guide" style="grid-column:1/-1;">
     <div class="icon-big">📊</div>
-    <h2>欢迎使用收益记录器</h2>
+    <h2>欢迎使用收益账本</h2>
     <p>开始追踪你的投资收益吧，只需三步</p>
     <div class="steps">
       <div class="step"><div class="step-num">第一步</div><div class="step-title">🏦 创建账户</div><div class="step-desc">点击上方「+ 新建账户」，创建现金账户和投资账户</div></div>
@@ -524,6 +541,25 @@ function calcMaxDrawdown(){
 }
 
 // 切换主页图表模式
+function computeRangeStart(range){
+  const n=new Date();
+  if(range==='thisYear')return new Date(n.getFullYear(),0,1).toISOString().slice(0,10);
+  if(range==='1y'){n.setFullYear(n.getFullYear()-1);return n.toISOString().slice(0,10);}
+  if(range==='3y'){n.setFullYear(n.getFullYear()-3);return n.toISOString().slice(0,10);}
+  return '';
+}
+function setChartRange(range){
+  chartRange=range;
+  document.querySelectorAll('.chart-range-btn').forEach(b=>b.classList.toggle('active',b.dataset.range===range));
+  renderChart();
+}
+function setDrawerRange(range){
+  const start=computeRangeStart(range);
+  $('filterDateStart').value=start;
+  $('filterDateEnd').value='';
+  document.querySelectorAll('#drawerRangeBtns .chart-range-btn').forEach(b=>b.classList.toggle('active',b.dataset.range===range));
+  if(drawerAccountId)showRecords(drawerAccountId);
+}
 function switchChartMode(mode){
   chartMode=mode;
   document.querySelectorAll('.chart-tab').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
@@ -543,6 +579,16 @@ function renderChart(){
   if(!data){if(chartInstance){chartInstance.dispose();chartInstance=null;}$('chartEmpty').style.display='block';return;}
   $('chartEmpty').style.display='none';
   const {dates,totalVal,totalCost,nav,cumRet,dailyTransfers}=data;
+  // 按日期范围截取数据
+  const rangeStart=computeRangeStart(chartRange);
+  if(rangeStart){
+    const idx=dates.findIndex(d=>d>=rangeStart);
+    if(idx>0){
+      const slice=(arr)=>arr.slice(idx);
+      dates.splice(0,idx);totalVal.splice(0,idx);totalCost.splice(0,idx);nav.splice(0,idx);cumRet.splice(0,idx);
+      Object.keys(dailyTransfers).forEach(k=>{if(k<rangeStart)delete dailyTransfers[k];});
+    }
+  }
   
   if(!chartInstance){chartInstance=echarts.init($('totalChart'));}
   
@@ -579,15 +625,17 @@ function renderChart(){
           lineStyle:{width:1,color:'#f59e0b'}}]
     };
   }else if(chartMode==='nav'){
-    // 构建沪深300归一化数据（无数据日向前填充，避免断线）
+    // 构建沪深300归一化数据（向后填充+向左补齐，避免断线）
     let lastVal=null;
-    const hs300Data=dates.map(d=>{
-      const v=csi300Map&&csi300Map[d]?csi300Map[d]:lastVal;
+    const hs300Raw=dates.map(d=>{
+      const v=csi300Map&&csi300Map[d]?csi300Map[d]:null;
       if(v!=null)lastVal=v;
       return v;
     });
-    const firstIdx=hs300Data.findIndex(v=>v!==null);
-    const baseVal=firstIdx>=0?hs300Data[firstIdx]:1;
+    // 向左补齐：开头null用第一个有效值填充
+    const firstGood=hs300Raw.find(v=>v!=null);
+    const hs300Data=hs300Raw.map(v=>v!=null?v:(firstGood||null));
+    const baseVal=firstGood||1;
     const hs300Nav=hs300Data.map(v=>v!=null?v/baseVal:null);
     option={
       tooltip:{trigger:'axis',valueFormatter:(v,idx)=>{
@@ -823,11 +871,13 @@ async function showRecords(accountId){
   const xirrStr=xirrVal!=null&&!isNaN(xirrVal)?(xirrVal*100).toFixed(2)+'%':'—';
   const xirrColor=xirrVal!=null?(xirrVal>=0?'#dc2626':'#2563eb'):'var(--text-secondary)';
   $('drawerSummary').innerHTML=`<div class="drawer-stat"><div class="v">${fmt(calc.currentValue)}</div><div class="l">当前资产</div></div><div class="drawer-stat"><div class="v" style="color:${calc.totalReturn>=0?'#dc2626':'#2563eb'}">${fmt(calc.totalReturn)}</div><div class="l">累计收益</div></div><div class="drawer-stat"><div class="v">${calc.nav.toFixed(3)}</div><div class="l">净值</div></div><div class="drawer-stat"><div class="v" style="color:#2563eb">${ddStr}</div><div class="l">最大回撤</div></div><div class="drawer-stat"><div class="v" style="color:${xirrColor}">${xirrStr}</div><div class="l">年化 <span class="xirr">XIRR</span></div></div>`;
-  // 默认日期范围为最早记录到今日
-  const earliest=allRecs.length?allRecs.reduce((a,b)=>a.record_date<b.record_date?a:b).record_date:'';
-  const today=new Date();const todayStr=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
-  $('filterDateStart').value=earliest;
-  $('filterDateEnd').value=todayStr;
+  // 默认日期范围为最早记录到今日（仅首次打开时设置）
+  if(!$('filterDateStart').value){
+    const earliest=allRecs.length?allRecs.reduce((a,b)=>a.record_date<b.record_date?a:b).record_date:'';
+    const today=new Date();const todayStr=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+    $('filterDateStart').value=earliest;
+    $('filterDateEnd').value=todayStr;
+  }
   // 迷你折线图
   renderDrawerChart(accountId,acct);
   const records=allRecords[accountId]||[];const tbody=$('drawerRecords');
@@ -862,7 +912,7 @@ function renderDrawerChart(accountId,acct){
     return d!==0?d:new Date(a.created_at||0)-new Date(b.created_at||0);
   });
   if(records.length<2){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.8rem;">至少2条记录才能显示趋势</div>';$('drawerChartTabs').style.display='none';return;}
-  $('drawerChartTabs').style.display='flex';
+  $('drawerChartTabs').style.display='flex';$('drawerRangeBtns').style.display='flex';
   // 构建该账户的时间序列
   let value=0,cost=0;
   const dates=[],vals=[],costs=[],navs=[],rets=[];
@@ -924,15 +974,16 @@ function renderDrawerChart(accountId,acct){
       ]
     };
   }else if(mode==='nav'){
-    // 构建沪深300归一化数据（无数据日向前填充，避免断线）
+    // 构建沪深300归一化数据（向后填充+向左补齐，避免断线）
     let lastV=null;
-    const hs300Drawer=dates.map(d=>{
-      const v=csi300Map&&csi300Map[d]?csi300Map[d]:lastV;
+    const hs300RawD=dates.map(d=>{
+      const v=csi300Map&&csi300Map[d]?csi300Map[d]:null;
       if(v!=null)lastV=v;
       return v;
     });
-    const firstDIdx=hs300Drawer.findIndex(v=>v!==null);
-    const baseD=firstDIdx>=0?hs300Drawer[firstDIdx]:1;
+    const firstGoodD=hs300RawD.find(v=>v!=null);
+    const hs300Drawer=hs300RawD.map(v=>v!=null?v:(firstGoodD||null));
+    const baseD=firstGoodD||1;
     const hs300NavD=hs300Drawer.map(v=>v!=null?v/baseD:null);
     const isInvest=acct.account_type==='investment';
     option={

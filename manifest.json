@@ -1,6 +1,6 @@
 {
-  "name": "收益记录器",
-  "short_name": "收益记录器",
+  "name": "收益账本",
+  "short_name": "收益账本",
   "description": "个人投资理财追踪工具",
   "start_url": "/",
   "scope": "/",

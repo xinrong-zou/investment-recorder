@@ -1,4 +1,4 @@
-// 理财收益记录器 - 导航栏 Vue3 组件 (头像+下拉菜单)
+// 理财收益账本 - 导航栏 Vue3 组件 (头像+下拉菜单)
 // 用法: 在HTML中引入后，执行 mountNavBar('#nav-app')
 (function() {
   const SUPABASE_URL = 'https://spb-cl9n18iof0i9qxjh.supabase.opentrust.net';
@@ -35,7 +35,7 @@
 
   const NavBar = {
     props: {
-      title: { type: String, default: '收益记录器' },
+      title: { type: String, default: '收益账本' },
       logoUrl: { type: String, default: '/' },
       loginUrl: { type: String, default: 'login.html' },
       registerUrl: { type: String, default: 'register.html' },
