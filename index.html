@@ -124,10 +124,7 @@
       .empty-guide .steps { grid-template-columns: 1fr; gap: 10px; }
     }
     /* Pie chart */
-    .pie-chart-row { display: flex; gap: 16px; margin-bottom: 24px; align-items: stretch; }
-    .pie-chart-box { flex: 1; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; min-width: 0; }
-    .pie-chart-box h3 { font-size: 0.88rem; margin-bottom: 6px; color: var(--text-secondary); }
-    .pie-chart-area { width: 100%; height: 200px; }
+    .pie-chart-area { height: 200px; }
     .pie-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; }
     .pie-legend-item { display: flex; align-items: center; gap: 4px; font-size: 0.76rem; color: var(--text-secondary); }
     .pie-legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -172,16 +169,14 @@
           <button class="chart-tab active" data-mode="assets" onclick="switchChartMode('assets')">总资产</button>
           <button class="chart-tab" data-mode="nav" onclick="switchChartMode('nav')">净值</button>
           <button class="chart-tab" data-mode="return" onclick="switchChartMode('return')">累计收益</button>
+          <button class="chart-tab" data-mode="pie" onclick="switchChartMode('pie')">配置</button>
         </div>
         <div id="totalChart" class="chart-area"></div>
-        <div class="chart-empty" id="chartEmpty" style="display:none;">暂无数据</div>
-      </div>
-
-      <div class="pie-chart-row" id="pieChartRow" style="display:none;">
-        <div class="pie-chart-box">
-          <h3>📊 资产配置</h3>
-          <div id="pieChart" class="pie-chart-area"></div>
+        <div id="pieChartContainer" class="chart-area" style="display:none;">
+          <div id="pieChart" class="pie-chart-area" style="height:200px;"></div>
+          <div class="chart-empty" id="pieChartEmpty" style="display:none;">至少2个可见账户才能显示资产配置</div>
         </div>
+        <div class="chart-empty" id="chartEmpty" style="display:none;">暂无数据</div>
       </div>
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
@@ -319,9 +314,10 @@ function calcXIRR(records, accountType, currentValue){
   if(flows.length<2)return null;
   // 按日期排序
   flows.sort((a,b)=>a.date-b.date);
-  // 把当前市值作为最后一笔正向现金流加入（=今天全部赎回）
+  // 从所有记录中取最晚日期（含更新市值），用于放置当前市值
   if(currentValue!=null&&currentValue!==0){
-    const lastDate=flows[flows.length-1].date;
+    let lastDate=flows[flows.length-1].date;
+    records.forEach(r=>{const d=new Date(r.record_date);if(!isNaN(d)&&d>lastDate)lastDate=d;});
     flows.push({amount:currentValue, date:lastDate});
   }
   const startDate=flows[0].date;
@@ -427,7 +423,7 @@ function render(){
   const {maxDd,ddStart,ddEnd}=calcMaxDrawdown();
   // 汇总 XIRR
   const allFlows=[];
-  accounts.forEach(a=>{(allRecords[a.id]||[]).filter(r=>r.action_type!=='revalue').forEach(r=>{allFlows.push({amount:r.action_type==='transfer_in'?-Number(r.amount):Number(r.amount),date:new Date(r.record_date)});});});
+  accounts.forEach(a=>{(allRecords[a.id]||[]).forEach(r=>{allFlows.push(r);});});
   const totalXirr=calcXIRR(allFlows,'investment', totalVal);
   const retColor=totalRet>=0?'profit':'loss';
   const ddHtml=maxDd<0?`<div class="item"><div class="num loss">${(maxDd*100).toFixed(2)}%</div><div class="label">最大回撤</div><div class="sub">${ddStart} ~ ${ddEnd}</div></div>`:'';
@@ -479,21 +475,7 @@ function buildSeries(){
     nav.push(c>0?v/c:1);cumRet.push(v-c);
     if(dayNetIn>0||dayNetOut>0)dailyTransfers[d]={netIn:dayNetIn,netOut:dayNetOut};
   }
-  // 构建月累投基准
-  const monthLabels=[],monthlyCost=[];
-  const costByMonth={};
-  for(const d of dates){
-    const m=d.substring(0,7);
-    if(!costByMonth[m])costByMonth[m]=0;
-    // 找出当天净投入变化
-    let idx=dates.indexOf(d);
-    if(idx>=0)costByMonth[m]=totalCost[idx];
-  }
-  for(const m of Object.keys(costByMonth).sort()){
-    monthLabels.push(m);
-    monthlyCost.push(costByMonth[m]);
-  }
-  return {dates,totalVal,totalCost,nav,cumRet,dailyTransfers,monthLabels,monthlyCost};
+  return {dates,totalVal,totalCost,nav,cumRet,dailyTransfers};
 }
 
 // 计算最大回撤
@@ -513,20 +495,28 @@ function calcMaxDrawdown(){
 function switchChartMode(mode){
   chartMode=mode;
   document.querySelectorAll('.chart-tab').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
-  renderChart();
+  if(mode==='pie'){
+    $('totalChart').style.display='none';
+    $('pieChartContainer').style.display='block';
+    renderPieChart();
+  }else{
+    $('totalChart').style.display='block';
+    $('pieChartContainer').style.display='none';
+    renderChart();
+  }
 }
 
 function renderChart(){
   const data=buildSeries();
   if(!data){if(chartInstance){chartInstance.dispose();chartInstance=null;}$('chartEmpty').style.display='block';return;}
   $('chartEmpty').style.display='none';
-  const {dates,totalVal,totalCost,nav,cumRet,dailyTransfers,monthLabels,monthlyCost}=data;
+  const {dates,totalVal,totalCost,nav,cumRet,dailyTransfers}=data;
   
   if(!chartInstance){chartInstance=echarts.init($('totalChart'));}
   
   let option;
   if(chartMode==='assets'){
-    // 构建总资产数据点：有资金变动的日期用红/蓝圆点标注
+    // 总资产：有资金变动的日期用红/蓝圆点
     const assetData=totalVal.map((v,i)=>{
       const dt=dates[i];
       const tf=dailyTransfers[dt];
@@ -534,6 +524,12 @@ function renderChart(){
       if(tf.netIn>tf.netOut)return {value:v,symbol:'circle',symbolSize:7,itemStyle:{color:'#dc2626',borderColor:'#dc2626'}};
       if(tf.netOut>0)return {value:v,symbol:'circle',symbolSize:7,itemStyle:{color:'#2563eb',borderColor:'#2563eb'}};
       return v;
+    });
+    // 净投入：仅在有变动的日期显示小圆点
+    let prevC=0;
+    const costData=totalCost.map((v,i)=>{
+      const changed=v!==prevC;prevC=v;
+      return changed?{value:v,symbol:'circle',symbolSize:5,itemStyle:{color:'#f59e0b',borderColor:'#f59e0b'}}:v;
     });
     option={
       tooltip:{trigger:'axis',formatter:function(p){
@@ -543,24 +539,17 @@ function renderChart(){
         let lines=[date,'总资产: ¥'+av.toLocaleString(),'净投入: ¥'+cv.toLocaleString()];
         const tf=dailyTransfers[date];
         if(tf){const net=tf.netIn-tf.netOut;if(net!==0)lines.push('当日净'+(net>0?'转入: +¥':'转出: -¥')+Math.abs(net).toLocaleString());}
-        // 月累投值：找到该日期所在月的累积净投入
-        const monthKey=date.substring(0,7);
-        const mIdx=monthLabels?monthLabels.indexOf(monthKey):-1;
-        const mv=mIdx>=0?monthlyCost[mIdx]:cv;
-        lines.push('月累投: ¥'+mv.toLocaleString());
         return lines.join('<br/>');
       }},
-      legend:{data:['总资产','净投入','月累投'],icon:'line',bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
+      legend:{data:['总资产','净投入'],icon:'line',bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
       grid:{left:55,right:16,top:16,bottom:48},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',axisLabel:{fontSize:10,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(0)+'万':v},splitLine:{lineStyle:{color:'#f1f5f9'}}},
       series:[
         {name:'总资产',type:'line',data:assetData,smooth:true,symbol:'none',lineStyle:{width:2,color:'#3b82f6'},
           areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(59,130,246,0.15)'},{offset:1,color:'rgba(59,130,246,0)'}]}}},
-        {name:'净投入',type:'line',data:totalCost,smooth:true,symbol:'none',
-          lineStyle:{width:1,color:'#f59e0b'}},
-        {name:'月累投',type:'line',data:totalCost,step:'end',smooth:false,symbol:'none',
-          lineStyle:{width:1,color:'#8b5cf6',type:'dashed'}}]
+        {name:'净投入',type:'line',data:costData,smooth:true,symbol:'none',
+          lineStyle:{width:1,color:'#f59e0b'}}]
     };
   }else if(chartMode==='nav'){
     option={
@@ -605,13 +594,14 @@ let pieChartInstance=null;
 function renderPieChart(){
   const el=$('pieChart');if(!el)return;
   const visible=accounts.filter(a=>showHidden||!a.hidden);
-  if(visible.length<2){$('pieChartRow').style.display='none';return;}
-  $('pieChartRow').style.display='flex';
+  if(pieChartInstance){pieChartInstance.dispose();pieChartInstance=null;}
+  if(visible.length<2){$('pieChartEmpty').style.display='block';el.style.display='none';return;}
+  $('pieChartEmpty').style.display='none';el.style.display='block';
   const data=visible.map(a=>{
     const c=calcAccount(a,allRecords[a.id]||[]);
     return {name:a.name,value:Math.max(0,c.currentValue)};
   }).filter(d=>d.value>0);
-  if(data.length<2){$('pieChartRow').style.display='none';return;}
+  if(data.length<2){$('pieChartEmpty').style.display='block';el.style.display='none';return;}
   if(pieChartInstance){pieChartInstance.dispose();}
   pieChartInstance=echarts.init(el);
   const colors=['#3b82f6','#059669','#f59e0b','#dc2626','#8b5cf6','#ec4899','#14b8a6','#f97316'];
@@ -856,6 +846,12 @@ function renderDrawerChart(accountId,acct){
   const mode=drawerChartMode;
   let option;
   if(mode==='assets'){
+    // 净投入仅在有变动的日期显示小圆点
+    let prevC=0;
+    const costData=costs.map((v,i)=>{
+      const changed=v!==prevC;prevC=v;
+      return changed?{value:v,symbol:'circle',symbolSize:4,itemStyle:{color:'#f59e0b',borderColor:'#f59e0b'}}:v;
+    });
     option={
       tooltip:{trigger:'axis',formatter:function(p){return p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':'¥'+Number(d.value).toFixed(2))).join('<br/>');}},
       legend:{data:['余额','净投入'],icon:'line',top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
@@ -865,7 +861,7 @@ function renderDrawerChart(accountId,acct){
       series:[
         {name:'余额',type:'line',data:vals,smooth:true,symbol:'none',lineStyle:{width:2,color:'#3b82f6'},
           areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(59,130,246,0.3)'},{offset:1,color:'rgba(59,130,246,0)'}]}}},
-        {name:'净投入',type:'line',data:costs,smooth:true,symbol:'none',
+        {name:'净投入',type:'line',data:costData,smooth:true,symbol:'none',
           lineStyle:{width:1,color:'#f59e0b'}}
       ]
     };
