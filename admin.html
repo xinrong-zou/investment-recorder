@@ -69,7 +69,7 @@
       <div style="overflow-x:auto;">
         <table class="admin-table">
           <thead><tr>
-            <th>邮箱</th><th>注册时间</th><th>账户数</th><th>总记录数</th><th>角色</th>
+            <th>邮箱</th><th>注册时间</th><th>账户数</th><th>总记录数</th><th>计划</th><th>角色</th>
           </tr></thead>
           <tbody id="adminUserList"></tbody>
         </table>
@@ -186,10 +186,11 @@
           <td>${(u.created_at||'').substring(0,10)}</td>
           <td>${acctCountByUser[u.id]||0}</td>
           <td>${recCountByUser[u.id]||0}</td>
+          <td>${u.plan==='pro'?'<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:0.72rem;font-weight:500;background:#fef3c7;color:#d97706;">Pro</span>':'<span style="color:var(--text-muted);font-size:0.78rem;">free</span>'}</td>
           <td>${ADMIN_EMAILS.includes(u.email) ? '<span style="color:var(--primary);font-weight:600;">管理员</span>' : '用户'}</td>
-        </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">暂无数据</td></tr>';
+        </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">暂无数据</td></tr>';
     } catch(e) {
-      document.getElementById('adminUserList').innerHTML = '<tr><td colspan="5" style="color:var(--text-muted);text-align:center;">加载失败: ' + e.message + '</td></tr>';
+      document.getElementById('adminUserList').innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);text-align:center;">加载失败: ' + e.message + '</td></tr>';
     }
     document.getElementById('adminUsersLoading').style.display = 'none';
   };

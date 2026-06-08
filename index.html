@@ -10,12 +10,14 @@
   <style>
     .dash-layout { display: flex; min-height: calc(100vh - 60px); }
     .dash-main { flex: 1; padding: 20px; max-width: 1000px; margin: 0 auto; overflow-y: auto; }
-    .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
-    .summary-card { padding: 20px; text-align: center; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); }
-    .summary-card .num { font-size: 1.6rem; font-weight: 800; color: var(--primary); }
-    .summary-card .num.profit { color: #dc2626; }
-    .summary-card .num.loss { color: #2563eb; }
-    .summary-card .label { font-size: 0.82rem; color: var(--text-muted); margin-top: 4px; }
+    .summary-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px 20px; margin-bottom: 24px; }
+    .summary-card .row { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+    .summary-card .item { flex: 1; min-width: 90px; }
+    .summary-card .item .num { font-size: 1.1rem; font-weight: 700; color: var(--text); line-height: 1.3; }
+    .summary-card .item .num.profit { color: #dc2626; }
+    .summary-card .item .num.loss { color: #2563eb; }
+    .summary-card .item .label { font-size: 0.7rem; color: var(--text-muted); margin-top: 1px; letter-spacing: 0.3px; }
+    .summary-card .item .sub { font-size: 0.65rem; color: var(--text-muted); }
     .account-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px; }
     .account-card { padding: 20px; position: relative; cursor: pointer; transition: border-color 0.15s; }
     .account-card:hover { border-color: var(--primary-light); }
@@ -87,7 +89,8 @@
     .auth-prompt h1 { font-size: 1.8rem; margin-bottom: 8px; }
     .auth-prompt p { color: var(--text-muted); margin-bottom: 20px; }
     @media (max-width: 768px) {
-      .summary-grid { grid-template-columns: repeat(2, 1fr); }
+      .summary-card .row { gap: 6px 12px; }
+      .summary-card .item { min-width: 70px; }
       .account-grid { grid-template-columns: 1fr; }
       .drawer { width: 100vw; }
     }
@@ -106,12 +109,8 @@
     </div>
 
     <div id="dashContent" style="display:none;">
-      <div class="summary-grid" id="summaryGrid">
-        <div class="summary-card"><div class="num" id="totalAssets">—</div><div class="label">总资产</div></div>
-        <div class="summary-card"><div class="num" id="totalReturn">—</div><div class="label">总收益</div></div>
-        <div class="summary-card"><div class="num" id="totalReturnPct">—</div><div class="label">总收益率</div></div>
-        <div class="summary-card"><div class="num" id="totalNav">—</div><div class="label">总净值</div></div>
-        <div class="summary-card" id="maxDrawdownCard" style="display:none;"><div class="num" id="totalMaxDd">—</div><div class="label">最大回撤</div><div class="dd-label" id="totalMaxDdRange"></div></div>
+      <div class="summary-card" id="summaryCard">
+        <div class="row" id="summaryRow"></div>
       </div>
 
       <div class="chart-container">
@@ -303,14 +302,17 @@ function render(){
   if(filtered.length===0)html='<div class="card" style="padding:48px;text-align:center;color:var(--text-muted);grid-column:1/-1;">还没有账户，点击上方「+ 新建账户」开始</div>';
   $('accountGrid').innerHTML=html;
   const totalRet=totalVal-totalCost,totalRetPct=totalCost>0?(totalRet/totalCost)*100:0;
-  $('totalAssets').textContent=fmt(totalVal);$('totalReturn').textContent=fmt(totalRet);$('totalReturn').style.color=totalRet>=0?'#dc2626':'#2563eb';
-  $('totalReturnPct').textContent = fmtPct(totalRetPct);$('totalReturnPct').style.color=totalRetPct>=0?'#dc2626':'#2563eb';
   const totalNavVal=totalCost>0?(totalVal/totalCost):1;
-  $('totalNav').textContent=totalNavVal.toFixed(3);
-  // 计算最大回撤
   const {maxDd,ddStart,ddEnd}=calcMaxDrawdown();
-  if(maxDd<0){$('maxDrawdownCard').style.display='block';$('totalMaxDd').textContent=(maxDd*100).toFixed(2)+'%';$('totalMaxDd').style.color='#2563eb';$('totalMaxDdRange').textContent=ddStart+' ~ '+ddEnd;}
-  else{$('maxDrawdownCard').style.display='none';}
+  const retColor=totalRet>=0?'profit':'loss';
+  const ddHtml=maxDd<0?`<div class="item"><div class="num loss">${(maxDd*100).toFixed(2)}%</div><div class="label">最大回撤</div><div class="sub">${ddStart} ~ ${ddEnd}</div></div>`:'';
+  $('summaryRow').innerHTML=`
+    <div class="item"><div class="num">${fmt(totalVal)}</div><div class="label">总资产</div></div>
+    <div class="item"><div class="num ${retColor}">${fmt(totalRet)}</div><div class="label">总收益</div></div>
+    <div class="item"><div class="num ${retColor}">${fmtPct(totalRetPct)}</div><div class="label">总收益率</div></div>
+    <div class="item"><div class="num">${totalNavVal.toFixed(3)}</div><div class="label">总净值</div></div>
+    ${ddHtml}
+  `;
   const hasHidden=accounts.some(a=>a.hidden);$('showHiddenToggle').style.display=hasHidden?'':'none';
   renderChart();
   // 如果抽屉开着，刷新其数据
@@ -398,7 +400,7 @@ function renderChart(){
         const cv=typeof p[1].value==='object'?p[1].value.value:p[1].value;
         let lines=[date,'总资产: ¥'+av.toLocaleString(),'净投入: ¥'+cv.toLocaleString()];
         const tf=dailyTransfers[date];
-        if(tf){if(tf.netIn>0)lines.push('当日转入: +¥'+tf.netIn.toLocaleString());if(tf.netOut>0)lines.push('当日转出: -¥'+tf.netOut.toLocaleString());}
+        if(tf){const net=tf.netIn-tf.netOut;if(net!==0)lines.push('当日净'+(net>0?'转入: +¥':'转出: -¥')+Math.abs(net).toLocaleString());}
         return lines.join('<br/>');
       }},
       legend:{data:['总资产','净投入'],bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
