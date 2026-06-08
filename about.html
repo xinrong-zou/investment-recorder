@@ -125,7 +125,7 @@ mountNavBar('#nav-app');
 
   // 加载赞助者列表
   try {
-    const resp = await fetch('/api/donors');
+    const resp = await fetch((window.__API_BASE||'') + '/api/donors');
     const data = await resp.json();
     const donors = data.donors || [];
     document.getElementById('donorLoading').style.display = 'none';

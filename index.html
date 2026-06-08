@@ -313,34 +313,41 @@ function calcAccount(acct,records){
 }
 
 // ====== XIRR 年化收益率计算 ======
-function calcXIRR(records, accountType){
+function calcXIRR(records, accountType, currentValue){
   // 从记录中提取现金流（仅转入转出影响现金流）
   const flows=records.filter(r=>r.action_type!=='revalue').map(r=>({amount:r.action_type==='transfer_in'?-Number(r.amount):Number(r.amount),date:new Date(r.record_date)}));
   if(flows.length<2)return null;
   // 按日期排序
   flows.sort((a,b)=>a.date-b.date);
+  // 把当前市值作为最后一笔正向现金流加入（=今天全部赎回）
+  if(currentValue!=null&&currentValue!==0){
+    const lastDate=flows[flows.length-1].date;
+    flows.push({amount:currentValue, date:lastDate});
+  }
   const startDate=flows[0].date;
   // 将现金流归一化到年偏移
   const days=flows.map(f=>(f.date-startDate)/86400000);
   const amounts=flows.map(f=>f.amount);
-  // 用牛顿法求解 XIRR
-  let rate=0.1; // 初始猜测 10%
-  for(let iter=0;iter<100;iter++){
-    let f=0,fp=0;
-    for(let i=0;i<amounts.length;i++){
-      const exp=days[i]/365;
-      const denom=Math.pow(1+rate,exp);
-      f+=amounts[i]/denom;
-      fp-=exp*amounts[i]/(denom*(1+rate));
+  // 用牛顿法求解 XIRR（多初始猜测，提高收敛率）
+  const guesses=[0.1,-0.1,0.3,-0.3,0.5,-0.5,0.01,-0.01,0.001,-0.001,0.99];
+  for(let g of guesses){
+    let rate=g;
+    for(let iter=0;iter<100;iter++){
+      let f=0,fp=0;
+      for(let i=0;i<amounts.length;i++){
+        const exp=days[i]/365;
+        const denom=Math.pow(1+rate,exp);
+        f+=amounts[i]/denom;
+        fp-=exp*amounts[i]/(denom*(1+rate));
+      }
+      if(Math.abs(f)<1e-7)return rate;
+      if(fp===0)break;
+      const newRate=rate-f/fp;
+      if(newRate<-0.9999||newRate>10)break;
+      rate=newRate;
     }
-    if(Math.abs(f)<1e-7)break;
-    if(fp===0){rate=null;break;}
-    const newRate=rate-f/fp;
-    if(newRate<-0.9999||newRate>10){rate=null;break;}
-    rate=newRate;
   }
-  if(rate==null||rate<=-1||rate>10)return null;
-  return rate;
+  return null;
 }
 
 async function loadData(){
@@ -421,10 +428,10 @@ function render(){
   // 汇总 XIRR
   const allFlows=[];
   accounts.forEach(a=>{(allRecords[a.id]||[]).filter(r=>r.action_type!=='revalue').forEach(r=>{allFlows.push({amount:r.action_type==='transfer_in'?-Number(r.amount):Number(r.amount),date:new Date(r.record_date)});});});
-  const totalXirr=calcXIRR(allFlows,'investment');
+  const totalXirr=calcXIRR(allFlows,'investment', totalVal);
   const retColor=totalRet>=0?'profit':'loss';
   const ddHtml=maxDd<0?`<div class="item"><div class="num loss">${(maxDd*100).toFixed(2)}%</div><div class="label">最大回撤</div><div class="sub">${ddStart} ~ ${ddEnd}</div></div>`:'';
-  const xirrHtml=totalXirr!=null?`<div class="item"><div class="num ${totalXirr>=0?'profit':'loss'}">${(totalXirr*100).toFixed(2)}%</div><div class="label">年化收益率 <span class="xirr">XIRR</span></div></div>`:'';
+  const xirrHtml=totalXirr!=null&&!isNaN(totalXirr)?`<div class="item"><div class="num ${totalXirr>=0?'profit':'loss'}">${(totalXirr*100).toFixed(2)}%</div><div class="label">年化收益率 <span class="xirr">XIRR</span></div></div>`:'';
   $('summaryRow').innerHTML=`
     <div class="item"><div class="num">${fmt(totalVal)}</div><div class="label">总资产</div></div>
     <div class="item"><div class="num ${retColor}">${fmt(totalRet)}</div><div class="label">总收益</div></div>
@@ -781,7 +788,7 @@ async function showRecords(accountId){
     if(ddVal<0){maxDd=ddVal;ddStart=allRecs[ddStart].record_date;ddEnd=allRecs[ddEnd].record_date;}
   }
   const ddStr=maxDd<0?((maxDd*100).toFixed(2)+'%'):'—';
-  const xirrVal=calcXIRR(allRecs,acct.account_type);
+  const xirrVal=calcXIRR(allRecs,acct.account_type, calc.currentValue);
   const xirrStr=xirrVal!=null&&!isNaN(xirrVal)?(xirrVal*100).toFixed(2)+'%':'—';
   const xirrColor=xirrVal!=null?(xirrVal>=0?'#dc2626':'#2563eb'):'var(--text-secondary)';
   $('drawerSummary').innerHTML=`<div class="drawer-stat"><div class="v">${fmt(calc.currentValue)}</div><div class="l">当前资产</div></div><div class="drawer-stat"><div class="v" style="color:${calc.totalReturn>=0?'#dc2626':'#2563eb'}">${fmt(calc.totalReturn)}</div><div class="l">累计收益</div></div><div class="drawer-stat"><div class="v">${calc.nav.toFixed(3)}</div><div class="l">净值</div></div><div class="drawer-stat"><div class="v" style="color:#2563eb">${ddStr}</div><div class="l">最大回撤</div></div><div class="drawer-stat"><div class="v" style="color:${xirrColor}">${xirrStr}</div><div class="l">年化 <span class="xirr">XIRR</span></div></div>`;

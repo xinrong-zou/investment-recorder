@@ -171,7 +171,7 @@
 
     // 通过Worker验证管理员身份（auth/v1/user验签）
     try {
-      const testReq = await fetch('/api/admin/users', {
+      const testReq = await fetch((window.__API_BASE||'') + '/api/admin/users', {
         headers: { 'Authorization': 'Bearer ' + session.access_token }
       });
       if (!testReq.ok) throw new Error('not admin');
@@ -220,7 +220,7 @@
       // 先尝试 Worker 接口
       let users = null;
       try {
-        const req = await fetch('/api/admin/users', {
+        const req = await fetch((window.__API_BASE||'') + '/api/admin/users', {
           headers: { 'Authorization': 'Bearer ' + session.access_token }
         });
         if (req.ok) {
@@ -268,7 +268,7 @@
     try {
       const session = (await client.auth.getSession()).data.session;
       if (!session) throw new Error('未登录');
-      const req = await fetch('/api/admin/users', {
+      const req = await fetch((window.__API_BASE||'') + '/api/admin/users', {
         headers: { 'Authorization': 'Bearer ' + session.access_token }
       });
       if (!req.ok) throw new Error('请求失败');
@@ -305,7 +305,7 @@
     try {
       const session = (await client.auth.getSession()).data.session;
       if (!session) throw new Error('未登录');
-      const req = await fetch('/api/admin/subscription', {
+      const req = await fetch((window.__API_BASE||'') + '/api/admin/subscription', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, action, months: 1 })
@@ -357,7 +357,7 @@
     try {
       const session = (await client.auth.getSession()).data.session;
       if (!session) throw new Error('未登录');
-      const req = await fetch('/api/admin/feedback-reply', {
+      const req = await fetch((window.__API_BASE||'') + '/api/admin/feedback-reply', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, reply: reply.trim() })

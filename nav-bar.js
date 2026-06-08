@@ -2,6 +2,9 @@
 // 用法: 在HTML中引入后，执行 mountNavBar('#nav-app')
 (function() {
   const SUPABASE_URL = 'https://spb-cl9n18iof0i9qxjh.supabase.opentrust.net';
+  // API base — local dev uses Cloudflare Worker, production uses same-origin
+  const API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? 'https://qyit.eu.org' : '';
+  window.__API_BASE = API_BASE;
   const SUPABASE_ANON_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiIsInJlZiI6InNwYi1jbDluMThpb2YwaTlxeGpoIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA2NjgzNzQsImV4cCI6MjA5NjI0NDM3NH0.t8MDF4zdvV9kpUz-gZpVM-OgFlAow8FlENASpqkUkwk';
   const ADMIN_EMAILS = []; // Worker验证
   const ADMIN_CHECK_CACHE = {}; // 缓存管理员状态
@@ -120,7 +123,7 @@
         try {
           const { data: { session } } = await this.client.auth.getSession();
           if (!session) return;
-          const req = await fetch('/api/admin/users', {
+          const req = await fetch(__API_BASE + '/api/admin/users', {
             headers: { 'Authorization': 'Bearer ' + session.access_token }
           });
           this._isAdmin = req.ok;
