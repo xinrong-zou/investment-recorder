@@ -84,22 +84,23 @@
         } catch(e) { this.initializing = false; console.log('nav auth err:', e.message); }
       },
       async fetchPlan() {
-        // 新项目无订阅体系，保持默认
-        this.plan = 'free';
+        if (!this.client || !this.user) return;
+        try {
+          const { data } = await this.client
+            .from('subscriptions')
+            .select('plan,expires_at')
+            .eq('user_id', this.user.id)
+            .maybeSingle();
+          if (data) {
+            this.plan = data.plan || 'free';
+            this.expiresAt = data.expires_at || null;
+          }
+        } catch(e) {}
       },
       async logout() {
         this.showMenu = false;
         if (this.client) await this.client.auth.signOut();
         window.location.href = '/';
-      },
-      openSettings() {
-        this.showMenu = false;
-        // 如果首页，跳转到看板并携带参数自动打开设置
-        if (!window.location.pathname.includes('dashboard')) {
-          window.location.href = 'dashboard.html?settings=1';
-          return;
-        }
-        window.dispatchEvent(new CustomEvent('open-settings'));
       },
     },
     template: `
@@ -137,12 +138,9 @@
                     </div>
                   </div>
                   <div class="dropdown-divider"></div>
-                  <a :href="dashboardUrl" class="dropdown-item">
-                    <span class="dropdown-icon">📋</span> 看板
+                  <a href="/about.html" class="dropdown-item">
+                    <span class="dropdown-icon">📖</span> 关于
                   </a>
-                  <button @click="openSettings" class="dropdown-item">
-                    <span class="dropdown-icon">⚙️</span> 设置
-                  </button>
                   <a v-if="isAdmin" :href="adminUrl" class="dropdown-item">
                     <span class="dropdown-icon">⭐</span> 后台管理
                   </a>

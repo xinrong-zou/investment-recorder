@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>收益记录器 - 关于</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .page-content { max-width: 720px; margin: 0 auto; padding: 32px 20px; }
+    .page-content h1 { font-size: 1.6rem; margin-bottom: 8px; }
+    .page-content .subtitle { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 32px; }
+    .feature-list { display: grid; gap: 16px; margin-bottom: 40px; }
+    .feature-card { padding: 20px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+    .feature-card .icon { font-size: 1.5rem; margin-bottom: 6px; }
+    .feature-card h3 { font-size: 1rem; margin-bottom: 4px; }
+    .feature-card p { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; }
+    .donate-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 40px; }
+    .donate-section h2 { font-size: 1.15rem; margin-bottom: 8px; }
+    .donate-section .desc { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5; }
+    .donate-btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 24px; font-size: 0.95rem; border: none; border-radius: var(--radius-sm); cursor: pointer; text-decoration: none; }
+    .donate-btn.primary { background: #f59e0b; color: white; }
+    .donate-btn.primary:hover { background: #d97706; }
+    .donor-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(200px,1fr)); gap: 10px; }
+    .donor-card { padding: 12px; background: var(--bg); border-radius: var(--radius-sm); display: flex; align-items: center; gap: 10px; }
+    .donor-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: var(--text-muted); }
+    .donor-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+    .donor-info { flex: 1; min-width: 0; }
+    .donor-name { font-size: 0.85rem; font-weight: 600; }
+    .donor-amount { font-size: 0.72rem; color: var(--text-muted); }
+    .donor-time { font-size: 0.65rem; color: var(--text-muted); }
+    .donors-empty { text-align: center; padding: 32px; color: var(--text-muted); font-size: 0.85rem; }
+    .footer-links { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); }
+    .footer-links a { color: var(--text-muted); font-size: 0.82rem; text-decoration: none; margin: 0 8px; }
+    .footer-links a:hover { color: var(--text); }
+  </style>
+</head>
+<body>
+<div id="nav-app"><nav-bar title="收益记录器" logo-url="/"></nav-bar></div>
+
+<div class="page-content">
+  <h1>📊 收益记录器</h1>
+  <p class="subtitle">个人投资理财追踪工具 · 多账户管理 · 收益率可视化</p>
+
+  <div class="feature-list">
+    <div class="feature-card">
+      <div class="icon">🏦</div>
+      <h3>多账户管理</h3>
+      <p>同时管理现金账户和投资账户（股票、基金等），每个账户独立追踪</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">📈</div>
+      <h3>资产走势图</h3>
+      <p>总资产、净值、累计收益三图切换。净投入线标记每次资金变动</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">📉</div>
+      <h3>最大回撤分析</h3>
+      <p>自动计算持仓期内最大回撤幅度及起止日期，辅助风险评估</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🔐</div>
+      <h3>数据安全</h3>
+      <p>基于Supabase的用户认证和行级权限控制，数据仅自己可见</p>
+    </div>
+  </div>
+
+  <div class="donate-section" id="donateSection">
+    <h2>☕ 赞助支持</h2>
+    <p class="desc">
+      如果你觉得这个工具对你有帮助，欢迎赞助支持开发维护。<br>
+      赞助后可获得 <strong>Pro 会员</strong>（在备注中填写你的注册邮箱即可自动到账）。
+    </p>
+    <p style="margin-bottom:16px;">
+      <a class="donate-btn primary" id="donateLink" href="https://ifdian.net/a/ashoredove" target="_blank">
+        ❤️ 前往爱发电赞助
+      </a>
+    </p>
+    <p id="donateHint" style="font-size:0.78rem;color:var(--text-muted);display:none;">
+      💡 已自动填入你的邮箱，提交订单时确认备注中包含即可
+    </p>
+  </div>
+
+  <h2 style="font-size:1.05rem;margin-bottom:12px;">🎖️ 赞助者</h2>
+  <div id="donorList" class="donor-grid"></div>
+  <div id="donorLoading" class="donors-empty">加载中...</div>
+
+  <div class="footer-links">
+    <a href="/">返回首页</a>
+    <a href="login.html">登录</a>
+    <a href="register.html">注册</a>
+  </div>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="nav-bar.js"></script>
+<script>
+mountNavBar('#nav-app');
+(async function(){
+  // 如果已登录，自动填入邮箱到捐赠链接
+  const { data: { session } } = await supabase.createClient(
+    'https://spb-cl9n18iof0i9qxjh.supabase.opentrust.net',
+    'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiIsInJlZiI6InNwYi1jbDluMThpb2YwaTlxeGpoIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA2NjgzNzQsImV4cCI6MjA5NjI0NDM3NH0.t8MDF4zdvV9kpUz-gZpVM-OgFlAow8FlENASpqkUkwk'
+  ).auth.getSession();
+  if (session?.user?.email) {
+    const url = 'https://ifdian.net/a/ashoredove?remark=' + encodeURIComponent(session.user.email);
+    document.getElementById('donateLink').href = url;
+    document.getElementById('donateHint').style.display = 'block';
+  }
+
+  // 加载赞助者列表
+  try {
+    const resp = await fetch('/api/donors');
+    const data = await resp.json();
+    const donors = data.donors || [];
+    document.getElementById('donorLoading').style.display = 'none';
+    if (donors.length === 0) {
+      document.getElementById('donorList').innerHTML = '<div class="donors-empty">还没有赞助者，成为第一个 ☕</div>';
+      return;
+    }
+    document.getElementById('donorList').innerHTML = donors.map(d => `
+      <div class="donor-card">
+        <div class="donor-avatar">${d.avatar ? '<img src="'+d.avatar+'" alt="">' : '💖'}</div>
+        <div class="donor-info">
+          <div class="donor-name">${escapeHtml(d.nickname)}</div>
+          <div class="donor-amount">${escapeHtml(d.amount||'支持')}</div>
+          <div class="donor-time">${d.time ? new Date(d.time).toLocaleDateString('zh-CN') : ''}</div>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) {
+    document.getElementById('donorLoading').textContent = '加载失败';
+  }
+
+  function escapeHtml(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+})();
+</script>
+</body>
+</html>
