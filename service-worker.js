@@ -76,7 +76,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-first for all other requests (API calls, supabase, etc.)
+  // Network-first for all other GET requests (API calls, supabase, etc.)
+  if (event.request.method !== 'GET') return;
   event.respondWith(
     fetch(event.request).then((networkResponse) => {
       if (networkResponse && networkResponse.ok) {

@@ -9,6 +9,7 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1e40af">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="收益记录器">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <script>
@@ -552,7 +553,7 @@ function renderChart(){
         {name:'净投入',type:'line',data:totalCost,smooth:true,symbol:'none',
           lineStyle:{width:1,color:'#f59e0b'}},
         {name:'月累投',type:'line',data:totalCost,step:'end',smooth:false,symbol:'none',
-          lineStyle:{width:1,color:'#8b5cf6',type:'dashed'}}
+          lineStyle:{width:1,color:'#8b5cf6',type:'dashed'}}]
     };
   }else if(chartMode==='nav'){
     option={
