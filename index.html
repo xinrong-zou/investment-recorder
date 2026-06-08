@@ -464,6 +464,20 @@ async function getUserPlan(){
     return data?.plan||'free';
   }catch(e){return 'free';}
 }
+// 检查账户是否因超限而冻结（会员到期后超出免费限额的账户不可操作）
+function isFrozenAccount(accountId){
+  const sorted=[...accounts].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+  let cashCount=0,investCount=0;
+  for(const a of sorted){
+    if(a.account_type==='cash')cashCount++;
+    else investCount++;
+    if(a.id===accountId){
+      if(a.account_type==='cash')return cashCount>1;
+      return investCount>5;
+    }
+  }
+  return false;
+}
 async function saveAccount(){
   const name=$('accountName').value.trim();if(!name){toast('请输入账户名称','error');return;}
   const type=$('accountType').value;
@@ -518,6 +532,16 @@ async function saveRecord(){
   const recs=[];
 
   if(!recordAccountId){toast('系统错误：缺少账户信息','error');return;}
+
+  // 检查账户是否被冻结
+  const plan=await getUserPlan();
+  if(plan!=='pro'){
+    if(isFrozenAccount(recordAccountId)){toast('该账户已超出免费额度，操作被冻结','error');return;}
+    const srcId=$('srcAccount').value;
+    const destId=$('destAccount').value;
+    if(srcId&&isFrozenAccount(srcId)){toast('来源账户已超出免费额度','error');return;}
+    if(destId&&isFrozenAccount(destId)){toast('目标账户已超出免费额度','error');return;}
+  }
 
   if(type==='transfer_in'){
     const srcId=$('srcAccount').value;
@@ -718,6 +742,16 @@ async function editRecord(id,accountId,actionType,amount,date,note){
     }else{if(!amt||amt<=0){toast('请输入有效金额','error');return;}}
     const newDate=$('editDate').value||date;
 
+    // 检查账户是否被冻结
+    const ePlan=await getUserPlan();
+    if(ePlan!=='pro'){
+      if(isFrozenAccount(accountId)){toast('该账户已超出免费额度，无法修改','error');return;}
+      // 如果配对记录在另一个账户上，也检查
+      if(editingPairedId){
+        try{const{data:pr}=await client.from('investment_records').select('account_id').eq('id',editingPairedId).single();if(pr&&isFrozenAccount(pr.account_id)){toast('关联账户已超出免费额度','error');return;}}catch(e){}
+      }
+    }
+
     // 通用余额校验：所有账户用更新后的数据重算
     const allTestRecords={};
     for(const aid of Object.keys(allRecords)){
@@ -758,6 +792,9 @@ async function editRecord(id,accountId,actionType,amount,date,note){
 
   // 删除按钮
   $('editDeleteBtn').onclick=async function(){
+    // 检查账户是否被冻结
+    const dPlan=await getUserPlan();
+    if(dPlan!=='pro'&&isFrozenAccount(accountId)){toast('该账户已超出免费额度，无法删除','error');return;}
     if(!confirm('确定删除此记录？'))return;
     // 先删配对记录
     if(editingPairedId)await client.from('investment_records').delete().eq('id',editingPairedId);
