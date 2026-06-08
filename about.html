@@ -108,7 +108,6 @@
         <tr><td>XIRR 年化收益率</td><td class="check">✓</td><td class="check">✓</td></tr>
         <tr><td>Excel 数据导出</td><td class="check">✓</td><td class="check">✓</td></tr>
         <tr><td>图表自定义日期范围</td><td class="cross">预设范围</td><td class="check">可自定义起止日期</td></tr>
-        <tr><td>账户数量限制</td><td class="cross">1 现金 + 5 投资</td><td class="check">无限制</td></tr>
       </tbody>
     </table>
 
@@ -129,8 +128,7 @@
   <div class="footer-links">
     <a href="feedback.html">💬 反馈</a>
     <a href="/">返回首页</a>
-    <a href="login.html">登录</a>
-    <a href="register.html">注册</a>
+    <span id="footerAuthLinks"><a href="login.html">登录</a><a href="register.html" style="margin-left:8px;">注册</a></span>
   </div>
 </div>
 
@@ -152,6 +150,14 @@ mountNavBar('#nav-app');
     document.getElementById('donateHint').style.display = 'block';
   }
 
+  // 如果已登录，隐藏登录/注册链接
+  try {
+    const { data: { session } } = await supabase.createClient(
+      'https://spb-cl9n18iof0i9qxjh.supabase.opentrust.net',
+      'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiIsInJlZiI6InNwYi1jbDluMThpb2YwaTlxeGpoIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA2NjgzNzQsImV4cCI6MjA5NjI0NDM3NH0.t8MDF4zdvV9kpUz-gZpVM-OgFlAow8FlENASpqkUkwk'
+    ).auth.getSession();
+    if (session?.user) document.getElementById('footerAuthLinks').style.display = 'none';
+  } catch(e) {}
   // 加载赞助者列表
   try {
     const resp = await fetch((window.__API_BASE||'') + '/api/donors');
