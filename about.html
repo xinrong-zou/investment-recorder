@@ -30,6 +30,7 @@
     .compare-table td:first-child { font-weight: 600; color: var(--text); }
     .compare-table .check { color: #059669; font-weight: 700; }
     .compare-table .cross { color: var(--text-muted); }
+    .compare-table .free-badge { display:inline-block;padding:1px 8px;border-radius:10px;font-size:0.72rem;font-weight:500;background:#f1f5f9;color:#64748b; }
     .compare-table .pro-badge { display:inline-block;padding:1px 8px;border-radius:10px;font-size:0.72rem;font-weight:500;background:#fef3c7;color:#d97706; }
     @media (max-width: 600px) {
       .compare-table { font-size: 0.78rem; }
@@ -98,14 +99,10 @@
     </p>
 
     <table class="compare-table">
-      <thead><tr><th>功能</th><th>普通用户</th><th><span class="pro-badge">赞助用户</span></th></tr></thead>
+      <thead><tr><th>功能</th><th><span class="free-badge">普通用户</span></th><th><span class="pro-badge">赞助用户</span></th></tr></thead>
       <tbody>
         <tr><td>现金账户</td><td class="check">1 个</td><td class="check">无限</td></tr>
         <tr><td>投资账户</td><td class="check">5 个</td><td class="check">无限</td></tr>
-        <tr><td>记录转入/转出/更新</td><td class="check">✓</td><td class="check">✓</td></tr>
-        <tr><td>资产走势图（总资产/净值/收益）</td><td class="check">✓</td><td class="check">✓</td></tr>
-        <tr><td>沪深300对比基准线</td><td class="check">✓</td><td class="check">✓</td></tr>
-        <tr><td>XIRR 年化收益率</td><td class="check">✓</td><td class="check">✓</td></tr>
         <tr><td>Excel 数据导出</td><td class="check">✓</td><td class="check">✓</td></tr>
         <tr><td>图表自定义日期范围</td><td class="cross">预设范围</td><td class="check">可自定义起止日期</td></tr>
       </tbody>
