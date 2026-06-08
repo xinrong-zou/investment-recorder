@@ -124,8 +124,16 @@
       .empty-guide .steps { grid-template-columns: 1fr; gap: 10px; }
     }
     /* Pie chart */
-    .pie-chart-area { height: 200px; }
-    .pie-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; }
+     .pie-chart-area { height: 200px; }
+     /* Skeleton screen */
+     @keyframes shimmer{0%{background-position:-200px 0}100%{background-position:calc(200px + 100%) 0}}
+     .skeleton{background:linear-gradient(90deg,var(--bg-card) 25%,var(--border) 50%,var(--bg-card) 75%);background-size:200px 100%;animation:shimmer 1.5s infinite;border-radius:var(--radius-sm);}
+     .skeleton-row{display:flex;gap:12px;margin-bottom:16px;}
+     .skeleton-card{height:56px;flex:1;}
+     .skeleton-chart{height:200px;margin-bottom:16px;}
+     .skeleton-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;}
+     .skeleton-acct{height:80px;}
+     .pie-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; }
     .pie-legend-item { display: flex; align-items: center; gap: 4px; font-size: 0.76rem; color: var(--text-secondary); }
     .pie-legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
     /* Drawer filter */
@@ -160,6 +168,11 @@
     </div>
 
     <div id="dashContent" style="display:none;">
+      <div id="dashSkeleton">
+        <div class="skeleton-row"><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div></div>
+        <div class="skeleton skeleton-chart"></div>
+        <div class="skeleton-grid"><div class="skeleton skeleton-acct"></div><div class="skeleton skeleton-acct"></div><div class="skeleton skeleton-acct"></div></div>
+      </div>
       <div class="summary-card" id="summaryCard">
         <div class="row" id="summaryRow"></div>
       </div>
@@ -349,7 +362,7 @@ function calcXIRR(records, accountType, currentValue){
 async function loadData(){
   const{data:{session}}=await client.auth.getSession();
   if(!session){$('loginPrompt').style.display='block';$('dashContent').style.display='none';return;}
-  currentUser=session.user;$('loginPrompt').style.display='none';$('dashContent').style.display='block';
+  currentUser=session.user;$('loginPrompt').style.display='none';$('dashContent').style.display='block';$('dashSkeleton').style.display='block';
   const{data:s}=await client.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle();settings=s;
   const{data:accts}=await client.from('investment_accounts').select('*').eq('user_id',currentUser.id).order('created_at');accounts=accts||[];
   const hasCash=accounts.some(a=>a.account_type==='cash');
@@ -380,6 +393,7 @@ function checkNegativeBalance(accountId){
 }
 
 function render(){
+  $('dashSkeleton').style.display='none';
   // 汇总用全部账户（含隐藏）
   let totalVal=0,totalCost=0;
   accounts.forEach(a=>{const c=calcAccount(a,allRecords[a.id]||[]);totalVal+=c.currentValue;totalCost+=c.costBasis;});
@@ -516,20 +530,12 @@ function renderChart(){
   
   let option;
   if(chartMode==='assets'){
-    // 总资产：有资金变动的日期用红/蓝圆点
+    // 总资产：仅在数值有变动时显示数据点，涨红跌蓝
+    let prevV=null;
     const assetData=totalVal.map((v,i)=>{
-      const dt=dates[i];
-      const tf=dailyTransfers[dt];
-      if(!tf)return v;
-      if(tf.netIn>tf.netOut)return {value:v,symbol:'circle',symbolSize:7,itemStyle:{color:'#dc2626',borderColor:'#dc2626'}};
-      if(tf.netOut>0)return {value:v,symbol:'circle',symbolSize:7,itemStyle:{color:'#2563eb',borderColor:'#2563eb'}};
-      return v;
-    });
-    // 净投入：仅在有变动的日期显示小圆点
-    let prevC=0;
-    const costData=totalCost.map((v,i)=>{
-      const changed=v!==prevC;prevC=v;
-      return changed?{value:v,symbol:'circle',symbolSize:5,itemStyle:{color:'#f59e0b',borderColor:'#f59e0b'}}:v;
+      const changed=prevV!==null&&v!==prevV;const old=prevV;prevV=v;
+      if(!changed)return v;
+      return {value:v,symbol:'circle',symbolSize:6,itemStyle:{color:v>old?'#dc2626':'#2563eb',borderColor:v>old?'#dc2626':'#2563eb'}};
     });
     option={
       tooltip:{trigger:'axis',formatter:function(p){
@@ -548,7 +554,7 @@ function renderChart(){
       series:[
         {name:'总资产',type:'line',data:assetData,smooth:true,symbol:'none',lineStyle:{width:2,color:'#3b82f6'},
           areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(59,130,246,0.15)'},{offset:1,color:'rgba(59,130,246,0)'}]}}},
-        {name:'净投入',type:'line',data:costData,smooth:true,symbol:'none',
+        {name:'净投入',type:'line',data:totalCost,smooth:true,symbol:'none',
           lineStyle:{width:1,color:'#f59e0b'}}]
     };
   }else if(chartMode==='nav'){
@@ -846,11 +852,11 @@ function renderDrawerChart(accountId,acct){
   const mode=drawerChartMode;
   let option;
   if(mode==='assets'){
-    // 净投入仅在有变动的日期显示小圆点
-    let prevC=0;
-    const costData=costs.map((v,i)=>{
-      const changed=v!==prevC;prevC=v;
-      return changed?{value:v,symbol:'circle',symbolSize:4,itemStyle:{color:'#f59e0b',borderColor:'#f59e0b'}}:v;
+    // 余额：仅在数值有变动时显示数据点，涨红跌蓝
+    let prevV=null;
+    const valData=vals.map((v,i)=>{
+      const changed=prevV!==null&&v!==prevV;const old=prevV;prevV=v;
+      return changed?{value:v,symbol:'circle',symbolSize:4,itemStyle:{color:v>old?'#dc2626':'#2563eb',borderColor:v>old?'#dc2626':'#2563eb'}}:v;
     });
     option={
       tooltip:{trigger:'axis',formatter:function(p){return p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':'¥'+Number(d.value).toFixed(2))).join('<br/>');}},
@@ -859,9 +865,9 @@ function renderDrawerChart(accountId,acct){
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8'}},
       series:[
-        {name:'余额',type:'line',data:vals,smooth:true,symbol:'none',lineStyle:{width:2,color:'#3b82f6'},
+        {name:'余额',type:'line',data:valData,smooth:true,symbol:'none',lineStyle:{width:2,color:'#3b82f6'},
           areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(59,130,246,0.3)'},{offset:1,color:'rgba(59,130,246,0)'}]}}},
-        {name:'净投入',type:'line',data:costData,smooth:true,symbol:'none',
+        {name:'净投入',type:'line',data:costs,smooth:true,symbol:'none',
           lineStyle:{width:1,color:'#f59e0b'}}
       ]
     };
