@@ -28,16 +28,19 @@
     .summary-card .total-row { margin-bottom: 6px; }
     .summary-card .total-row .v { font-size: 1.6rem; font-weight: 800; color: var(--text); line-height: 1.2; }
     .summary-card .total-row .l { font-size: 0.75rem; color: var(--text-muted); }
-    .summary-card .row { display: flex; flex-wrap: wrap; gap: 6px 20px; }
-    .summary-card .stat { flex: 1; min-width: 60px; text-align: left; }
-    .summary-card .stat .v { font-size: 1rem; font-weight: 700; color: var(--text); white-space: nowrap; }
-    .summary-card .stat .v.profit { color: #dc2626; }
-    .summary-card .stat .v.loss { color: #2563eb; }
-    .summary-card .stat .l { font-size: 0.68rem; color: var(--text-muted); margin-top: 1px; }
-    .summary-card .stat .sub { font-size: 0.65rem; color: var(--text-muted); }
+    .summary-card .sub-row { display: flex; flex-wrap: wrap; gap: 6px 20px; }
+    .summary-card .sub-row .stat { flex: 1; min-width: 60px; text-align: left; }
+    .summary-card .sub-row .stat .v { font-size: 1rem; font-weight: 700; color: var(--text); white-space: nowrap; }
+    .summary-card .sub-row .stat .v.profit { color: #dc2626; }
+    .summary-card .sub-row .stat .v.loss { color: #2563eb; }
+    .summary-card .sub-row .stat .l { font-size: 0.68rem; color: var(--text-muted); margin-top: 1px; }
+    .summary-card .sub-row .stat .sub { font-size: 0.65rem; color: var(--text-muted); }
     .account-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px; }
     .account-card { padding: 20px; position: relative; cursor: pointer; transition: border-color 0.15s; }
     .account-card:hover { border-color: var(--primary-light); }
+    .acct-stats .row-extra { display: flex; gap: 4px; margin-top: 2px; }
+    .acct-stats .row-extra .stat .v { font-size: 0.78rem; }
+    .acct-stats .row-extra .stat .l { font-size: 0.6rem; }
     .account-card .acct-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
     .account-card .acct-name { font-size: 1.05rem; font-weight: 700; }
     .account-card .acct-type { font-size: 0.72rem; padding: 1px 8px; border-radius: 10px; font-weight: 500; }
@@ -120,10 +123,10 @@
     @media (max-width: 768px) {
       .summary-card { padding: 10px 12px; }
       .summary-card .total-row .v { font-size: 1.3rem; }
-      .summary-card .row { gap: 4px 8px; display: grid; grid-template-columns: repeat(2, 1fr); }
-      .summary-card .stat { min-width: 0; }
-      .summary-card .stat .v { font-size: 0.85rem; }
-      .summary-card .stat .l { font-size: 0.6rem; }
+      .summary-card .sub-row { gap: 4px 8px; display: grid; grid-template-columns: repeat(2, 1fr); }
+      .summary-card .sub-row .stat { min-width: 0; }
+      .summary-card .sub-row .stat .v { font-size: 0.85rem; }
+      .summary-card .sub-row .stat .l { font-size: 0.6rem; }
       .account-grid { grid-template-columns: 1fr; }
       .drawer { width: 100vw; }
       .dash-main { padding: 12px; }
@@ -139,6 +142,7 @@
       .drawer-summary .stat .v { font-size: 0.78rem; }
       .acct-stats .total-val { font-size: 1rem; }
       .acct-stats .stat .v { font-size: 0.82rem; }
+      .acct-stats .row-extra { display: none; }
       .pie-chart-area { height: 180px; }
       .empty-guide { padding: 24px 16px; }
       .empty-guide .steps { grid-template-columns: 1fr; gap: 10px; }
@@ -192,7 +196,7 @@
         <div class="skeleton-grid"><div class="skeleton skeleton-acct"></div><div class="skeleton skeleton-acct"></div><div class="skeleton skeleton-acct"></div></div>
       </div>
       <div class="summary-card" id="summaryCard">
-        <div class="row" id="summaryRow"></div>
+        <div id="summaryRow"></div>
       </div>
 
       <div class="chart-container">
@@ -468,14 +472,34 @@ function render(){
     const acctXirr=calcXIRR(acctRecs,a.account_type,calc.currentValue);
     const xirrStr=acctXirr!=null&&!isNaN(acctXirr)?(acctXirr*100).toFixed(2)+'%':'—';
     const xirrColor=acctXirr!=null?(acctXirr>=0?'#dc2626':'#2563eb'):'var(--text-secondary)';
+    // 计算该账户净值与最大回撤
+    const cardNav=calc.nav;
+    let cardDd='—',cardDdPct=0;
+    if(acctRecs.length>=2){
+      let v=0,c=0,peak=1;
+      for(const r of acctRecs){
+        if(r.action_type==='transfer_in'){v+=Number(r.amount);c+=Number(r.amount);}
+        else if(r.action_type==='transfer_out'){v-=Number(r.amount);c-=Number(r.amount);}
+        else if(r.action_type==='revalue')v=Number(r.amount);
+        const nv=a.account_type==='investment'?(c>0?v/c:v):v;
+        if(nv>peak)peak=nv;
+        const dd=(nv-peak)/peak;
+        if(dd<cardDdPct)cardDdPct=dd;
+      }
+    }
+    if(cardDdPct<0)cardDd=(cardDdPct*100).toFixed(2)+'%';
     html+=`<div class="account-card card" onclick="showRecords('${a.id}')">
       <div class="acct-header"><span class="acct-name">${a.name}${hiddenLabel}${warnBadge}</span><span class="acct-type ${isCash?'type-cash':'type-investment'}">${isCash?'现金':'投资'}</span></div>
       <div class="acct-stats">
         <div class="total-val">${fmt(calc.currentValue)}</div>
         <div class="total-lbl">当前资产</div>
-        <div class="row">
+        <div class="row-main">
           <div class="stat"><div class="v" style="color:${retColor}">${fmt(calc.totalReturn)}</div><div class="l">累计收益</div></div>
           <div class="stat"><div class="v" style="color:${xirrColor}">${xirrStr}</div><div class="l">年化 XIRR</div></div>
+        </div>
+        <div class="row-extra">
+          <div class="stat"><div class="v">${cardNav.toFixed(3)}</div><div class="l">净值</div></div>
+          <div class="stat"><div class="v loss">${cardDd}</div><div class="l">最大回撤</div></div>
         </div>
       </div>
       <div class="acct-actions">
@@ -508,16 +532,16 @@ function render(){
   const retColor=totalRet>=0?'profit':'loss';
   const ddHtml=maxDd<0?`<div class="stat"><div class="v loss">${(maxDd*100).toFixed(2)}%</div><div class="l">最大回撤</div><div class="sub">${ddStart} ~ ${ddEnd}</div></div>`:'';
   const xirrHtml=totalXirr!=null&&!isNaN(totalXirr)?`<div class="stat"><div class="v ${totalXirr>=0?'profit':'loss'}">${(totalXirr*100).toFixed(2)}%</div><div class="l">年化 <span class="xirr">XIRR</span></div></div>`:'';
-  $('summaryRow').innerHTML=`
+  $('summaryRow').innerHTML=\`
     <div class="total-row"><div class="v">${fmt(totalVal)}</div><div class="l">总资产</div></div>
-    <div class="row">
+    <div class="sub-row">
       <div class="stat"><div class="v ${retColor}">${fmt(totalRet)}</div><div class="l">累计收益</div></div>
       <div class="stat"><div class="v ${retColor}">${fmtPct(totalRetPct)}</div><div class="l">总收益率</div></div>
       <div class="stat"><div class="v">${totalNavVal.toFixed(3)}</div><div class="l">净值</div></div>
       ${xirrHtml}
       ${ddHtml}
     </div>
-  `;
+  \`;
   const hasHidden=accounts.some(a=>a.hidden);$('showHiddenToggle').style.display=hasHidden?'':'none';
   renderChart();
   renderPieChart();
@@ -930,9 +954,9 @@ async function showRecords(accountId){
     <div class="total-row"><div class="v">${fmt(calc.currentValue)}</div><div class="l">当前资产</div></div>
     <div class="row">
       <div class="stat"><div class="v" style="color:${calc.totalReturn>=0?'#dc2626':'#2563eb'}">${fmt(calc.totalReturn)}</div><div class="l">累计收益</div></div>
+      <div class="stat"><div class="v" style="color:${xirrColor}">${xirrStr}</div><div class="l">年化 <span class="xirr">XIRR</span></div></div>
       <div class="stat"><div class="v">${calc.nav.toFixed(3)}</div><div class="l">净值</div></div>
       <div class="stat"><div class="v" style="color:#2563eb">${ddStr}</div><div class="l">最大回撤</div></div>
-      <div class="stat"><div class="v" style="color:${xirrColor}">${xirrStr}</div><div class="l">年化 <span class="xirr">XIRR</span></div></div>
     </div>`;
   // 默认日期范围为最早记录到今日（仅首次打开时设置）
   if(!$('filterDateStart').value){
