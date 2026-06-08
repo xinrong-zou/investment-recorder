@@ -278,9 +278,12 @@
       list.innerHTML = users.map(u => {
         const isPro = u.plan === 'pro';
         const expires = u.expires_at ? new Date(u.expires_at).toLocaleDateString('zh-CN') : '—';
-        const planTag = isPro
+        const notExpired = isPro && (!u.expires_at || new Date(u.expires_at) > new Date());
+        const planTag = notExpired
           ? '<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:0.72rem;font-weight:500;background:#fef3c7;color:#d97706;">已赞助</span>'
-          : '<span style="color:var(--text-muted);font-size:0.78rem;">free</span>';
+          : isPro
+            ? '<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:0.72rem;font-weight:500;background:#f3f4f6;color:#9ca3af;">已过期</span>'
+            : '<span style="color:var(--text-muted);font-size:0.78rem;">free</span>';
         const actionBtn = isPro
           ? `<button class="btn btn-ghost btn-sm" onclick="setSubscription('${u.email}','revoke')">取消赞助</button>`
           : `<button class="btn btn-primary btn-sm" onclick="setSubscription('${u.email}','grant')">设为赞助</button>`;

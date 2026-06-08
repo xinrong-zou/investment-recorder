@@ -859,8 +859,11 @@ async function unhideAccount(id){await client.from('investment_accounts').update
 function openAddAccount(){$('accountModalTitle').textContent='新建账户';$('saveAccountBtn').textContent='创建';$('accountName').value='';$('accountType').value='investment';openModal('accountModal');}
 async function getUserPlan(){
   try{
-    const{data}=await cachedQuery('plan_'+currentUser.id,()=>client.from('subscriptions').select('plan').eq('user_id',currentUser.id).maybeSingle());
-    return data?.plan||'free';
+    const{data}=await cachedQuery('plan_'+currentUser.id,()=>client.from('subscriptions').select('plan,expires_at').eq('user_id',currentUser.id).maybeSingle());
+    if(!data||data.plan!=='pro')return'free';
+    // 没有expires_at=永久Pro，有时效则需检查是否过期
+    if(!data.expires_at)return'pro';
+    return new Date(data.expires_at)>new Date()?'pro':'free';
   }catch(e){return 'free';}
 }
 // 检查账户是否因超限而冻结（赞助到期后超出免费限额的账户不可操作）
