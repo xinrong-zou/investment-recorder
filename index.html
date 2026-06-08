@@ -194,6 +194,13 @@
           <button class="chart-range-btn" data-range="thisYear" onclick="setChartRange('thisYear')">今年</button>
           <button class="chart-range-btn" data-range="1y" onclick="setChartRange('1y')">近1年</button>
           <button class="chart-range-btn" data-range="3y" onclick="setChartRange('3y')">近3年</button>
+          <button class="chart-range-btn" data-range="custom" onclick="setChartRange('custom')">自定义</button>
+        </div>
+        <div class="chart-range-custom" id="chartRangeCustom" style="display:none;margin-bottom:6px;"><div style="display:flex;gap:6px;align-items:center;">
+          <input type="date" id="chartRangeStart" onchange="applyChartCustomRange()">
+          <span style="color:var(--text-muted);font-size:0.8rem;">至</span>
+          <input type="date" id="chartRangeEnd" onchange="applyChartCustomRange()">
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('chartRangeStart').value='';document.getElementById('chartRangeEnd').value='';setChartRange('all')">✕ 清除</button>
         </div>
         <div id="totalChart" class="chart-area"></div>
         <div id="pieChartContainer" class="chart-area" style="display:none;">
@@ -272,14 +279,13 @@
     <div id="drawerChart" style="height:140px;margin-bottom:12px;"></div>
     <div class="drawer-filter" id="drawerFilter">
       <select id="filterType" onchange="applyDrawerFilter()">
-        <option value="">全部</option>
+        <option value="">全部操作</option>
         <option value="transfer_in">转入</option>
         <option value="transfer_out">转出</option>
         <option value="revalue">更新市值</option>
       </select>
-      <input type="date" id="filterDateStart" onchange="applyDrawerFilter()" title="起始日期">
-      <input type="date" id="filterDateEnd" onchange="applyDrawerFilter()" title="截止日期">
-      <button class="btn btn-ghost btn-sm" onclick="clearDrawerFilter()">✕ 清除</button>
+      <input type="date" id="filterDateStart" style="display:none;">
+      <input type="date" id="filterDateEnd" style="display:none;">
     </div>
     <h3 style="font-size:0.9rem;margin-bottom:8px;">操作记录</h3>
     <table class="record-table"><thead><tr><th>日期</th><th>类型</th><th>金额</th><th>备注</th></tr></thead><tbody id="drawerRecords"></tbody></table>
@@ -542,6 +548,12 @@ function calcMaxDrawdown(){
 
 // 切换主页图表模式
 function computeRangeStart(range){
+  if(range==='custom'){
+    const s=$('chartRangeStart').value,e=$('chartRangeEnd').value;
+    if(s&&e&&s<=e)return s;
+    if(s)return s;
+    return '';
+  }
   const n=new Date();
   if(range==='thisYear')return new Date(n.getFullYear(),0,1).toISOString().slice(0,10);
   if(range==='1y'){n.setFullYear(n.getFullYear()-1);return n.toISOString().slice(0,10);}
@@ -551,6 +563,16 @@ function computeRangeStart(range){
 function setChartRange(range){
   chartRange=range;
   document.querySelectorAll('.chart-range-btn').forEach(b=>b.classList.toggle('active',b.dataset.range===range));
+  if(range==='custom'){
+    $('chartRangeCustom').style.display='flex';
+    renderChart(); // 不设日期范围时展示全部
+  }else{
+    $('chartRangeCustom').style.display='none';
+    renderChart();
+  }
+}
+function applyChartCustomRange(){
+  chartRange='custom';
   renderChart();
 }
 function setDrawerRange(range){
@@ -584,9 +606,19 @@ function renderChart(){
   if(rangeStart){
     const idx=dates.findIndex(d=>d>=rangeStart);
     if(idx>0){
-      const slice=(arr)=>arr.slice(idx);
       dates.splice(0,idx);totalVal.splice(0,idx);totalCost.splice(0,idx);nav.splice(0,idx);cumRet.splice(0,idx);
       Object.keys(dailyTransfers).forEach(k=>{if(k<rangeStart)delete dailyTransfers[k];});
+    }
+  }
+  // 自定义截止日期
+  if(chartRange==='custom'){
+    const end=$('chartRangeEnd').value;
+    if(end){
+      const idx=dates.findIndex(d=>d>end);
+      if(idx>=0){
+        dates.splice(idx);totalVal.splice(idx);totalCost.splice(idx);nav.splice(idx);cumRet.splice(idx);
+        Object.keys(dailyTransfers).forEach(k=>{if(k>end)delete dailyTransfers[k];});
+      }
     }
   }
   
@@ -878,12 +910,17 @@ async function showRecords(accountId){
     $('filterDateStart').value=earliest;
     $('filterDateEnd').value=todayStr;
   }
-  // 迷你折线图
-  renderDrawerChart(accountId,acct);
-  const records=allRecords[accountId]||[];const tbody=$('drawerRecords');
-  const filterType=$('filterType').value;
+  // 迷你折线图（按日期范围筛选）
   const filterStart=$('filterDateStart').value;
   const filterEnd=$('filterDateEnd').value;
+  const chartRecs=(allRecords[accountId]||[]).filter(r=>{
+    if(filterStart&&r.record_date<filterStart)return false;
+    if(filterEnd&&r.record_date>filterEnd)return false;
+    return true;
+  });
+  renderDrawerChart(accountId,acct,chartRecs);
+  const records=allRecords[accountId]||[];const tbody=$('drawerRecords');
+  const filterType=$('filterType').value;
   let filtered=[...records];
   if(filterType)filtered=filtered.filter(r=>r.action_type===filterType);
   if(filterStart)filtered=filtered.filter(r=>r.record_date>=filterStart);
@@ -904,10 +941,10 @@ async function showRecords(accountId){
 
 // ====== 抽屉迷你折线图 ======
 let drawerChartInstance=null;
-function renderDrawerChart(accountId,acct){
+function renderDrawerChart(accountId,acct,filteredRecs){
   const el=$('drawerChart');if(!el)return;
   if(drawerChartInstance){drawerChartInstance.dispose();drawerChartInstance=null;}
-  const records=(allRecords[accountId]||[]).slice().sort((a,b)=>{
+  const records=(filteredRecs||allRecords[accountId]||[]).slice().sort((a,b)=>{
     const d=new Date(a.record_date)-new Date(b.record_date);
     return d!==0?d:new Date(a.created_at||0)-new Date(b.created_at||0);
   });
