@@ -33,6 +33,13 @@
     .footer-links { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); }
     .footer-links a { color: var(--text-muted); font-size: 0.82rem; text-decoration: none; margin: 0 8px; }
     .footer-links a:hover { color: var(--text); }
+    @media (max-width: 768px) {
+      .page-content { padding: 20px 12px; }
+      .page-content h1 { font-size: 1.3rem; }
+      .feature-list { gap: 10px; }
+      .donate-section { padding: 16px; }
+      .donor-grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -91,35 +98,10 @@
   <div id="donorLoading" class="donors-empty">加载中...</div>
 
   <div class="footer-links">
-    <a href="javascript:openFeedback()">💬 反馈</a>
+    <a href="feedback.html">💬 反馈</a>
     <a href="/">返回首页</a>
     <a href="login.html">登录</a>
     <a href="register.html">注册</a>
-  </div>
-</div>
-
-<!-- 反馈弹窗 -->
-<div class="modal-overlay" id="feedbackModal">
-  <div class="modal-box">
-    <h2>💬 提交反馈</h2>
-    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px;">遇到问题或有建议？告诉我们</p>
-    <div class="input-group">
-      <label>类型</label>
-      <select class="input" id="fbType">
-        <option value="bug">问题报告</option>
-        <option value="feature">功能建议</option>
-        <option value="other">其他</option>
-      </select>
-    </div>
-    <div class="input-group">
-      <label>描述</label>
-      <textarea class="input" id="fbContent" rows="4" placeholder="请详细描述..." style="resize:vertical;font-family:inherit;font-size:0.88rem;"></textarea>
-    </div>
-    <div class="form-actions">
-      <button class="btn btn-ghost" onclick="closeModal('feedbackModal')">取消</button>
-      <button class="btn btn-primary" onclick="submitFeedback()">提交</button>
-    </div>
-    <p id="fbResult" style="font-size:0.82rem;margin-top:8px;display:none;"></p>
   </div>
 </div>
 
@@ -128,48 +110,7 @@
 <script src="nav-bar.js"></script>
 <script>
 mountNavBar('#nav-app');
-const FB_SUPABASE_URL = 'https://spb-cl9n18iof0i9qxjh.supabase.opentrust.net';
-const FB_ANON_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiIsInJlZiI6InNwYi1jbDluMThpb2YwaTlxeGpoIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA2NjgzNzQsImV4cCI6MjA5NjI0NDM3NH0.t8MDF4zdvV9kpUz-gZpVM-OgFlAow8FlENASpqkUkwk';
-const fbClient = supabase.createClient(FB_SUPABASE_URL, FB_ANON_KEY);
-if(!window.__supabaseClient) window.__supabaseClient = fbClient;
 
-// 打开反馈弹窗
-function openFeedback(){
-  const s = fbClient.auth.getSession();
-  s.then(({data:{session}})=>{
-    if(!session){alert('请先登录');window.location.href='login.html';return;}
-    document.getElementById('fbContent').value='';
-    document.getElementById('fbResult').style.display='none';
-    openModal('feedbackModal');
-  });
-}
-
-// 提交反馈
-async function submitFeedback(){
-  const session = (await fbClient.auth.getSession()).data.session;
-  if(!session){alert('请先登录');return;}
-  const type=document.getElementById('fbType').value;
-  const content=document.getElementById('fbContent').value.trim();
-  if(!content){alert('请填写描述');return;}
-  document.getElementById('fbResult').style.display='block';
-  document.getElementById('fbResult').textContent='提交中...';
-  try{
-    const {error}=await fbClient.from('feedbacks').insert({
-      user_id:session.user.id,
-      user_email:session.user.email,
-      type,
-      content
-    });
-    if(error)throw error;
-    document.getElementById('fbResult').style.color='#059669';
-    document.getElementById('fbResult').textContent='✅ 已收到，感谢反馈！';
-    document.getElementById('fbContent').value='';
-    setTimeout(()=>closeModal('feedbackModal'),1500);
-  }catch(e){
-    document.getElementById('fbResult').style.color='#dc2626';
-    document.getElementById('fbResult').textContent='❌ 提交失败: '+e.message;
-  }
-}
 (async function(){
   // 如果已登录，自动填入邮箱到捐赠链接
   const { data: { session } } = await supabase.createClient(

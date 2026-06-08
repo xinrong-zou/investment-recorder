@@ -1,0 +1,19 @@
+{
+  "name": "收益记录器",
+  "short_name": "收益记录器",
+  "description": "个人投资理财追踪工具",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#1e40af",
+  "background_color": "#f8fafc",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

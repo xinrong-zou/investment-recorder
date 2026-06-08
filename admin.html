@@ -30,6 +30,16 @@
     .login-required p { color: var(--text-muted); margin-bottom: 20px; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
+    @media (max-width: 768px) {
+      .admin-layout { flex-direction: column; }
+      .admin-sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); display: flex; gap: 4px; overflow-x: auto; padding: 10px 16px; }
+      .admin-sidebar .nav-item { white-space: nowrap; flex-shrink: 0; font-size: 0.82rem; }
+      .admin-main h1 { font-size: 1.1rem; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .stat-card .num { font-size: 1.4rem; }
+      table.admin-table { font-size: 0.78rem; }
+      table.admin-table th, table.admin-table td { padding: 6px 8px; }
+    }
   </style>
 </head>
 <body>

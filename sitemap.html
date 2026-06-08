@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>站点地图 - 收益记录器</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .sitemap-page { max-width: 640px; margin: 0 auto; padding: 40px 20px; }
+    .sitemap-page h1 { font-size: 1.4rem; margin-bottom: 24px; }
+    .sitemap-list { display: flex; flex-direction: column; gap: 8px; }
+    .sitemap-item { display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); transition: all 0.15s; text-decoration: none; color: var(--text); }
+    .sitemap-item:hover { border-color: var(--primary-light); box-shadow: var(--shadow-md); }
+    .sitemap-item .icon { font-size: 1.3rem; }
+    .sitemap-item .info { flex: 1; min-width: 0; }
+    .sitemap-item .info .name { font-size: 0.95rem; font-weight: 600; }
+    .sitemap-item .info .desc { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+  </style>
+</head>
+<body>
+<div id="nav-app"><nav-bar title="收益记录器" logo-url="/"></nav-bar></div>
+
+<div class="sitemap-page">
+  <h1>📋 站点地图</h1>
+  <div class="sitemap-list">
+    <a href="/" class="sitemap-item">
+      <div class="icon">📊</div>
+      <div class="info">
+        <div class="name">投资看板</div>
+        <div class="desc">多账户管理、资产走势图、收益率分析</div>
+      </div>
+    </a>
+    <a href="about.html" class="sitemap-item">
+      <div class="icon">ℹ️</div>
+      <div class="info">
+        <div class="name">关于</div>
+        <div class="desc">功能介绍与赞助支持</div>
+      </div>
+    </a>
+    <a href="feedback.html" class="sitemap-item">
+      <div class="icon">💬</div>
+      <div class="info">
+        <div class="name">反馈</div>
+        <div class="desc">提交问题报告与功能建议</div>
+      </div>
+    </a>
+    <a href="login.html" class="sitemap-item">
+      <div class="icon">🔐</div>
+      <div class="info">
+        <div class="name">登录</div>
+        <div class="desc">登录已有账号</div>
+      </div>
+    </a>
+    <a href="register.html" class="sitemap-item">
+      <div class="icon">📝</div>
+      <div class="info">
+        <div class="name">注册</div>
+        <div class="desc">创建新账号</div>
+      </div>
+    </a>
+    <a href="privacy.html" class="sitemap-item">
+      <div class="icon">🔒</div>
+      <div class="info">
+        <div class="name">隐私政策</div>
+        <div class="desc">数据使用与隐私说明</div>
+      </div>
+    </a>
+  </div>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="nav-bar.js"></script>
+<script>mountNavBar('#nav-app');</script>
+</body>
+</html>
