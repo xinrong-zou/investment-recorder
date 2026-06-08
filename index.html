@@ -90,8 +90,11 @@
     .auth-prompt h1 { font-size: 1.8rem; margin-bottom: 8px; }
     .auth-prompt p { color: var(--text-muted); margin-bottom: 20px; }
     @media (max-width: 768px) {
-      .summary-card .row { gap: 6px 12px; }
-      .summary-card .item { min-width: 70px; }
+      .summary-card { padding: 10px 12px; }
+      .summary-card .row { gap: 4px 8px; display: grid; grid-template-columns: repeat(2, 1fr); }
+      .summary-card .item { min-width: 0; }
+      .summary-card .item .num { font-size: 0.95rem; }
+      .summary-card .item .label { font-size: 0.65rem; }
       .account-grid { grid-template-columns: 1fr; }
       .drawer { width: 100vw; }
     }
@@ -405,7 +408,7 @@ function renderChart(){
         if(tf){const net=tf.netIn-tf.netOut;if(net!==0)lines.push('当日净'+(net>0?'转入: +¥':'转出: -¥')+Math.abs(net).toLocaleString());}
         return lines.join('<br/>');
       }},
-      legend:{data:['总资产','净投入'],bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
+      legend:{data:['总资产','净投入'],icon:'line',bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
       grid:{left:55,right:16,top:16,bottom:36},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',axisLabel:{fontSize:10,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(0)+'万':v},splitLine:{lineStyle:{color:'#f1f5f9'}}},
@@ -419,7 +422,7 @@ function renderChart(){
   }else if(chartMode==='nav'){
     option={
       tooltip:{trigger:'axis',valueFormatter:v=>v.toFixed(3)},
-      legend:{data:['净值'],bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
+      legend:{data:['净值'],icon:'line',bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
       grid:{left:40,right:16,top:16,bottom:36},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',axisLabel:{fontSize:10,color:'#94a3b8'},splitLine:{lineStyle:{color:'#f1f5f9'}}},
@@ -439,7 +442,7 @@ function renderChart(){
   }else{ // return
     option={
       tooltip:{trigger:'axis',valueFormatter:v=>'¥'+(v||0).toLocaleString()},
-      legend:{data:['累计收益'],bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
+      legend:{data:['累计收益'],icon:'line',bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
       grid:{left:55,right:16,top:16,bottom:36},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',axisLabel:{fontSize:10,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(0)+'万':v},splitLine:{lineStyle:{color:'#f1f5f9'}}},
@@ -671,7 +674,7 @@ function renderDrawerChart(accountId,acct){
   if(mode==='assets'){
     option={
       tooltip:{trigger:'axis',formatter:function(p){return p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':'¥'+Number(d.value).toFixed(2))).join('<br/>');}},
-      legend:{data:['余额','净投入'],top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
+      legend:{data:['余额','净投入'],icon:'line',top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
       grid:{left:30,right:8,top:16,bottom:22},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8'}},
