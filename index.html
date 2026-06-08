@@ -364,7 +364,7 @@ const client=window.__supabaseClient||supabase.createClient(SUPABASE_URL,SUPABAS
 if(!window.__supabaseClient)window.__supabaseClient=client;
 
 let currentUser=null,accounts=[],allRecords={},settings=null,showHidden=false;
-let chartInstance=null,drawerAccountId=null,chartMode='assets',drawerChartMode='assets',csi300Map=null,csi500Map=null,chartRange='all',privacyMode=false;
+let chartInstance=null,drawerAccountId=null,chartMode='assets',drawerChartMode='assets',csi300Map={},csi500Map={},chartRange='all',privacyMode=false;
 // 内存缓存
 const queryCache={};
 function cachedQuery(key,fn){
@@ -468,9 +468,14 @@ async function loadData(){
     allRecords[a.id]=recs||[];
   }));
   // don't clearCache — 保留缓存，同页面内切tab不重复请求
-  // 并行加载指数数据
-  [csi300Map,csi500Map]=await Promise.all([fetchIndexData('hs300'),fetchIndexData('zz500')]);
+  // 不阻塞渲染，后台加载指数数据
+  const indexPromise = Promise.all([fetchIndexData('hs300'), fetchIndexData('zz500')]);
   render();
+  // 指数数据到齐后，刷新图表加上对比线
+  const [hs300, zz500] = await indexPromise;
+  csi300Map = hs300; csi500Map = zz500;
+  if(chartInstance) renderChart();
+  if(drawerAccountId) renderDrawerChart();
 }
 
 // 检查现金账户历史中是否有余额为负的情况
