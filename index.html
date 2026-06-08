@@ -530,12 +530,14 @@ function renderChart(){
   
   let option;
   if(chartMode==='assets'){
-    // 总资产：仅在数值有变动时显示数据点，涨红跌蓝
-    let prevV=null;
+    // 总资产：仅当日有净投入时显示数据点，转入红转出蓝
     const assetData=totalVal.map((v,i)=>{
-      const changed=prevV!==null&&v!==prevV;const old=prevV;prevV=v;
-      if(!changed)return v;
-      return {value:v,symbol:'circle',symbolSize:6,itemStyle:{color:v>old?'#dc2626':'#2563eb',borderColor:v>old?'#dc2626':'#2563eb'}};
+      const dt=dates[i];
+      const tf=dailyTransfers[dt];
+      if(!tf)return v;
+      if(tf.netIn>tf.netOut)return {value:v,symbol:'circle',symbolSize:6,itemStyle:{color:'#dc2626',borderColor:'#dc2626'}};
+      if(tf.netOut>0)return {value:v,symbol:'circle',symbolSize:6,itemStyle:{color:'#2563eb',borderColor:'#2563eb'}};
+      return v;
     });
     option={
       tooltip:{trigger:'axis',formatter:function(p){
@@ -827,9 +829,12 @@ function renderDrawerChart(accountId,acct){
   let value=0,cost=0;
   const dates=[],vals=[],costs=[],navs=[],rets=[];
   const transferDates=new Set();
+  const dailyTransfers={};
   for(const r of records){
-    if(r.action_type==='transfer_in'){value+=Number(r.amount);cost+=Number(r.amount);transferDates.add(r.record_date);}
-    else if(r.action_type==='transfer_out'){value-=Number(r.amount);cost-=Number(r.amount);transferDates.add(r.record_date);}
+    if(r.action_type==='transfer_in'){value+=Number(r.amount);cost+=Number(r.amount);transferDates.add(r.record_date);
+      dailyTransfers[r.record_date]=dailyTransfers[r.record_date]||{netIn:0,netOut:0};dailyTransfers[r.record_date].netIn+=Number(r.amount);}
+    else if(r.action_type==='transfer_out'){value-=Number(r.amount);cost-=Number(r.amount);transferDates.add(r.record_date);
+      dailyTransfers[r.record_date]=dailyTransfers[r.record_date]||{netIn:0,netOut:0};dailyTransfers[r.record_date].netOut+=Number(r.amount);}
     else if(r.action_type==='revalue'){value=Number(r.amount);}
     const isInvest=acct.account_type==='investment';
     const navPlot=isInvest?(cost>0?value/cost:value):value;
@@ -852,14 +857,21 @@ function renderDrawerChart(accountId,acct){
   const mode=drawerChartMode;
   let option;
   if(mode==='assets'){
-    // 余额：仅在数值有变动时显示数据点，涨红跌蓝
-    let prevV=null;
+    // 余额：仅当日有净投入时显示数据点，转入红转出蓝
     const valData=vals.map((v,i)=>{
-      const changed=prevV!==null&&v!==prevV;const old=prevV;prevV=v;
-      return changed?{value:v,symbol:'circle',symbolSize:4,itemStyle:{color:v>old?'#dc2626':'#2563eb',borderColor:v>old?'#dc2626':'#2563eb'}}:v;
+      const tf=dailyTransfers[dates[i]];
+      if(!tf)return v;
+      if(tf.netIn>tf.netOut)return {value:v,symbol:'circle',symbolSize:4,itemStyle:{color:'#dc2626',borderColor:'#dc2626'}};
+      return {value:v,symbol:'circle',symbolSize:4,itemStyle:{color:'#2563eb',borderColor:'#2563eb'}};
     });
     option={
-      tooltip:{trigger:'axis',formatter:function(p){return p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':'¥'+Number(d.value).toFixed(2))).join('<br/>');}},
+      tooltip:{trigger:'axis',formatter:function(p){
+        const idx=p[0].dataIndex,date=dates[idx];
+        const lines=p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':'¥'+Number(d.value).toFixed(2)));
+        const tf=dailyTransfers[date];
+        if(tf){const net=tf.netIn-tf.netOut;if(net!==0)lines.push('当日净'+(net>0?'转入: +¥':'转出: -¥')+Math.abs(net).toLocaleString());}
+        return lines.join('<br/>');
+      }},
       legend:{data:['余额','净投入'],icon:'line',top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
       grid:{left:30,right:8,top:16,bottom:22},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
