@@ -123,6 +123,8 @@
   </main>
 </div>
 
+<div id="toastContainer" style="position:fixed;bottom:20px;right:20px;z-index:2000;"></div>
+
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="nav-bar.js"></script>
@@ -134,6 +136,8 @@
   if (!window.__supabaseClient) window.__supabaseClient = client;
   const ADMIN_EMAILS = []; // 管理员验证由Worker通过auth/v1/user完成
   let currentUser = null;
+
+  function toast(text,type='info'){const c=$('toastContainer'),el=document.createElement('div');el.className='toast toast-'+type;el.textContent=text;c.appendChild(el);setTimeout(()=>el.remove(),3000);}
 
   mountNavBar('#nav-app');
 
