@@ -800,7 +800,7 @@ function renderChart(){
       legend:{data:['净值','沪深300','中证500'],selected:{'净值':true,'沪深300':true,'中证500':false},icon:'rect',itemWidth:14,itemHeight:2.5,bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
       grid:{left:40,right:16,top:16,bottom:36},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
-      yAxis:{type:'value',axisLabel:{fontSize:10,color:'#94a3b8'},splitLine:{lineStyle:{color:'#f1f5f9'}}},
+      yAxis:{type:'value',scale:true,axisLabel:{fontSize:10,color:'#94a3b8',formatter:v=>v.toFixed(3)},splitLine:{lineStyle:{color:'#f1f5f9'}}},
       series:[
         {name:'净值',type:'line',data:nav,smooth:true,symbol:'none',color:'#1e293b',lineStyle:{width:1.5,color:'#1e293b'},
           areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(30,41,59,0.12)'},{offset:1,color:'rgba(30,41,59,0)'}]}},
@@ -1175,7 +1175,7 @@ function renderDrawerChart(accountId,acct,filteredRecs){
       legend:{data:['净值','沪深300','中证500'],selected:{'净值':true,'沪深300':true,'中证500':false},icon:'rect',itemWidth:12,itemHeight:2,top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
       grid:{left:42,right:10,top:18,bottom:28},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8',margin:4},axisLine:{show:false},axisTick:{show:false}},
-      yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(1)+'万':v}},
+      yAxis:{type:'value',scale:true,splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8',formatter:v=>v.toFixed(3)}},
       series:[
         {name:'净值',type:'line',data:navs,smooth:true,symbol:'none',color:'#1e293b',lineStyle:{width:1.5,color:'#1e293b'},
           areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(30,41,59,0.15)'},{offset:1,color:'rgba(30,41,59,0)'}]}},
