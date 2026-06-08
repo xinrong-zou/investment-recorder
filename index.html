@@ -295,7 +295,7 @@ const client=window.__supabaseClient||supabase.createClient(SUPABASE_URL,SUPABAS
 if(!window.__supabaseClient)window.__supabaseClient=client;
 
 let currentUser=null,accounts=[],allRecords={},settings=null,showHidden=false;
-let chartInstance=null,drawerAccountId=null,chartMode='assets',drawerChartMode='assets';
+let chartInstance=null,drawerAccountId=null,chartMode='assets',drawerChartMode='assets',csi300Map=null;
 
 const $=id=>document.getElementById(id);
 function fmt(n){return n==null?'—':'¥'+Number(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
@@ -356,6 +356,16 @@ function calcXIRR(records, accountType, currentValue){
   return null;
 }
 
+// 获取沪深300指数历史收盘价
+async function fetchCSI300(){
+  try{
+    const r=await fetch('https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=1.000300&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=101&fqt=1&end=20500101&lmt=5000');
+    const d=await r.json();
+    const map={};
+    (d.data?.klines||[]).forEach(k=>{const p=k.split(',');map[p[0]]=parseFloat(p[2]);});
+    csi300Map=map;
+  }catch(e){csi300Map={};}
+}
 async function loadData(){
   const{data:{session}}=await client.auth.getSession();
   if(!session){$('loginPrompt').style.display='block';$('dashContent').style.display='none';return;}
@@ -369,6 +379,7 @@ async function loadData(){
   }
   allRecords={};
   for(const a of accounts){const{data:recs}=await client.from('investment_records').select('*').eq('account_id',a.id).order('record_date',{ascending:true});allRecords[a.id]=recs||[];}
+  fetchCSI300();
   render();
 }
 
@@ -558,20 +569,34 @@ function renderChart(){
           lineStyle:{width:1,color:'#f59e0b'}}]
     };
   }else if(chartMode==='nav'){
+    // 构建沪深300归一化数据
+    const hs300Data=dates.map(d=>{
+      if(!csi300Map||!csi300Map[d])return null;
+      return csi300Map[d];
+    });
+    const firstIdx=hs300Data.findIndex(v=>v!==null);
+    const baseVal=firstIdx>=0?hs300Data[firstIdx]:1;
+    const hs300Nav=hs300Data.map(v=>v!=null?v/baseVal:null);
     option={
-      tooltip:{trigger:'axis',valueFormatter:v=>v.toFixed(3)},
-      legend:{data:['净值'],icon:'rect',itemWidth:14,itemHeight:2.5,bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
+      tooltip:{trigger:'axis',valueFormatter:(v,idx)=>{
+        const isHs=Array.isArray(idx)?idx.seriesName==='沪深300':false;
+        return (isNaN(v)?'—':v.toFixed(3));
+      },formatter:function(p){
+        return p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':d.value.toFixed(3))).join('<br/>');
+      }},
+      legend:{data:['净值','沪深300'],icon:'rect',itemWidth:14,itemHeight:2.5,bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
       grid:{left:40,right:16,top:16,bottom:36},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',axisLabel:{fontSize:10,color:'#94a3b8'},splitLine:{lineStyle:{color:'#f1f5f9'}}},
-      series:[{name:'净值',type:'line',data:nav,smooth:true,symbol:'none',lineStyle:{width:2,color:'#1e293b'},
-        areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(30,41,59,0.12)'},{offset:1,color:'rgba(30,41,59,0)'}]}},
-        // 标记最大回撤区间
-        markArea:{
-          silent:true,itemStyle:{color:'rgba(37,99,235,0.08)'},
-          data:[[{xAxis:dates[0]},{xAxis:dates[dates.length-1]}]] // 占位，由calcMaxDrawdown填充
-        }
-      }]
+      series:[
+        {name:'净值',type:'line',data:nav,smooth:true,symbol:'none',lineStyle:{width:2,color:'#1e293b'},
+          areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(30,41,59,0.12)'},{offset:1,color:'rgba(30,41,59,0)'}]}},
+          markArea:{silent:true,itemStyle:{color:'rgba(37,99,235,0.08)'},
+            data:[[{xAxis:dates[0]},{xAxis:dates[dates.length-1]}]]}
+        },
+        {name:'沪深300',type:'line',data:hs300Nav,smooth:true,symbol:'none',
+          lineStyle:{width:1.5,color:'#f97316',type:'dashed'}}
+      ]
     };
     // 在option上叠加drawdown标记
     const {maxDd,ddStart,ddEnd}=calcMaxDrawdown();
@@ -882,18 +907,32 @@ function renderDrawerChart(accountId,acct){
       ]
     };
   }else if(mode==='nav'){
+    // 构建沪深300归一化数据
+    const hs300Drawer=dates.map(d=>{
+      if(!csi300Map||!csi300Map[d])return null;
+      return csi300Map[d];
+    });
+    const firstDIdx=hs300Drawer.findIndex(v=>v!==null);
+    const baseD=firstDIdx>=0?hs300Drawer[firstDIdx]:1;
+    const hs300NavD=hs300Drawer.map(v=>v!=null?v/baseD:null);
     const isInvest=acct.account_type==='investment';
     option={
-      tooltip:{trigger:'axis',formatter:function(p){const d=p[0];return d.axisValue+'<br/>净值: '+(isNaN(d.value)?'—':d.value.toFixed(3));}},
-      legend:{data:['净值'],icon:'rect',itemWidth:12,itemHeight:2,top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
+      tooltip:{trigger:'axis',formatter:function(p){
+        return p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':d.value.toFixed(3))).join('<br/>');
+      }},
+      legend:{data:['净值','沪深300'],icon:'rect',itemWidth:12,itemHeight:2,top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
       grid:{left:30,right:8,top:8,bottom:20},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
       yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8'}},
-      series:[{name:'净值',type:'line',data:navs,smooth:true,symbol:'none',lineStyle:{width:2,color:'#1e293b'},
-        areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(30,41,59,0.15)'},{offset:1,color:'rgba(30,41,59,0)'}]}},
-        markArea:maxDd<0?{silent:true,itemStyle:{color:'rgba(37,99,235,0.12)'},
-          data:[[{xAxis:dates[ddStartIdx],label:{show:true,formatter:'最大回撤 '+(maxDd*100).toFixed(2)+'%',fontSize:9,color:'#2563eb',position:'insideTop'}},{xAxis:dates[ddEndIdx]}]]}:undefined
-      }]
+      series:[
+        {name:'净值',type:'line',data:navs,smooth:true,symbol:'none',lineStyle:{width:2,color:'#1e293b'},
+          areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(30,41,59,0.15)'},{offset:1,color:'rgba(30,41,59,0)'}]}},
+          markArea:maxDd<0?{silent:true,itemStyle:{color:'rgba(37,99,235,0.12)'},
+            data:[[{xAxis:dates[ddStartIdx],label:{show:true,formatter:'最大回撤 '+(maxDd*100).toFixed(2)+'%',fontSize:9,color:'#2563eb',position:'insideTop'}},{xAxis:dates[ddEndIdx]}]]}:undefined
+        },
+        {name:'沪深300',type:'line',data:hs300NavD,smooth:true,symbol:'none',
+          lineStyle:{width:1.5,color:'#f97316',type:'dashed'}}
+      ]
     };
   }else{ // return
     option={
