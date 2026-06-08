@@ -54,6 +54,7 @@
       <a class="nav-item active" data-tab="overview" onclick="switchTab('overview')">📊 概览</a>
       <a class="nav-item" data-tab="users" onclick="switchTab('users');loadUsers()">👥 用户管理</a>
       <a class="nav-item" data-tab="subscriptions" onclick="switchTab('subscriptions');loadSubscriptions()">🎗️ 赞助管理</a>
+      <a class="nav-item" data-tab="feedbacks" onclick="switchTab('feedbacks');loadAdminFeedbacks()">💬 反馈管理</a>
       <a class="nav-item" data-tab="settings" onclick="switchTab('settings')">⚙️ 设置</a>
     </div>
   </aside>
@@ -92,6 +93,21 @@
       </div>
       <div id="subMgmtLoading" style="text-align:center;padding:40px;color:var(--text-muted);">加载中...</div>
       <div id="subMgmtResult" style="display:none;margin-top:12px;padding:12px;border-radius:var(--radius-sm);font-size:0.85rem;"></div>
+    </div>
+
+    <!-- 反馈管理 -->
+    <div class="tab-content" id="tab-feedbacks">
+      <h1>💬 反馈管理</h1>
+      <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px;">用户提交的反馈，可回复</p>
+      <div style="overflow-x:auto;">
+        <table class="admin-table">
+          <thead><tr>
+            <th>时间</th><th>用户</th><th>类型</th><th>内容</th><th>回复</th><th>操作</th>
+          </tr></thead>
+          <tbody id="adminFeedbackList"></tbody>
+        </table>
+      </div>
+      <div id="feedbackLoading" style="text-align:center;padding:40px;color:var(--text-muted);">加载中...</div>
     </div>
 
     <!-- 设置 -->
@@ -295,6 +311,53 @@
     } catch(e) {
       resultDiv.style.background = '#f8d7da'; resultDiv.style.color = '#721c24';
       resultDiv.textContent = '❌ 操作失败: ' + e.message;
+    }
+  };
+
+  // ====== 反馈管理 ======
+  window.loadAdminFeedbacks = async function() {
+    document.getElementById('feedbackLoading').style.display = 'block';
+    try {
+      const { data, error } = await client
+        .from('feedbacks')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      const list = document.getElementById('adminFeedbackList');
+      list.innerHTML = (data || []).map(f => `
+        <tr>
+          <td style="font-size:0.78rem;color:var(--text-muted);">${(f.created_at||'').substring(0,16)}</td>
+          <td style="font-size:0.82rem;">${escapeHtml((f.user_email||f.user_id||'').substring(0,24))}</td>
+          <td><span class="tag ${f.type==='bug'?'tag-in':f.type==='feature'?'tag-out':'tag-revalue'}">${f.type==='bug'?'问题':f.type==='feature'?'建议':'其他'}</span></td>
+          <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(f.content)}</td>
+          <td style="font-size:0.82rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(f.reply||'')||'<span style="color:var(--text-muted);">—</span>'}</td>
+          <td class="admin-actions">
+            ${!f.reply ? `<button class="btn btn-ghost btn-sm" onclick="replyFeedback('${f.id}')">回复</button>` : ''}
+          </td>
+        </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">暂无反馈</td></tr>';
+    } catch(e) {
+      document.getElementById('adminFeedbackList').innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);text-align:center;">加载失败: ' + e.message + '</td></tr>';
+    }
+    document.getElementById('feedbackLoading').style.display = 'none';
+  };
+
+  window.replyFeedback = async function(id) {
+    const reply = prompt('输入回复内容：');
+    if (!reply || !reply.trim()) return;
+    try {
+      const session = (await client.auth.getSession()).data.session;
+      if (!session) throw new Error('未登录');
+      const req = await fetch('/api/admin/feedback-reply', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, reply: reply.trim() })
+      });
+      const data = await req.json();
+      if (!data.ok) throw new Error(data.error || '回复失败');
+      toast('已回复', 'success');
+      loadAdminFeedbacks();
+    } catch(e) {
+      toast('回复失败: ' + e.message, 'error');
     }
   };
 

@@ -91,6 +91,7 @@
   <div id="donorLoading" class="donors-empty">加载中...</div>
 
   <div class="footer-links">
+    <a href="javascript:openFeedback()">💬 反馈</a>
     <a href="/">返回首页</a>
     <a href="login.html">登录</a>
     <a href="register.html">注册</a>
@@ -169,6 +170,7 @@ async function submitFeedback(){
     document.getElementById('fbResult').textContent='❌ 提交失败: '+e.message;
   }
 }
+(async function(){
   // 如果已登录，自动填入邮箱到捐赠链接
   const { data: { session } } = await supabase.createClient(
     'https://spb-cl9n18iof0i9qxjh.supabase.opentrust.net',

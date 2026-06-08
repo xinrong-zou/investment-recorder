@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>反馈 - 收益记录器</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .fb-layout { max-width: 680px; margin: 0 auto; padding: 24px 20px; }
+    .fb-layout h1 { font-size: 1.3rem; margin-bottom: 20px; }
+    .fb-form { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 20px; margin-bottom: 24px; }
+    .fb-form h2 { font-size: 1rem; margin-bottom: 12px; }
+    .fb-history h2 { font-size: 1rem; margin-bottom: 12px; }
+    .fb-item { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 10px; }
+    .fb-item .meta { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 6px; display: flex; gap: 8px; align-items: center; }
+    .fb-item .tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 500; }
+    .fb-item .tag-bug { background: #fef2f2; color: #dc2626; }
+    .fb-item .tag-feature { background: #eff6ff; color: #2563eb; }
+    .fb-item .tag-other { background: #f8fafc; color: #64748b; }
+    .fb-item .content { font-size: 0.88rem; line-height: 1.5; margin-bottom: 6px; }
+    .fb-item .reply { background: var(--bg); border-left: 3px solid var(--primary); padding: 10px 14px; margin-top: 8px; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-size: 0.84rem; }
+    .fb-item .reply .from { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 2px; }
+    .fb-empty { text-align: center; padding: 40px; color: var(--text-muted); font-size: 0.88rem; }
+    .login-required { text-align: center; padding: 80px 20px; }
+  </style>
+</head>
+<body>
+<div id="nav-app"><nav-bar title="收益记录器" logo-url="/"></nav-bar></div>
+
+<div class="fb-layout">
+  <div id="loginPrompt" class="login-required" style="display:none;">
+    <h2>需要登录</h2>
+    <p style="color:var(--text-muted);margin-bottom:16px;">请登录后提交反馈</p>
+    <a href="login.html" class="btn btn-primary">去登录</a>
+  </div>
+
+  <div id="fbContent" style="display:none;">
+    <h1>💬 反馈</h1>
+
+    <div class="fb-form">
+      <h2>提交反馈</h2>
+      <div class="input-group">
+        <label>类型</label>
+        <select class="input" id="fbType">
+          <option value="bug">问题报告</option>
+          <option value="feature">功能建议</option>
+          <option value="other">其他</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label>描述</label>
+        <textarea class="input" id="fbContentInput" rows="4" placeholder="请详细描述..." style="resize:vertical;font-family:inherit;font-size:0.88rem;"></textarea>
+      </div>
+      <div class="form-actions" style="margin-top:0;">
+        <button class="btn btn-primary" onclick="submitFeedback()">提交</button>
+      </div>
+      <p id="fbResult" style="font-size:0.82rem;margin-top:8px;display:none;"></p>
+    </div>
+
+    <div class="fb-history">
+      <h2>我的反馈记录</h2>
+      <div id="fbList"></div>
+      <div id="fbLoading" class="fb-empty">加载中...</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="nav-bar.js"></script>
+<script>
+mountNavBar('#nav-app');
+const SUPABASE_URL='https://spb-cl9n18iof0i9qxjh.supabase.opentrust.net';
+const SUPABASE_ANON_KEY='eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiIsInJlZiI6InNwYi1jbDluMThpb2YwaTlxeGpoIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA2NjgzNzQsImV4cCI6MjA5NjI0NDM3NH0.t8MDF4zdvV9kpUz-gZpVM-OgFlAow8FlENASpqkUkwk';
+const client=window.__supabaseClient||supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+if(!window.__supabaseClient)window.__supabaseClient=client;
+
+function escapeHtml(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+async function init(){
+  const{data:{session}}=await client.auth.getSession();
+  if(!session){document.getElementById('loginPrompt').style.display='block';return;}
+  document.getElementById('fbContent').style.display='block';
+  await loadMyFeedbacks();
+}
+
+async function submitFeedback(){
+  const session=(await client.auth.getSession()).data.session;
+  if(!session){alert('请先登录');return;}
+  const type=document.getElementById('fbType').value;
+  const content=document.getElementById('fbContentInput').value.trim();
+  if(!content){alert('请填写描述');return;}
+  const r=document.getElementById('fbResult');
+  r.style.display='block';r.textContent='提交中...';r.style.color='var(--text-secondary)';
+  try{
+    const{error}=await client.from('feedbacks').insert({user_id:session.user.id,user_email:session.user.email,type,content});
+    if(error)throw error;
+    r.style.color='#059669';r.textContent='✅ 已提交，感谢反馈！';
+    document.getElementById('fbContentInput').value='';
+    await loadMyFeedbacks();
+  }catch(e){r.style.color='#dc2626';r.textContent='❌ '+e.message;}
+}
+
+async function loadMyFeedbacks(){
+  document.getElementById('fbLoading').style.display='block';
+  try{
+    const session=(await client.auth.getSession()).data.session;
+    if(!session)return;
+    const{data}=await client.from('feedbacks').select('*').eq('user_id',session.user.id).order('created_at',{ascending:false});
+    const list=document.getElementById('fbList');
+    if(!data||data.length===0){list.innerHTML='<div class="fb-empty">还没有提交过反馈</div>';return;}
+    list.innerHTML=data.map(f=>{
+      const tagClass=f.type==='bug'?'tag-bug':f.type==='feature'?'tag-feature':'tag-other';
+      const tagLabel={bug:'问题',feature:'建议',other:'其他'}[f.type]||f.type;
+      const replyHtml=f.reply?`<div class="reply"><div class="from">管理员回复</div>${escapeHtml(f.reply)}</div>`:'';
+      return `<div class="fb-item">
+        <div class="meta"><span class="tag ${tagClass}">${tagLabel}</span><span>${new Date(f.created_at).toLocaleDateString('zh-CN')}</span></div>
+        <div class="content">${escapeHtml(f.content)}</div>${replyHtml}
+      </div>`;
+    }).join('');
+  }catch(e){document.getElementById('fbList').innerHTML='<div class="fb-empty">加载失败</div>';}
+  document.getElementById('fbLoading').style.display='none';
+}
+
+init();
+</script>
+</body>
+</html>
