@@ -1000,9 +1000,9 @@ function renderDrawerChart(accountId,acct,filteredRecs){
         return lines.join('<br/>');
       }},
       legend:{data:['余额','净投入'],icon:'rect',itemWidth:12,itemHeight:2,top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
-      grid:{left:30,right:8,top:16,bottom:22},
-      xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
-      yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8'}},
+      grid:{left:42,right:10,top:18,bottom:28},
+      xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8',margin:4},axisLine:{show:false},axisTick:{show:false}},
+      yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(1)+'万':v}},
       series:[
         {name:'余额',type:'line',data:valData,smooth:true,symbol:'none',color:'#3b82f6',lineStyle:{width:1.5,color:'#3b82f6'},
           areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(59,130,246,0.3)'},{offset:1,color:'rgba(59,130,246,0)'}]}}},
@@ -1028,9 +1028,9 @@ function renderDrawerChart(accountId,acct,filteredRecs){
         return p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':d.value.toFixed(3))).join('<br/>');
       }},
       legend:{data:['净值','沪深300'],icon:'rect',itemWidth:12,itemHeight:2,top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
-      grid:{left:30,right:8,top:8,bottom:20},
-      xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
-      yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8'}},
+      grid:{left:42,right:10,top:18,bottom:28},
+      xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8',margin:4},axisLine:{show:false},axisTick:{show:false}},
+      yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(1)+'万':v}},
       series:[
         {name:'净值',type:'line',data:navs,smooth:true,symbol:'none',color:'#1e293b',lineStyle:{width:1.5,color:'#1e293b'},
           areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(30,41,59,0.15)'},{offset:1,color:'rgba(30,41,59,0)'}]}},
@@ -1045,9 +1045,9 @@ function renderDrawerChart(accountId,acct,filteredRecs){
     option={
       tooltip:{trigger:'axis',formatter:function(p){const d=p[0];return d.axisValue+'<br/>累计收益: '+(isNaN(d.value)?'—':'¥'+Number(d.value).toFixed(2));}},
       legend:{data:['累计收益'],icon:'rect',itemWidth:12,itemHeight:2,top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
-      grid:{left:30,right:8,top:8,bottom:20},
-      xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
-      yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8'}},
+      grid:{left:42,right:10,top:18,bottom:28},
+      xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8',margin:4},axisLine:{show:false},axisTick:{show:false}},
+      yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(1)+'万':v}},
       series:[{name:'累计收益',type:'line',data:rets,smooth:true,symbol:'none',color:'#dc2626',lineStyle:{width:1.5,color:'#dc2626'},
         areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(220,38,38,0.3)'},{offset:1,color:'rgba(220,38,38,0)'}]}}}]
     };
