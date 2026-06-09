@@ -661,16 +661,25 @@ function render(){
         <div class="dot-menu"><button class="dot-btn" onclick="event.stopPropagation();toggleDotMenu(this)">⋮</button><div class="dot-dropdown"><div onclick="event.stopPropagation();showRecords('${a.id}')">📋 查看记录</div><div onclick="event.stopPropagation();${hideAction}">${hideLabel}</div><div class="danger" onclick="event.stopPropagation();deleteAccount('${a.id}')">🗑 删除</div></div></div>
       </div></div>`;
   });
-  if(filtered.length===0)html=`<div class="empty-guide" style="grid-column:1/-1;">
+  // 检测新用户：仅1个现金账户且0条记录
+  const totalAllRecs=Object.values(allRecords).reduce((sum,arr)=>sum+(arr||[]).length,0);
+  const isNewUser=accounts.length===1&&accounts[0].account_type==='cash'&&totalAllRecs===0;
+  if(isNewUser)html=`<div class="empty-guide" style="grid-column:1/-1;">
     <div class="icon-big">📊</div>
     <h2>欢迎使用收益账本</h2>
-    <p>开始追踪你的投资收益吧，只需三步</p>
+    <p>开始追踪你的投资收益吧，只需两步</p>
     <div class="steps">
-      <div class="step"><div class="step-num">第一步</div><div class="step-title">🏦 创建账户</div><div class="step-desc">点击上方「+ 新建账户」，创建现金账户和投资账户</div></div>
-      <div class="step"><div class="step-num">第二步</div><div class="step-title">💰 记录操作</div><div class="step-desc">录入转入、转出、市值更新，记录每一笔资金变动</div></div>
-      <div class="step"><div class="step-num">第三步</div><div class="step-title">📈 查看趋势</div><div class="step-desc">图表展示资产走势、收益率、最大回撤等关键指标</div></div>
+      <div class="step"><div class="step-num">第一步</div><div class="step-title">💰 记录操作</div><div class="step-desc">点击下方按钮，录入第一笔资金变动</div></div>
+      <div class="step"><div class="step-num">第二步</div><div class="step-title">📈 查看趋势</div><div class="step-desc">图表自动展示资产走势、收益率等关键指标</div></div>
     </div>
-    <button class="btn btn-primary" onclick="openAddAccount()">+ 创建第一个账户</button>
+    <button class="btn btn-primary" onclick="openRecord('${accounts[0].id}','transfer_in')">💰 录入第一笔记录</button>
+    <a href="about.html" class="btn btn-ghost" style="margin-left:8px;">了解更多</a>
+  </div>`;
+  else if(filtered.length===0)html=`<div class="empty-guide" style="grid-column:1/-1;">
+    <div class="icon-big">📊</div>
+    <h2>暂无账户</h2>
+    <p>创建一个新账户开始追踪吧</p>
+    <button class="btn btn-primary" onclick="openAddAccount()">+ 创建账户</button>
     <a href="about.html" class="btn btn-ghost" style="margin-left:8px;">了解更多</a>
   </div>`;
   $('accountGrid').innerHTML=html;
