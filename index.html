@@ -229,7 +229,7 @@
           <button class="chart-tab" data-mode="return" onclick="switchChartMode('return')">累计收益</button>
           <button class="chart-tab" data-mode="pie" onclick="switchChartMode('pie')">配置</button>
         </div>
-        <div class="chart-range-btns">
+        <div class="chart-range-btns" id="chartRangeBtns">
           <button class="chart-range-btn active" data-range="all" onclick="setChartRange('all')">全部</button>
           <button class="chart-range-btn" data-range="thisYear" onclick="setChartRange('thisYear')">今年</button>
           <button class="chart-range-btn" data-range="1y" onclick="setChartRange('1y')">近1年</button>
@@ -289,6 +289,12 @@
     <div class="input-group"><label>金额</label><input type="number" class="input" id="recordAmount" placeholder="0.00" step="0.01" min="0"></div>
     <div class="input-group"><label>日期</label><input type="date" class="input" id="recordDate"></div>
     <div class="input-group"><label>备注</label><input type="text" class="input" id="recordNote" placeholder="选填" maxlength="50"></div>
+    <div id="revalueHint" style="display:none;margin-top:8px;padding:8px 12px;background:#f0fdf4;border-radius:8px;font-size:0.76rem;color:#059669;line-height:1.5;">
+      💡 更新市值代表当天<strong>最终</strong>市值。如有同一天的转入/转出，请<strong>先录入转入转出</strong>，最后再录入更新市值。
+    </div>
+    <div id="revalueDupHint" style="display:none;margin-top:6px;padding:8px 12px;background:#fef3c7;border-radius:8px;font-size:0.76rem;color:#d97706;line-height:1.5;">
+      ⚠️ 当天已有一条更新市值记录，继续录入将覆盖前面的值。如需修改建议编辑已有记录。
+    </div>
     <div class="form-actions"><button class="btn btn-ghost" onclick="closeModal('recordModal')">取消</button><button class="btn btn-primary" onclick="saveRecord()">保存</button></div>
   </div>
 </div>
@@ -385,7 +391,9 @@ function calcAccount(acct,records){
   const sorted=[...records].sort((a,b)=>{
     const d=new Date(a.record_date)-new Date(b.record_date);
     if(d!==0)return d;
-    return new Date(a.created_at||0)-new Date(b.created_at||0);
+    // 同一天：先处理转入转出，更新市值最后（代表当天最终市值）
+    const order={transfer_in:0,transfer_out:1,revalue:2};
+    return (order[a.action_type]||0)-(order[b.action_type]||0);
   });
   let cost=0,lastRevalue=null;
   sorted.forEach(r=>{
@@ -451,6 +459,7 @@ async function fetchIndexData(code){
   }catch(e){return {};}
 }
 async function loadData(){
+  clearCache();
   const{data:{session}}=await client.auth.getSession();
   if(!session){$('loginPrompt').style.display='block';$('dashContent').style.display='none';return;}
   currentUser=session.user;$('loginPrompt').style.display='none';$('dashContent').style.display='block';$('dashSkeleton').style.display='block';
@@ -464,10 +473,10 @@ async function loadData(){
   allRecords={};
   // 并行加载所有账户记录（比串行快N倍）
   await Promise.all(accounts.map(async a=>{
-    const{data:recs}=await cachedQuery('recs_'+a.id,()=>client.from('investment_records').select('id,account_id,record_date,action_type,amount,note,paired_id').eq('account_id',a.id).order('record_date',{ascending:true}));
+    const{data:recs}=await cachedQuery('recs_'+a.id,()=>client.from('investment_records').select('id,account_id,record_date,action_type,amount,note,paired_id').eq('account_id',a.id).order('record_date',{ascending:true}).order('id',{ascending:true}));
     allRecords[a.id]=recs||[];
   }));
-  // don't clearCache — 保留缓存，同页面内切tab不重复请求
+  // clearCache in loadData() ensures fresh data after save/delete/edit
   // 不阻塞渲染，后台加载指数数据
   const indexPromise = Promise.all([fetchIndexData('hs300'), fetchIndexData('zz500')]);
   render();
@@ -484,7 +493,7 @@ function checkNegativeBalance(accountId){
   if(!acct||acct.account_type!=='cash')return null;
   const records=(allRecords[accountId]||[]).slice().sort((a,b)=>{
     const d=new Date(a.record_date)-new Date(b.record_date);
-    return d!==0?d:new Date(a.created_at||0)-new Date(b.created_at||0);
+    return d!==0?d:(({transfer_in:0,transfer_out:1,revalue:2}[a.action_type]||0)-({transfer_in:0,transfer_out:1,revalue:2}[b.action_type]||0));
   });
   let bal=0;
   for(const r of records){
@@ -527,7 +536,7 @@ function render(){
     const neg=checkNegativeBalance(a.id);
     const warnBadge=neg?' <span title="'+neg.date+' 余额 '+fmt(neg.balance)+'，查看折线图定位问题" style="display:inline-flex;align-items:center;gap:3px;font-size:0.72rem;color:#d97706;background:#fef3c7;padding:1px 8px;border-radius:10px;font-weight:500;cursor:help;">⚠ 余额异常</span>':'';
     // 计算该账户XIRR
-    const acctRecs=(allRecords[a.id]||[]).slice().sort((x,y)=>{const d=new Date(x.record_date)-new Date(y.record_date);return d!==0?d:new Date(x.created_at||0)-new Date(y.created_at||0);});
+    const acctRecs=(allRecords[a.id]||[]).slice().sort((x,y)=>{const d=new Date(x.record_date)-new Date(y.record_date);return d!==0?d:(x.id||0)-(y.id||0);});
     const acctXirr=calcXIRR(acctRecs,a.account_type,calc.currentValue);
     const xirrStr=acctXirr!=null&&!isNaN(acctXirr)?(acctXirr*100).toFixed(2)+'%':'—';
     const xirrColor=acctXirr!=null?(acctXirr>=0?'#dc2626':'#2563eb'):'var(--text-secondary)';
@@ -704,6 +713,8 @@ function onDrawerCustomDate(){
 function switchChartMode(mode){
   chartMode=mode;
   document.querySelectorAll('.chart-tab').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+  $('chartRangeBtns').style.display=mode==='pie'?'none':'flex';
+  $('chartRangeCustom').style.display='none';
   if(mode==='pie'){
     $('totalChart').style.display='none';
     $('pieChartContainer').style.display='block';
@@ -756,7 +767,7 @@ function renderChart(){
       return v;
     });
     option={
-      tooltip:{trigger:'axis',formatter:function(p){
+      tooltip:{z:800,trigger:'axis',formatter:function(p){
         const idx=p[0].dataIndex,date=dates[idx];
         const av=typeof p[0].value==='object'?p[0].value.value:p[0].value;
         const cv=typeof p[1].value==='object'?p[1].value.value:p[1].value;
@@ -768,7 +779,7 @@ function renderChart(){
       legend:{data:['总资产','净投入'],icon:'rect',itemWidth:14,itemHeight:2.5,bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
       grid:{left:55,right:16,top:16,bottom:48},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
-      yAxis:{type:'value',axisLabel:{fontSize:10,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(0)+'万':v},splitLine:{lineStyle:{color:'#f1f5f9'}}},
+      yAxis:{type:'value',scale:true,axisLabel:{fontSize:10,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(0)+'万':v},splitLine:{lineStyle:{color:'#f1f5f9'}}},
       series:[
         {name:'总资产',type:'line',data:assetData,smooth:true,symbol:'none',color:'#3b82f6',lineStyle:{width:1.5,color:'#3b82f6'},
           areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(59,130,246,0.15)'},{offset:1,color:'rgba(59,130,246,0)'}]}}},
@@ -800,7 +811,7 @@ function renderChart(){
     const base5=firstGood5||1;
     const zz500Nav=zz500Data.map(v=>v!=null?v/base5:null);
     option={
-      tooltip:{trigger:'axis',valueFormatter:(v,idx)=>{
+      tooltip:{z:800,trigger:'axis',valueFormatter:(v,idx)=>{
         const isHs=Array.isArray(idx)?idx.seriesName==='沪深300'||idx.seriesName==='中证500':false;
         return (isNaN(v)?'—':v.toFixed(3));
       },formatter:function(p){
@@ -828,11 +839,11 @@ function renderChart(){
       option.series[0].markArea.data=[[{xAxis:ddStart,label:{show:true,formatter:'最大回撤 '+(maxDd*100).toFixed(2)+'%',fontSize:10,color:'#2563eb',position:'insideTop'}},{xAxis:ddEnd}]]};
   }else{ // return
     option={
-      tooltip:{trigger:'axis',valueFormatter:v=>'¥'+(v||0).toLocaleString()},
+      tooltip:{z:800,trigger:'axis',valueFormatter:v=>'¥'+(v||0).toLocaleString()},
       legend:{data:['累计收益'],icon:'rect',itemWidth:14,itemHeight:2.5,bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
       grid:{left:55,right:16,top:16,bottom:36},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
-      yAxis:{type:'value',axisLabel:{fontSize:10,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(0)+'万':v},splitLine:{lineStyle:{color:'#f1f5f9'}}},
+      yAxis:{type:'value',scale:true,axisLabel:{fontSize:10,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(0)+'万':v},splitLine:{lineStyle:{color:'#f1f5f9'}}},
       series:[{name:'累计收益',type:'line',data:cumRet,smooth:true,symbol:'none',color:'#dc2626',lineStyle:{width:1.5,color:'#dc2626'},
         areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(220,38,38,0.15)'},{offset:1,color:'rgba(220,38,38,0)'}]}}}]
     };
@@ -929,6 +940,16 @@ function onRecordTypeChange(){
   const type=$('recordType').value,srcGroup=$('srcGroup'),destGroup=$('destGroup');
   srcGroup.style.display=type==='transfer_in'?'':'none';
   destGroup.style.display=type==='transfer_out'?'':'none';
+  const hint=$('revalueHint');if(hint)hint.style.display=type==='revalue'?'block':'none';
+  // 检查当天是否已有更新市值记录
+  const dupHint=$('revalueDupHint');
+  if(dupHint){
+    if(type==='revalue'&&recordAccountId){
+      const date=$('recordDate').value;
+      const hasRevalue=(allRecords[recordAccountId]||[]).some(r=>r.record_date===date&&r.action_type==='revalue');
+      dupHint.style.display=hasRevalue?'block':'none';
+    }else{dupHint.style.display='none';}
+  }
   if(type==='transfer_in'){
     const sel=$('srcAccount');sel.innerHTML='<option value="">外部资金（从外部转入）</option>';
     let defaultSelected=false;
@@ -1018,7 +1039,7 @@ async function showRecords(accountId){
   $('drawerBtnRevalue').style.display=acct.account_type==='investment'?'':'none';
   const calc=calcAccount(acct,allRecords[accountId]||[]);
   // 计算该账户的最大回撤
-  const allRecs=(allRecords[accountId]||[]).slice().sort((a,b)=>{const d=new Date(a.record_date)-new Date(b.record_date);return d!==0?d:new Date(a.created_at||0)-new Date(b.created_at||0);});
+  const allRecs=(allRecords[accountId]||[]).slice().sort((a,b)=>{const d=new Date(a.record_date)-new Date(b.record_date);return d!==0?d:(a.id||0)-(b.id||0);});
   let ddPeak=1,ddVal=0,ddStart='',ddEnd='',maxDd=0;
   if(allRecs.length>=2){
     let val=0,cost=0,peak=1,peakIdx=0;
@@ -1089,7 +1110,7 @@ function renderDrawerChart(accountId,acct,filteredRecs){
   if(drawerChartInstance){drawerChartInstance.dispose();drawerChartInstance=null;}
   const records=(filteredRecs||allRecords[accountId]||[]).slice().sort((a,b)=>{
     const d=new Date(a.record_date)-new Date(b.record_date);
-    return d!==0?d:new Date(a.created_at||0)-new Date(b.created_at||0);
+    return d!==0?d:(({transfer_in:0,transfer_out:1,revalue:2}[a.action_type]||0)-({transfer_in:0,transfer_out:1,revalue:2}[b.action_type]||0));
   });
   if(records.length<2){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.8rem;">至少2条记录才能显示趋势</div>';$('drawerChartTabs').style.display='none';return;}
   $('drawerChartTabs').style.display='flex';$('drawerRangeBtns').style.display='flex';
@@ -1135,7 +1156,7 @@ function renderDrawerChart(accountId,acct,filteredRecs){
       return v;
     });
     option={
-      tooltip:{trigger:'axis',formatter:function(p){
+      tooltip:{z:800,trigger:'axis',formatter:function(p){
         const idx=p[0].dataIndex,date=dates[idx];
         const lines=p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':'¥'+Number(d.value).toFixed(2)));
         const tf=dailyTransfers[date];
@@ -1145,7 +1166,7 @@ function renderDrawerChart(accountId,acct,filteredRecs){
       legend:{data:['余额','净投入'],icon:'rect',itemWidth:12,itemHeight:2,top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
       grid:{left:42,right:10,top:18,bottom:28},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8',margin:4},axisLine:{show:false},axisTick:{show:false}},
-      yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(1)+'万':v}},
+      yAxis:{type:'value',scale:true,splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(1)+'万':v}},
       series:[
         {name:'余额',type:'line',data:valData,smooth:true,symbol:'none',color:'#3b82f6',lineStyle:{width:1.5,color:'#3b82f6'},
           areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(59,130,246,0.3)'},{offset:1,color:'rgba(59,130,246,0)'}]}}},
@@ -1178,7 +1199,7 @@ function renderDrawerChart(accountId,acct,filteredRecs){
     const zz500NavD=zz500Drawer.map(v=>v!=null?v/base5D:null);
     const isInvest=acct.account_type==='investment';
     option={
-      tooltip:{trigger:'axis',formatter:function(p){
+      tooltip:{z:800,trigger:'axis',formatter:function(p){
         return p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':d.value.toFixed(3))).join('<br/>');
       }},
       legend:{data:['净值','沪深300','中证500'],selected:{'净值':true,'沪深300':true,'中证500':false},icon:'rect',itemWidth:12,itemHeight:2,top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
@@ -1199,11 +1220,11 @@ function renderDrawerChart(accountId,acct,filteredRecs){
     };
   }else{ // return
     option={
-      tooltip:{trigger:'axis',formatter:function(p){const d=p[0];return d.axisValue+'<br/>累计收益: '+(isNaN(d.value)?'—':'¥'+Number(d.value).toFixed(2));}},
+      tooltip:{z:800,trigger:'axis',formatter:function(p){const d=p[0];return d.axisValue+'<br/>累计收益: '+(isNaN(d.value)?'—':'¥'+Number(d.value).toFixed(2));}},
       legend:{data:['累计收益'],icon:'rect',itemWidth:12,itemHeight:2,top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
       grid:{left:42,right:10,top:18,bottom:28},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8',margin:4},axisLine:{show:false},axisTick:{show:false}},
-      yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(1)+'万':v}},
+      yAxis:{type:'value',scale:true,splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(1)+'万':v}},
       series:[{name:'累计收益',type:'line',data:rets,smooth:true,symbol:'none',color:'#dc2626',lineStyle:{width:1.5,color:'#dc2626'},
         areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(220,38,38,0.3)'},{offset:1,color:'rgba(220,38,38,0)'}]}}}]
     };
