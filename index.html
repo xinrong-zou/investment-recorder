@@ -846,11 +846,8 @@ function renderChart(){
     const base5=firstGood5||1;
     const zz500Nav=zz500Data.map(v=>v!=null?v/base5:null);
     option={
-      tooltip:{z:800,trigger:'axis',valueFormatter:(v,idx)=>{
-        const isHs=Array.isArray(idx)?idx.seriesName==='沪深300'||idx.seriesName==='中证500':false;
-        return (isNaN(v)?'—':v.toFixed(3));
-      },formatter:function(p){
-        return p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':d.value.toFixed(3))).join('<br/>');
+      tooltip:{z:800,trigger:'axis',formatter:function(p){
+        return [p[0].axisValue,...p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':d.value.toFixed(3)))].join('<br/>');
       }},
       legend:{data:['净值','沪深300','中证500'],selected:{'净值':true,'沪深300':true,'中证500':false},icon:'rect',itemWidth:14,itemHeight:2.5,bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
       grid:{left:40,right:16,top:16,bottom:36},
@@ -874,7 +871,7 @@ function renderChart(){
       option.series[0].markArea.data=[[{xAxis:ddStart,label:{show:true,formatter:'最大回撤 '+(maxDd*100).toFixed(2)+'%',fontSize:10,color:'#2563eb',position:'insideTop'}},{xAxis:ddEnd}]]};
   }else{ // return
     option={
-      tooltip:{z:800,trigger:'axis',valueFormatter:v=>'¥'+(v||0).toLocaleString()},
+      tooltip:{z:800,trigger:'axis',formatter:function(p){return p[0].axisValue+'<br/>累计收益: ¥'+(isNaN(p[0].value)?'—':Number(p[0].value).toLocaleString());}},
       legend:{data:['累计收益'],icon:'rect',itemWidth:14,itemHeight:2.5,bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
       grid:{left:55,right:16,top:16,bottom:36},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
@@ -1209,7 +1206,7 @@ function renderDrawerChart(accountId,acct,filteredRecs){
     option={
       tooltip:{z:800,trigger:'axis',formatter:function(p){
         const idx=p[0].dataIndex,date=dates[idx];
-        const lines=p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':'¥'+Number(d.value).toFixed(2)));
+        const lines=[date,...p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':'¥'+Number(d.value).toFixed(2)))];
         const tf=dailyTransfers[date];
         if(tf){const net=tf.netIn-tf.netOut;lines.push('当日净'+(net>0?'转入: +¥':'转出: -¥')+Math.abs(net).toLocaleString());}
         return lines.join('<br/>');
@@ -1251,7 +1248,7 @@ function renderDrawerChart(accountId,acct,filteredRecs){
     const isInvest=acct.account_type==='investment';
     option={
       tooltip:{z:800,trigger:'axis',formatter:function(p){
-        return p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':d.value.toFixed(3))).join('<br/>');
+        return [p[0].axisValue,...p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':d.value.toFixed(3)))].join('<br/>');
       }},
       legend:{data:['净值','沪深300','中证500'],selected:{'净值':true,'沪深300':true,'中证500':false},icon:'rect',itemWidth:12,itemHeight:2,top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
       grid:{left:42,right:10,top:18,bottom:28},
