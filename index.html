@@ -735,7 +735,9 @@ function checkAchievements(totalVal,totalRet){
 function flushAchievement(){
   if(!achievementQueue.length){achieving=false;return;}
   achieving=true;
-  const a=achievementQueue.shift();
+  displayAchievement(achievementQueue.shift());
+}
+function displayAchievement(a){
   $('achievementIcon').textContent=a.icon||'🏆';
   $('achievementName').textContent=a.name;
   $('achievementMsg').textContent=a.msg;
@@ -1546,7 +1548,7 @@ function exportData(){
     XLSX.writeFile(wb,fn);
     toast('已导出 '+fn,'success');
     // 有备无患成就
-    if(!achieved['export_1']){achieved['export_1']=new Date().toISOString().substring(0,10);achievementQueue.push({key:'export_1',name:'有备无患',msg:'导出备份，数据多一份安心',icon:'💾'});saveAchievements();if(!achieving)flushAchievement();}
+    if(!achieved['export_1']){achieved['export_1']=new Date().toISOString().substring(0,10);saveAchievements();if(achieving){achievementQueue.push({key:'export_1',name:'有备无患',msg:'导出备份，数据多一份安心',icon:'💾'});}else{achieving=true;displayAchievement({key:'export_1',name:'有备无患',msg:'导出备份，数据多一份安心',icon:'💾'});}}
   }catch(e){toast('导出失败: '+e.message,'error');}
 }
 // ====== 分享快照图 ======
