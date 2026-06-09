@@ -435,14 +435,16 @@ let chartInstance=null,drawerAccountId=null,chartMode='assets',drawerChartMode='
 // 成就系统
 let achieved={},lastReturnSign='negative',positiveReturnCount=0;
 const ACHIEVEMENTS=[
-  {key:'asset_10k',type:'asset',threshold:10000,name:'一勺之始',msg:'「万」事开头难，你已跨出第一步',icon:'💰'},
-  {key:'asset_100k',type:'asset',threshold:100000,name:'六位征途',msg:'六位数，是底气也是新的起点',icon:'💰'},
-  {key:'asset_500k',type:'asset',threshold:500000,name:'半壁江山',msg:'半百之数，已胜过九成路人',icon:'💰'},
-  {key:'asset_1m',type:'asset',threshold:1000000,name:'七位人生',msg:'百万不是终点，是自由的门票',icon:'💰'},
-  {key:'asset_5m',type:'asset',threshold:5000000,name:'积土成山',msg:'五百万，时间的朋友你当定了',icon:'💰'},
-  {key:'asset_10m',type:'asset',threshold:10000000,name:'八荒之外',msg:'千万级玩家，请收下我的膝盖',icon:'💰'},
-  {key:'record_1',type:'record',threshold:1,name:'千里之行',msg:'记账的第一笔，通往自由的第一步',icon:'🏆'},
-  {key:'record_100',type:'record',threshold:100,name:'百炼成钢',msg:'100 笔记录，你已是资深投资者',icon:'🏆'},
+  // 按弹窗优先级排列（最优先的排前面）
+  {key:'record_1',    name:'千里之行', msg:'记账的第一笔，通往自由的第一步',                                  icon:'🏆', check:(v,r,a)=>r>=1},
+  {key:'account_3',   name:'三足鼎立', msg:'三个账户，三分天下，从容布局',                                      icon:'🏛️', check:(v,r,a)=>a>=3},
+  {key:'asset_10k',   name:'一勺之始', msg:'「万」事开头难，你已跨出第一步',                                     icon:'💰', check:(v,r,a)=>v>=10000},
+  {key:'asset_100k',  name:'六位征途', msg:'六位数，是底气也是新的起点',                                        icon:'💰', check:(v,r,a)=>v>=100000},
+  {key:'asset_500k',  name:'半壁江山', msg:'半百之数，已胜过九成路人',                                          icon:'💰', check:(v,r,a)=>v>=500000},
+  {key:'asset_1m',    name:'七位人生', msg:'百万不是终点，是自由的门票',                                        icon:'💰', check:(v,r,a)=>v>=1000000},
+  {key:'asset_5m',    name:'积土成山', msg:'五百万，时间的朋友你当定了',                                        icon:'💰', check:(v,r,a)=>v>=5000000},
+  {key:'asset_10m',   name:'八荒之外', msg:'千万级玩家，请收下我的膝盖',                                        icon:'💰', check:(v,r,a)=>v>=10000000},
+  {key:'record_100',  name:'百炼成钢', msg:'100 笔记录，你已是资深投资者',                                      icon:'🏆', check:(v,r,a)=>r>=100},
 ];
 // 内存缓存
 const queryCache={};
@@ -703,20 +705,25 @@ let achievementQueue=[],achieving=false;
 function checkAchievements(totalVal,totalRet){
   if(!currentUser)return;
   const today=new Date().toISOString().substring(0,10);
-  for(const a of ACHIEVEMENTS){
-    if(a.type!=='asset')continue;
-    if(totalVal>=a.threshold&&!achieved[a.key]){achieved[a.key]=today;achievementQueue.push(a);}
-  }
+  // 通用数据
   let totalRecs=0;
   for(const aid of Object.keys(allRecords))totalRecs+=(allRecords[aid]||[]).length;
+  const acctCount=accounts.length;
+  // 按优先级依次检查每个成就
   for(const a of ACHIEVEMENTS){
-    if(a.type!=='record')continue;
-    if(totalRecs>=a.threshold&&!achieved[a.key]){achieved[a.key]=today;achievementQueue.push(a);}
+    if(!achieved[a.key]&&a.check(totalVal,totalRecs,acctCount)){achieved[a.key]=today;achievementQueue.push(a);}
   }
+  // 翻红检测（特殊逻辑：每次翻红都庆祝）
   if(lastReturnSign==='negative'&&totalRet>0){
     positiveReturnCount++;lastReturnSign='positive';
     achievementQueue.push({key:'positive_return',name:'拨云见日',msg:'第'+positiveReturnCount+'次翻红——守得云开见月明',icon:'🌅'});
   }else{lastReturnSign=totalRet>0?'positive':'negative';}
+  // 赞助支持检测（异步查询）
+  if(!achieved['sponsor_1']){
+    cachedQuery('plan_'+currentUser.id,()=>client.from('subscriptions').select('plan').eq('user_id',currentUser.id).maybeSingle()).then(d=>{
+      if(d&&d.plan==='pro'&&!achieved['sponsor_1']){achieved['sponsor_1']=today;achievementQueue.push({key:'sponsor_1',name:'雪中送炭',msg:'感恩你的支持，让这个工具变得更好',icon:'❤️'});saveAchievements();if(!achieving)flushAchievement();}
+    }).catch(()=>{});
+  }
   if(achievementQueue.length&&!achieving)flushAchievement();
 }
 function flushAchievement(){
