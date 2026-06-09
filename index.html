@@ -601,7 +601,7 @@ function render(){
           <div class="stat"><div class="v" style="color:${xirrColor}">${xirrStr}</div><div class="l">年化 XIRR</div></div>
         </div>
         <div class="row-extra">
-          <div class="stat"><div class="v">${cardNav.toFixed(3)}</div><div class="l">净值</div></div>
+          <div class="stat"><div class="v">${cardNav.toFixed(4)}</div><div class="l">净值</div></div>
           <div class="stat"><div class="v loss">${cardDd}</div><div class="l">最大回撤</div></div>
         </div>
       </div>
@@ -642,7 +642,7 @@ function render(){
     <div class="sub-row">
       <div class="stat"><div class="v ${retColor}">${fmtS(totalRet)}</div><div class="l">累计收益</div></div>
       <div class="stat"><div class="v ${retColor}">${fmtPct(totalRetPct)}</div><div class="l">总收益率</div></div>
-      <div class="stat"><div class="v">${totalNavVal.toFixed(3)}</div><div class="l">净值</div></div>
+      <div class="stat"><div class="v">${totalNavVal.toFixed(4)}</div><div class="l">净值</div></div>
       ${xirrHtml}
       ${ddHtml}
     </div>
@@ -847,12 +847,12 @@ function renderChart(){
     const zz500Nav=zz500Data.map(v=>v!=null?v/base5:null);
     option={
       tooltip:{z:800,trigger:'axis',formatter:function(p){
-        return [p[0].axisValue,...p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':d.value.toFixed(3)))].join('<br/>');
+        return [p[0].axisValue,...p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':d.value.toFixed(4)))].join('<br/>');
       }},
       legend:{data:['净值','沪深300','中证500'],selected:{'净值':true,'沪深300':true,'中证500':false},icon:'rect',itemWidth:14,itemHeight:2.5,bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
       grid:{left:40,right:16,top:16,bottom:36},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8'},axisLine:{show:false},axisTick:{show:false}},
-      yAxis:{type:'value',scale:true,axisLabel:{fontSize:10,color:'#94a3b8',formatter:v=>v.toFixed(3)},splitLine:{lineStyle:{color:'#f1f5f9'}}},
+      yAxis:{type:'value',scale:true,axisLabel:{fontSize:10,color:'#94a3b8',formatter:v=>v.toFixed(4)},splitLine:{lineStyle:{color:'#f1f5f9'}}},
       series:[
         {name:'净值',type:'line',data:nav,smooth:true,symbol:'none',color:'#1e293b',lineStyle:{width:1.5,color:'#1e293b'},
           areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(30,41,59,0.12)'},{offset:1,color:'rgba(30,41,59,0)'}]}},
@@ -1112,7 +1112,7 @@ async function showRecords(accountId){
     <div class="row">
       <div class="stat"><div class="v" style="color:${calc.totalReturn>=0?'#dc2626':'#2563eb'}">${fmtS(calc.totalReturn)}</div><div class="l">累计收益</div></div>
       <div class="stat"><div class="v" style="color:${xirrColor}">${xirrStr}</div><div class="l">年化 <span class="xirr">XIRR</span></div></div>
-      <div class="stat"><div class="v">${calc.nav.toFixed(3)}</div><div class="l">净值</div></div>
+      <div class="stat"><div class="v">${calc.nav.toFixed(4)}</div><div class="l">净值</div></div>
       <div class="stat"><div class="v" style="color:#2563eb">${ddStr}</div><div class="l">最大回撤</div></div>
     </div>`;
   // 默认日期范围为最早记录到今日（仅首次打开时设置）
@@ -1248,12 +1248,12 @@ function renderDrawerChart(accountId,acct,filteredRecs){
     const isInvest=acct.account_type==='investment';
     option={
       tooltip:{z:800,trigger:'axis',formatter:function(p){
-        return [p[0].axisValue,...p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':d.value.toFixed(3)))].join('<br/>');
+        return [p[0].axisValue,...p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':d.value.toFixed(4)))].join('<br/>');
       }},
       legend:{data:['净值','沪深300','中证500'],selected:{'净值':true,'沪深300':true,'中证500':false},icon:'rect',itemWidth:12,itemHeight:2,top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
       grid:{left:42,right:10,top:18,bottom:28},
       xAxis:{type:'category',data:dates,axisLabel:{fontSize:9,rotate:30,color:'#94a3b8',margin:4},axisLine:{show:false},axisTick:{show:false}},
-      yAxis:{type:'value',scale:true,splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8',formatter:v=>v.toFixed(3)}},
+      yAxis:{type:'value',scale:true,splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:9,color:'#94a3b8',formatter:v=>v.toFixed(4)}},
       series:[
         {name:'净值',type:'line',data:navs,smooth:true,symbol:'none',color:'#1e293b',lineStyle:{width:1.5,color:'#1e293b'},
           areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(30,41,59,0.15)'},{offset:1,color:'rgba(30,41,59,0)'}]}},
@@ -1494,7 +1494,7 @@ function shareSnapshot(){
   // 三指标行
   const metrics=[
     {label:'累计收益',val:privacyMode?'******':fmtN(tr),color:clr(tr)},
-    {label:'净值',val:nav.toFixed(3),color:'#0f172a'},
+    {label:'净值',val:nav.toFixed(4),color:'#0f172a'},
     {label:'年化 XIRR',val:xirr!=null?(xirr>=0?'+':'')+(xirr*100).toFixed(2)+'%':'—',color:xirr!=null?clr(xirr):'#94a3b8'},
   ];
   const mY=224;const mW=492/3;
