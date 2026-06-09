@@ -1585,15 +1585,14 @@ function shareSnapshot(){
   const xirr=calcXIRR(allF,'investment',tv);
   const today=new Date();const ds=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
   const fmtN=v=>privacyMode?'******':'¥'+Number(v).toLocaleString('zh-CN',{minimumFractionDigits:2});
-  const clr=n=>n>=0?'#10b981':'#ef4444';
+  const clr=n=>n>=0?'#dc2626':'#2563eb';
   const visible=accounts.filter(a=>showHidden||!a.hidden);
   // ===== 背景 =====
-  const bg=ctx.createLinearGradient(0,0,W,H);bg.addColorStop(0,'#0f172a');bg.addColorStop(0.5,'#1e293b');bg.addColorStop(1,'#0f172a');
+  const bg=ctx.createLinearGradient(0,0,W,H);bg.addColorStop(0,'#0b1120');bg.addColorStop(0.5,'#111827');bg.addColorStop(1,'#0b1120');
   ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
-  // 细微网格纹理（非常淡）
-  ctx.strokeStyle='rgba(255,255,255,0.03)';ctx.lineWidth=1;
-  for(let i=0;i<W;i+=24){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,H);ctx.stroke();}
-  for(let i=0;i<H;i+=24){ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(W,i);ctx.stroke();}
+  // 顶部光晕
+  const glow=ctx.createRadialGradient(W/2,0,0,W/2,0,280);glow.addColorStop(0,'rgba(59,130,246,0.07)');glow.addColorStop(1,'rgba(59,130,246,0)');
+  ctx.fillStyle=glow;ctx.fillRect(0,0,W,280);
   // ===== 顶部品牌区 =====
   ctx.textAlign='center';
   ctx.font='26px sans-serif';ctx.fillText('🕊',W/2,52);
@@ -1617,6 +1616,9 @@ function shareSnapshot(){
     {label:'年化 XIRR',val:xirr!=null?(xirr>=0?'+':'')+(xirr*100).toFixed(2)+'%':'—',color:xirr!=null?clr(xirr):'rgba(255,255,255,0.4)'},
   ];
   const mY=270;const mW=W/3;
+  // 指标分隔线
+  ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=1;
+  for(let i=1;i<3;i++){ctx.beginPath();ctx.moveTo(mW*i,242);ctx.lineTo(mW*i,300);ctx.stroke();}
   metrics.forEach((m,i)=>{
     ctx.textAlign='center';
     ctx.fillStyle=m.color;ctx.font='bold 20px sans-serif';ctx.fillText(m.val,mW*i+mW/2,mY);
@@ -1625,48 +1627,54 @@ function shareSnapshot(){
   // ===== 净值走势折线（简易 sparkline） =====
   const series=buildSeries();
   if(series&&series.nav.length>=2){
-    const sx=44,sy=330,sw=W-88,sh=80;
-    R(sx-4,sy-4,sw+8,sh+8,10);ctx.fillStyle='rgba(255,255,255,0.04)';ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='10px sans-serif';ctx.textAlign='left';ctx.fillText('净值走势',sx,sy+12);
+    const sx=44,sy=330,sw=W-88,sh=88;
+    R(sx-4,sy-4,sw+8,sh+8,12);ctx.fillStyle='rgba(255,255,255,0.04)';ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='10px sans-serif';ctx.textAlign='left';ctx.fillText('净值走势',sx,sy+14);
     const nMin=Math.min(...series.nav),nMax=Math.max(...series.nav),nRange=nMax-nMin||1;
-    const lineY=sy+28,lineH=sh-36;
+    const lineY=sy+32,lineH=sh-48;
+    // 面积填充
+    ctx.beginPath();ctx.moveTo(sx,lineY+lineH);
+    series.nav.forEach((v,i)=>{
+      const x=sx+(i/(series.nav.length-1))*sw;
+      const y=lineY+lineH-((v-nMin)/nRange)*lineH;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    });
+    ctx.lineTo(sx+sw,lineY+lineH);ctx.closePath();ctx.fillStyle='rgba(96,165,250,0.08)';ctx.fill();
+    // 折线
     ctx.beginPath();ctx.strokeStyle='rgba(96,165,250,0.7)';ctx.lineWidth=1.5;
     series.nav.forEach((v,i)=>{
       const x=sx+(i/(series.nav.length-1))*sw;
       const y=lineY+lineH-((v-nMin)/nRange)*lineH;
       i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
     });ctx.stroke();
-    // 填充面积
-    const lastIdx=series.nav.length-1;
-    ctx.lineTo(sx+(lastIdx/(series.nav.length-1))*sw,lineY+lineH);
-    ctx.lineTo(sx,lineY+lineH);ctx.closePath();
-    ctx.fillStyle='rgba(96,165,250,0.08)';ctx.fill();
-    // 两端标签
-    ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='9px sans-serif';ctx.textAlign='left';
-    ctx.fillText(nMin.toFixed(4),sx,lineY+lineH+12);
-    ctx.textAlign='right';ctx.fillText(nMax.toFixed(4),sx+sw,lineY+lineH+12);
+    // 起止日期标签
+    ctx.fillStyle='rgba(255,255,255,0.25)';ctx.font='9px sans-serif';ctx.textAlign='left';
+    ctx.fillText(series.dates[0],sx,lineY+lineH+14);
+    ctx.textAlign='right';ctx.fillText(series.dates[series.dates.length-1],sx+sw,lineY+lineH+14);
   }
   // ===== 账户列表 =====
-  let aY=440;
-  ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='11px sans-serif';ctx.textAlign='left';ctx.fillText('账户概览',44,aY-16);
+  let aY=450;
+  ctx.fillStyle='rgba(255,255,255,0.35)';ctx.font='11px sans-serif';ctx.textAlign='left';ctx.fillText('账户 ('+visible.length+')',44,aY-10);
   visible.forEach((a,i)=>{
-    if(aY>780)return;
+    if(aY>790)return;
     const c2=calcAccount(a,allRecords[a.id]||[]);const r2=c2.totalReturn;
     const isCash=a.account_type==='cash';
-    // 账户行背景
-    R(36,aY-2,W-72,44,8);ctx.fillStyle='rgba(255,255,255,0.04)';ctx.fill();
-    // 名称 + 类型标签
-    ctx.fillStyle='#ffffff';ctx.font='bold 14px sans-serif';ctx.textAlign='left';ctx.fillText(a.name,52,aY+16);
-    ctx.fillStyle=isCash?'rgba(16,185,129,0.6)':'rgba(96,165,250,0.6)';ctx.font='9px sans-serif';
-    ctx.fillText(isCash?'现金':'投资',52+ctx.measureText(a.name).width+10,aY+16);
-    // 金额
+    // 行背景
+    R(36,aY-2,W-72,48,10);ctx.fillStyle='rgba(255,255,255,0.04)';ctx.fill();
+    // 名称 + 类型标签（测量宽度后用固定间距避免重叠）
+    ctx.textAlign='left';
+    ctx.fillStyle='#ffffff';ctx.font='bold 13px sans-serif';
+    const nameW=ctx.measureText(a.name).width;
+    ctx.fillText(a.name,52,aY+20);
+    ctx.fillStyle=isCash?'rgba(16,185,129,0.5)':'rgba(96,165,250,0.5)';ctx.font='9px sans-serif';
+    ctx.fillText(isCash?'现金':'投资',52+Math.min(nameW+10,140),aY+20);
+    // 收益数值
     ctx.textAlign='right';
-    ctx.fillStyle=clr(r2);ctx.font='bold 14px sans-serif';
-    ctx.fillText((r2>=0?'+':'')+fmtN(r2),W-48,aY+14);
-    ctx.fillStyle='rgba(255,255,255,0.35)';ctx.font='10px sans-serif';
+    ctx.fillStyle=clr(r2);ctx.font='bold 14px sans-serif';ctx.fillText((r2>=0?'+':'')+fmtN(r2),W-48,aY+18);
+    ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='10px sans-serif';
     const mvStr=privacyMode?'******':fmtN(c2.currentValue);
-    ctx.fillText('资产 '+mvStr,W-48,aY+32);
-    aY+=50;
+    ctx.fillText('市值 '+mvStr,W-48,aY+36);
+    aY+=56;
   });
   // ===== 底部 =====
   const qrY=aY+20;
