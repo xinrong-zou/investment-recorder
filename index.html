@@ -15,6 +15,24 @@
   <meta name="apple-mobile-web-app-title" content="收益账本">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <script>
+    let deferredPrompt=null;
+    // PWA 安装提示
+    window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;showInstallBanner();});
+    window.addEventListener('appinstalled',()=>{deferredPrompt=null;const tc=document.getElementById('toastContainer');if(tc){const b=tc.querySelector('.install-banner');if(b)b.remove();}});
+    function showInstallBanner(){
+      const tc=document.getElementById('toastContainer');
+      if(!tc||tc.querySelector('.install-banner'))return;
+      const div=document.createElement('div');
+      div.className='install-banner';
+      div.style.cssText='background:#1e40af;color:#fff;padding:10px 16px;border-radius:8px;font-size:0.85rem;display:flex;align-items:center;gap:10px;box-shadow:0 4px 12px rgba(0,0,0,0.15);margin-bottom:8px;';
+      div.innerHTML='📲 安装收益账本到主屏幕 <button onclick="installPWA()" style="background:#fff;color:#1e40af;border:none;padding:4px 12px;border-radius:6px;font-size:0.8rem;cursor:pointer;font-weight:600;">安装</button><button onclick="this.parentElement.remove()" style="background:transparent;color:rgba(255,255,255,0.7);border:none;font-size:1.1rem;cursor:pointer;padding:0 2px;">✕</button>';
+      tc.appendChild(div);
+    }
+    window.installPWA=function(){
+      if(!deferredPrompt)return;
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(()=>{deferredPrompt=null;const b=document.querySelector('.install-banner');if(b)b.remove();});
+    };
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('service-worker.js').then(reg => {
