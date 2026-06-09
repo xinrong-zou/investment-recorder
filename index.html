@@ -396,6 +396,31 @@
 
 <div id="toastContainer" style="position:fixed;bottom:20px;right:20px;z-index:2000;"></div>
 
+<!-- 成就庆祝弹窗 -->
+<div class="modal-overlay" id="achievementModal">
+  <div class="achievement-box" onclick="event.stopPropagation()">
+    <div class="achievement-bg" id="achievementBg"></div>
+    <div class="achievement-icon" id="achievementIcon">🏆</div>
+    <div class="achievement-name" id="achievementName">成就名称</div>
+    <div class="achievement-msg" id="achievementMsg">成就描述</div>
+    <button class="achievement-close" id="achievementClose" style="display:none;" onclick="closeAchievement()">✕</button>
+  </div>
+</div>
+<style>
+  .achievement-box{position:relative;max-width:380px;width:88%;border-radius:20px;overflow:hidden;text-align:center;padding:48px 28px 36px;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#1a1a2e 100%);box-shadow:0 0 60px rgba(59,130,246,0.3);animation:achievementIn 0.6s cubic-bezier(0.22,1,0.36,1);}
+  @keyframes achievementIn{0%{transform:scale(0.5) translateY(40px);opacity:0}100%{transform:scale(1) translateY(0);opacity:1}}
+  .achievement-bg{position:absolute;inset:0;background:radial-gradient(circle at 50% 30%,rgba(251,191,36,0.08) 0%,transparent 60%);pointer-events:none;}
+  .achievement-icon{font-size:3.6rem;margin-bottom:12px;animation:achieveBounce 0.8s 0.3s both;}
+  @keyframes achieveBounce{0%{transform:scale(0)}50%{transform:scale(1.25)}100%{transform:scale(1)}}
+  .achievement-name{font-size:1.5rem;font-weight:800;color:#fff;margin-bottom:8px;letter-spacing:2px;}
+  .achievement-msg{font-size:0.88rem;color:rgba(255,255,255,0.75);line-height:1.6;margin-bottom:4px;}
+  .achievement-close{position:absolute;top:12px;right:14px;width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;}
+  .achievement-close:hover{background:rgba(255,255,255,0.15);color:#fff;}
+  /* 星星粒子 */
+  .star-particle{position:absolute;width:4px;height:4px;background:#fff;border-radius:50%;animation:starFall 1.5s ease-out forwards;}
+  @keyframes starFall{0%{transform:translateY(0) scale(1);opacity:1}100%{transform:translateY(120px) scale(0);opacity:0}}
+</style>
+
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="nav-bar.js"></script>
@@ -407,6 +432,18 @@ if(!window.__supabaseClient)window.__supabaseClient=client;
 
 let currentUser=null,accounts=[],allRecords={},settings=null,showHidden=false;
 let chartInstance=null,drawerAccountId=null,chartMode='assets',drawerChartMode='assets',csi300Map={},csi500Map={},chartRange='all',privacyMode=false;
+// 成就系统
+let achieved={},lastReturnSign='negative',positiveReturnCount=0;
+const ACHIEVEMENTS=[
+  {key:'asset_10k',type:'asset',threshold:10000,name:'一勺之始',msg:'「万」事开头难，你已跨出第一步',icon:'💰'},
+  {key:'asset_100k',type:'asset',threshold:100000,name:'六位征途',msg:'六位数，是底气也是新的起点',icon:'💰'},
+  {key:'asset_500k',type:'asset',threshold:500000,name:'半壁江山',msg:'半百之数，已胜过九成路人',icon:'💰'},
+  {key:'asset_1m',type:'asset',threshold:1000000,name:'七位人生',msg:'百万不是终点，是自由的门票',icon:'💰'},
+  {key:'asset_5m',type:'asset',threshold:5000000,name:'积土成山',msg:'五百万，时间的朋友你当定了',icon:'💰'},
+  {key:'asset_10m',type:'asset',threshold:10000000,name:'八荒之外',msg:'千万级玩家，请收下我的膝盖',icon:'💰'},
+  {key:'record_1',type:'record',threshold:1,name:'千里之行',msg:'记账的第一笔，通往自由的第一步',icon:'🏆'},
+  {key:'record_100',type:'record',threshold:100,name:'百炼成钢',msg:'100 笔记录，你已是资深投资者',icon:'🏆'},
+];
 // 内存缓存
 const queryCache={};
 function cachedQuery(key,fn){
@@ -499,6 +536,8 @@ async function loadData(){
   if(!session){$('loginPrompt').style.display='block';$('dashContent').style.display='none';return;}
   currentUser=session.user;$('loginPrompt').style.display='none';$('dashContent').style.display='block';$('dashSkeleton').style.display='block';
   const{data:s}=await cachedQuery('settings_'+currentUser.id,()=>client.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle());settings=s;
+  // 解析成就数据
+  achieved=settings?.achieved||{};lastReturnSign=settings?.last_return_sign||'negative';positiveReturnCount=settings?.positive_return_count||0;
   const{data:accts}=await cachedQuery('accts_'+currentUser.id,()=>client.from('investment_accounts').select('*').eq('user_id',currentUser.id).order('created_at'));accounts=accts||[];
   const hasCash=accounts.some(a=>a.account_type==='cash');
   if(!hasCash){
@@ -650,11 +689,53 @@ function render(){
   const hasHidden=accounts.some(a=>a.hidden);$('showHiddenToggle').style.display=hasHidden?'':'none';
   renderChart();
   renderPieChart();
+  // 成就检查
+  checkAchievements(totalVal,totalRet);
   // 如果抽屉开着，刷新其数据
   if(drawerAccountId&&$('drawer').classList.contains('open')){
     const acct=accounts.find(a=>a.id===drawerAccountId);
     if(acct)showRecords(drawerAccountId);
   }
+}
+
+// ====== 成就系统 ======
+function checkAchievements(totalVal,totalRet){
+  if(!currentUser)return;
+  // 资产里程碑
+  const today=new Date().toISOString().substring(0,10);
+  for(const a of ACHIEVEMENTS){
+    if(a.type!=='asset')continue;
+    if(totalVal>=a.threshold&&!achieved[a.key]){achieved[a.key]=today;showAchievement(a);saveAchievements();}
+  }
+  // 记录数量里程碑
+  let totalRecs=0;
+  for(const aid of Object.keys(allRecords))totalRecs+=(allRecords[aid]||[]).length;
+  for(const a of ACHIEVEMENTS){
+    if(a.type!=='record')continue;
+    if(totalRecs>=a.threshold&&!achieved[a.key]){achieved[a.key]=today;showAchievement(a);saveAchievements();}
+  }
+  // 翻红检测
+  if(lastReturnSign==='negative'&&totalRet>0){
+    positiveReturnCount++;lastReturnSign='positive';
+    const a={key:'positive_return',name:'拨云见日',msg:'第'+positiveReturnCount+'次翻红——守得云开见月明',icon:'🌅'};
+    showAchievement(a);saveAchievements();
+  }else{lastReturnSign=totalRet>0?'positive':'negative';}
+}
+function showAchievement(a){
+  $('achievementIcon').textContent=a.icon||'🏆';
+  $('achievementName').textContent=a.name;
+  $('achievementMsg').textContent=a.msg;
+  $('achievementClose').style.display='none';
+  // 星星粒子
+  const bg=$('achievementBg');bg.innerHTML='';
+  for(let i=0;i<20;i++){const s=document.createElement('div');s.className='star-particle';s.style.left=Math.random()*90+5+'%';s.style.top=Math.random()*60+10+'%';s.style.animationDelay=Math.random()*0.8+'s';s.style.width=s.style.height=Math.random()*4+2+'px';bg.appendChild(s);}
+  openModal('achievementModal');
+  // 1.5秒后显示关闭按钮
+  setTimeout(()=>{$('achievementClose').style.display='flex';},1500);
+}
+function closeAchievement(){closeModal('achievementModal');}
+async function saveAchievements(){
+  try{await client.from('user_settings').upsert({user_id:currentUser.id,achieved,last_return_sign:lastReturnSign,positive_return_count:positiveReturnCount},{onConflict:'user_id'});}catch(e){}
 }
 
 document.addEventListener('click',()=>{document.querySelectorAll('.dot-dropdown.open').forEach(d=>d.classList.remove('open'));});
