@@ -699,41 +699,45 @@ function render(){
 }
 
 // ====== 成就系统 ======
+let achievementQueue=[],achieving=false;
 function checkAchievements(totalVal,totalRet){
   if(!currentUser)return;
-  // 资产里程碑
   const today=new Date().toISOString().substring(0,10);
   for(const a of ACHIEVEMENTS){
     if(a.type!=='asset')continue;
-    if(totalVal>=a.threshold&&!achieved[a.key]){achieved[a.key]=today;showAchievement(a);saveAchievements();}
+    if(totalVal>=a.threshold&&!achieved[a.key]){achieved[a.key]=today;achievementQueue.push(a);}
   }
-  // 记录数量里程碑
   let totalRecs=0;
   for(const aid of Object.keys(allRecords))totalRecs+=(allRecords[aid]||[]).length;
   for(const a of ACHIEVEMENTS){
     if(a.type!=='record')continue;
-    if(totalRecs>=a.threshold&&!achieved[a.key]){achieved[a.key]=today;showAchievement(a);saveAchievements();}
+    if(totalRecs>=a.threshold&&!achieved[a.key]){achieved[a.key]=today;achievementQueue.push(a);}
   }
-  // 翻红检测
   if(lastReturnSign==='negative'&&totalRet>0){
     positiveReturnCount++;lastReturnSign='positive';
-    const a={key:'positive_return',name:'拨云见日',msg:'第'+positiveReturnCount+'次翻红——守得云开见月明',icon:'🌅'};
-    showAchievement(a);saveAchievements();
+    achievementQueue.push({key:'positive_return',name:'拨云见日',msg:'第'+positiveReturnCount+'次翻红——守得云开见月明',icon:'🌅'});
   }else{lastReturnSign=totalRet>0?'positive':'negative';}
+  if(achievementQueue.length&&!achieving)flushAchievement();
 }
-function showAchievement(a){
+function flushAchievement(){
+  if(!achievementQueue.length){achieving=false;return;}
+  achieving=true;
+  const a=achievementQueue.shift();
   $('achievementIcon').textContent=a.icon||'🏆';
   $('achievementName').textContent=a.name;
   $('achievementMsg').textContent=a.msg;
   $('achievementClose').style.display='none';
-  // 星星粒子
   const bg=$('achievementBg');bg.innerHTML='';
   for(let i=0;i<20;i++){const s=document.createElement('div');s.className='star-particle';s.style.left=Math.random()*90+5+'%';s.style.top=Math.random()*60+10+'%';s.style.animationDelay=Math.random()*0.8+'s';s.style.width=s.style.height=Math.random()*4+2+'px';bg.appendChild(s);}
+  saveAchievements();
   openModal('achievementModal');
-  // 1.5秒后显示关闭按钮
   setTimeout(()=>{$('achievementClose').style.display='flex';},1500);
 }
-function closeAchievement(){closeModal('achievementModal');}
+function closeAchievement(){
+  closeModal('achievementModal');
+  // 队列中还有下一个？0.4秒后弹出
+  if(achievementQueue.length){setTimeout(flushAchievement,400);}else{achieving=false;}
+}
 async function saveAchievements(){
   try{await client.from('user_settings').upsert({user_id:currentUser.id,achieved,last_return_sign:lastReturnSign,positive_return_count:positiveReturnCount},{onConflict:'user_id'});}catch(e){}
 }
