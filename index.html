@@ -664,16 +664,16 @@ function render(){
   // 检测新用户：仅1个现金账户且0条记录
   const totalAllRecs=Object.values(allRecords).reduce((sum,arr)=>sum+(arr||[]).length,0);
   const isNewUser=accounts.length===1&&accounts[0].account_type==='cash'&&totalAllRecs===0;
-  if(isNewUser)html=`<div class="empty-guide" style="grid-column:1/-1;">
-    <div class="icon-big">📊</div>
-    <h2>欢迎使用收益账本</h2>
-    <p>开始追踪你的投资收益吧，只需两步</p>
-    <div class="steps">
-      <div class="step"><div class="step-num">第一步</div><div class="step-title">💰 记录操作</div><div class="step-desc">点击下方按钮，录入第一笔资金变动</div></div>
-      <div class="step"><div class="step-num">第二步</div><div class="step-title">📈 查看趋势</div><div class="step-desc">图表自动展示资产走势、收益率等关键指标</div></div>
+  if(isNewUser)html=`<div class="empty-guide" style="grid-column:1/-1;padding:60px 20px 40px;">
+    <div class="icon-big" style="font-size:3.2rem;margin-bottom:14px;">🕊</div>
+    <h2 style="font-size:1.3rem;margin-bottom:4px;">欢迎来到收益账本</h2>
+    <p style="color:var(--text-muted);font-size:0.88rem;margin-bottom:28px;max-width:400px;margin-left:auto;margin-right:auto;line-height:1.6;">你已拥有一个现金账户，只需两步即可开启投资追踪之旅</p>
+    <div class="steps" style="grid-template-columns:repeat(2,1fr);max-width:480px;margin:0 auto 28px;text-align:left;">
+      <div class="step" style="padding:18px 16px;"><div class="step-num" style="font-size:0.78rem;">第一步</div><div class="step-title" style="font-size:0.9rem;font-weight:700;">💰 记录第一笔资金</div><div class="step-desc" style="font-size:0.8rem;line-height:1.5;margin-top:4px;">录入转入或转出，开始积累你的投资数据</div></div>
+      <div class="step" style="padding:18px 16px;"><div class="step-num" style="font-size:0.78rem;">第二步</div><div class="step-title" style="font-size:0.9rem;font-weight:700;">📈 查看资产走势</div><div class="step-desc" style="font-size:0.8rem;line-height:1.5;margin-top:4px;">图表自动生成，收益、净值一目了然</div></div>
     </div>
-    <button class="btn btn-primary" onclick="openRecord('${accounts[0].id}','transfer_in')">💰 录入第一笔记录</button>
-    <a href="about.html" class="btn btn-ghost" style="margin-left:8px;">了解更多</a>
+    <button class="btn btn-primary" style="font-size:0.95rem;padding:10px 28px;" onclick="openRecord('${accounts[0].id}','transfer_in')">💰 录入第一笔记录</button>
+    <div style="margin-top:12px;"><a href="about.html" style="color:var(--text-muted);font-size:0.82rem;">了解更多功能 →</a></div>
   </div>`;
   else if(filtered.length===0)html=`<div class="empty-guide" style="grid-column:1/-1;">
     <div class="icon-big">📊</div>
