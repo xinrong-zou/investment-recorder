@@ -729,7 +729,7 @@ function checkAchievements(totalVal,totalRet){
   // 赞助支持检测（异步查询）
   if(!achieved['sponsor_1']){
     cachedQuery('plan_'+currentUser.id,()=>client.from('subscriptions').select('plan').eq('user_id',currentUser.id).maybeSingle()).then(d=>{
-      if(d&&d.plan==='pro'&&!achieved['sponsor_1']){achieved['sponsor_1']=today;achievementQueue.push({key:'sponsor_1',name:'雪中送炭',msg:'感恩你的支持，让这个工具变得更好',icon:'❤️'});saveAchievements();if(!achieving)flushAchievement();}
+      if(d&&d.data&&d.data.plan==='pro'&&!achieved['sponsor_1']){achieved['sponsor_1']=today;achievementQueue.push({key:'sponsor_1',name:'雪中送炭',msg:'感恩你的支持，让这个工具变得更好',icon:'❤️'});saveAchievements();if(!achieving)flushAchievement();}
     }).catch(()=>{});
   }
   if(achievementQueue.length&&!achieving)flushAchievement();
