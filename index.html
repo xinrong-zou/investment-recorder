@@ -53,6 +53,10 @@
               }
             });
           });
+          // 每30分钟检查一次更新
+          setInterval(()=>{reg.update();},30*60*1000);
+          // 页面可见时也检查
+          document.addEventListener('visibilitychange',()=>{if(!document.hidden)reg.update();});
         }).catch(() => {});
       });
     }
