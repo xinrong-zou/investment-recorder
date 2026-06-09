@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>收益账本 - 离线</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .offline-page { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; text-align: center; padding: 40px 20px; }
+    .offline-icon { font-size: 4rem; margin-bottom: 16px; }
+    .offline-page h1 { font-size: 1.4rem; margin-bottom: 8px; }
+    .offline-page p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 24px; max-width: 360px; line-height: 1.6; }
+    .offline-page .btn { display: inline-flex; }
+  </style>
+</head>
+<body>
+  <div id="nav-app"><nav-bar title="收益账本" logo-url="/"></nav-bar></div>
+  <div class="offline-page">
+    <div class="offline-icon">🕊</div>
+    <h1>网络连接已断开</h1>
+    <p>收益账本需要网络连接才能获取你的投资数据。请检查网络后重试。</p>
+    <button class="btn btn-primary" onclick="location.reload()">🔄 重试</button>
+  </div>
+  <script src="nav-bar.js"></script>
+  <script>mountNavBar('#nav-app');</script>
+</body>
+</html>

@@ -1,19 +1,41 @@
 {
   "name": "收益账本",
   "short_name": "收益账本",
-  "description": "个人投资理财追踪工具",
+  "description": "个人投资理财追踪工具 - 多账户管理、收益率计算、资产走势可视化",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#1e40af",
   "background_color": "#f8fafc",
+  "categories": ["finance", "productivity", "utilities"],
   "icons": [
     {
       "src": "favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "收益账本主界面"
     }
   ]
 }

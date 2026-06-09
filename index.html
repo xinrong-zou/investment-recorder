@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>收益账本 - 投资看板</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512.png">
   <link rel="stylesheet" href="style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1e40af">
@@ -15,9 +17,25 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('service-worker.js').catch(() => {});
+        navigator.serviceWorker.register('service-worker.js').then(reg => {
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                const tc=document.getElementById('toastContainer');
+                if(tc)tc.innerHTML='<div style="background:#1e40af;color:#fff;padding:10px 16px;border-radius:8px;font-size:0.85rem;display:flex;align-items:center;gap:10px;box-shadow:0 4px 12px rgba(0,0,0,0.15);">🆕 新版本可用 <button onclick="applySWUpdate()" style="background:#fff;color:#1e40af;border:none;padding:4px 12px;border-radius:6px;font-size:0.8rem;cursor:pointer;font-weight:600;">立即更新</button></div>';
+              }
+            });
+          });
+        }).catch(() => {});
       });
     }
+    window.applySWUpdate = function() {
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({type: 'SKIP_WAITING'});
+        window.location.reload();
+      }
+    };
   </script>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
