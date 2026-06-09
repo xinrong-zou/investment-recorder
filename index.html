@@ -436,15 +436,21 @@ let chartInstance=null,drawerAccountId=null,chartMode='assets',drawerChartMode='
 let achieved={},lastReturnSign='negative',positiveReturnCount=0;
 const ACHIEVEMENTS=[
   // 按弹窗优先级排列（最优先的排前面）
-  {key:'record_1',    name:'千里之行', msg:'记账的第一笔，通往自由的第一步',                                  icon:'🏆', check:(v,r,a)=>r>=1},
-  {key:'account_3',   name:'三足鼎立', msg:'三个账户，三分天下，从容布局',                                      icon:'🏛️', check:(v,r,a)=>a>=3},
-  {key:'asset_10k',   name:'一勺之始', msg:'「万」事开头难，你已跨出第一步',                                     icon:'💰', check:(v,r,a)=>v>=10000},
-  {key:'asset_100k',  name:'六位征途', msg:'六位数，是底气也是新的起点',                                        icon:'💰', check:(v,r,a)=>v>=100000},
-  {key:'asset_500k',  name:'半壁江山', msg:'半百之数，已胜过九成路人',                                          icon:'💰', check:(v,r,a)=>v>=500000},
-  {key:'asset_1m',    name:'七位人生', msg:'百万不是终点，是自由的门票',                                        icon:'💰', check:(v,r,a)=>v>=1000000},
-  {key:'asset_5m',    name:'积土成山', msg:'五百万，时间的朋友你当定了',                                        icon:'💰', check:(v,r,a)=>v>=5000000},
-  {key:'asset_10m',   name:'八荒之外', msg:'千万级玩家，请收下我的膝盖',                                        icon:'💰', check:(v,r,a)=>v>=10000000},
-  {key:'record_100',  name:'百炼成钢', msg:'100 笔记录，你已是资深投资者',                                      icon:'🏆', check:(v,r,a)=>r>=100},
+  {key:'record_1',    name:'千里之行', msg:'记账的第一笔，通往自由的第一步',                                  icon:'🏆', check:(v,t,r,a)=>r>=1},
+  {key:'account_3',   name:'三足鼎立', msg:'三个账户，三分天下，从容布局',                                      icon:'🏛️', check:(v,t,r,a)=>a>=3},
+  {key:'asset_10k',   name:'一勺之始', msg:'「万」事开头难，你已跨出第一步',                                     icon:'💰', check:(v,t,r,a)=>v>=10000},
+  {key:'asset_100k',  name:'六位征途', msg:'六位数，是底气也是新的起点',                                        icon:'💰', check:(v,t,r,a)=>v>=100000},
+  {key:'asset_500k',  name:'半壁江山', msg:'半百之数，已胜过九成路人',                                          icon:'💰', check:(v,t,r,a)=>v>=500000},
+  {key:'profit_1k',   name:'小试牛刀', msg:'赚到第一笔四位数利润，未来可期',                                     icon:'🎯', check:(v,t,r,a)=>t>=1000},
+  {key:'asset_1m',    name:'七位人生', msg:'百万不是终点，是自由的门票',                                        icon:'💰', check:(v,t,r,a)=>v>=1000000},
+  {key:'profit_10k',  name:'颇有斩获', msg:'万元利润，已超越多数散户',                                           icon:'🎯', check:(v,t,r,a)=>t>=10000},
+  {key:'asset_5m',    name:'积土成山', msg:'五百万，时间的朋友你当定了',                                        icon:'💰', check:(v,t,r,a)=>v>=5000000},
+  {key:'profit_100k', name:'盆满钵满', msg:'六位数盈利，这是实力的证明',                                        icon:'🎯', check:(v,t,r,a)=>t>=100000},
+  {key:'asset_10m',   name:'八荒之外', msg:'千万级玩家，请收下我的膝盖',                                        icon:'💰', check:(v,t,r,a)=>v>=10000000},
+  {key:'profit_1m',   name:'富甲一方', msg:'百万利润，你已经财务自由',                                           icon:'🎯', check:(v,t,r,a)=>t>=1000000},
+  {key:'profit_10m',  name:'点石成金', msg:'千万盈利——点石成金，莫过于此',                                       icon:'🎯', check:(v,t,r,a)=>t>=10000000},
+  {key:'record_100',  name:'百炼成钢', msg:'100 笔记录，你已是资深投资者',                                      icon:'🏆', check:(v,t,r,a)=>r>=100},
+  {key:'export_1',    name:'有备无患', msg:'导出备份，数据多一份安心',                                          icon:'💾', check:()=>false}, // 由 exportData 手动触发
 ];
 // 内存缓存
 const queryCache={};
@@ -711,7 +717,7 @@ function checkAchievements(totalVal,totalRet){
   const acctCount=accounts.length;
   // 按优先级依次检查每个成就
   for(const a of ACHIEVEMENTS){
-    if(!achieved[a.key]&&a.check(totalVal,totalRecs,acctCount)){achieved[a.key]=today;achievementQueue.push(a);}
+    if(!achieved[a.key]&&a.check(totalVal,totalRet,totalRecs,acctCount)){achieved[a.key]=today;achievementQueue.push(a);}
   }
   // 翻红检测（特殊逻辑：每次翻红都庆祝）
   if(lastReturnSign==='negative'&&totalRet>0){
@@ -1539,6 +1545,8 @@ function exportData(){
     const fn='收益记录_'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'.xlsx';
     XLSX.writeFile(wb,fn);
     toast('已导出 '+fn,'success');
+    // 有备无患成就
+    if(!achieved['export_1']){achieved['export_1']=new Date().toISOString().substring(0,10);achievementQueue.push({key:'export_1',name:'有备无患',msg:'导出备份，数据多一份安心',icon:'💾'});saveAchievements();if(!achieving)flushAchievement();}
   }catch(e){toast('导出失败: '+e.message,'error');}
 }
 // ====== 分享快照图 ======
