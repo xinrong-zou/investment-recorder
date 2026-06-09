@@ -459,7 +459,6 @@ async function fetchIndexData(code){
   }catch(e){return {};}
 }
 async function loadData(){
-  clearCache();
   const{data:{session}}=await client.auth.getSession();
   if(!session){$('loginPrompt').style.display='block';$('dashContent').style.display='none';return;}
   currentUser=session.user;$('loginPrompt').style.display='none';$('dashContent').style.display='block';$('dashSkeleton').style.display='block';
@@ -476,7 +475,7 @@ async function loadData(){
     const{data:recs}=await cachedQuery('recs_'+a.id,()=>client.from('investment_records').select('id,account_id,record_date,action_type,amount,note,paired_id').eq('account_id',a.id).order('record_date',{ascending:true}).order('id',{ascending:true}));
     allRecords[a.id]=recs||[];
   }));
-  // clearCache in loadData() ensures fresh data after save/delete/edit
+  // CRUD 操作直接本地更新 allRecords，无需重新请求
   // 不阻塞渲染，后台加载指数数据
   const indexPromise = Promise.all([fetchIndexData('hs300'), fetchIndexData('zz500')]);
   render();
@@ -888,8 +887,8 @@ function renderPieChart(){
 // ====== 账户操作 ======
 function togglePrivacy(){privacyMode=!privacyMode;render();}
 function toggleHidden(){showHidden=$('showHiddenCheck').checked;render();}
-async function hideAccount(id){await client.from('investment_accounts').update({hidden:true}).eq('id',id);toast('已隐藏','success');await loadData();}
-async function unhideAccount(id){await client.from('investment_accounts').update({hidden:false}).eq('id',id);toast('已取消隐藏','success');await loadData();}
+async function hideAccount(id){await client.from('investment_accounts').update({hidden:true}).eq('id',id);const a=accounts.find(x=>x.id===id);if(a)a.hidden=true;toast('已隐藏','success');render();}
+async function unhideAccount(id){await client.from('investment_accounts').update({hidden:false}).eq('id',id);const a=accounts.find(x=>x.id===id);if(a)a.hidden=false;toast('已取消隐藏','success');render();}
 function openAddAccount(){$('accountModalTitle').textContent='新建账户';$('saveAccountBtn').textContent='创建';$('accountName').value='';$('accountType').value='investment';openModal('accountModal');}
 async function getUserPlan(){
   try{
@@ -925,8 +924,11 @@ async function saveAccount(){
     if(type==='cash'&&cashCount>=1){toast('免费用户只能拥有1个现金账户','error');return;}
     if(type==='investment'&&investCount>=5){toast('免费用户最多5个投资账户，赞助后可解锁无限','error');return;}
   }
-  const{error}=await client.from('investment_accounts').insert({user_id:currentUser.id,name,account_type:type});
-  if(error){toast(error.message,'error');return;}closeModal('accountModal');toast('账户已创建','success');await loadData();
+  const{data:newAcct,error}=await client.from('investment_accounts').insert({user_id:currentUser.id,name,account_type:type}).select().single();
+  if(error){toast(error.message,'error');return;}
+  accounts.push(newAcct);
+  allRecords[newAcct.id]=[];
+  closeModal('accountModal');toast('账户已创建','success');render();
 }
 
 let recordAccountId=null;
@@ -1022,13 +1024,26 @@ async function saveRecord(){
     // 更新第一条的 paired_id
     const{error:pairErr}=await client.from('investment_records').update({paired_id:r2.id}).eq('id',r1.id);
     if(pairErr)toast('配对关联失败:'+pairErr.message,'error');
+    r1.paired_id=r2.id;
+    // 本地追加配对记录
+    if(!allRecords[r2.account_id])allRecords[r2.account_id]=[];
+    allRecords[r2.account_id].push(r2);
   }
-  closeModal('recordModal');toast('记录已保存','success');await loadData();
+  // 本地追加主记录
+  if(!allRecords[r1.account_id])allRecords[r1.account_id]=[];
+  allRecords[r1.account_id].push(r1);
+  // 刷新缓存键，下次全量加载时跳过
+  if(queryCache['recs_'+r1.account_id]!==undefined)delete queryCache['recs_'+r1.account_id];
+  closeModal('recordModal');toast('记录已保存','success');render();
 }
 async function deleteAccount(id){
   if(!confirm('确定删除此账户？所有流水也会一并删除'))return;
   await client.from('investment_records').delete().eq('account_id',id);await client.from('investment_accounts').delete().eq('id',id);
-  toast('已删除','success');await loadData();
+  // 本地删除
+  accounts=accounts.filter(a=>a.id!==id);
+  delete allRecords[id];
+  if(queryCache['recs_'+id]!==undefined)delete queryCache['recs_'+id];
+  toast('已删除','success');render();
 }
 
 // ====== 抽屉（账户详情） ======
@@ -1310,8 +1325,12 @@ async function editRecord(id,accountId,actionType,amount,date,note){
       const{error:pairErr}=await client.from('investment_records').update({amount:amt,record_date:newDate}).eq('id',editingPairedId);
       if(pairErr)toast('配对记录未能同步更新','error');
     }
+    // 本地更新
+    const updateRec=(rid,vals)=>{for(const aid of Object.keys(allRecords)){for(let i=0;i<(allRecords[aid]||[]).length;i++){if(allRecords[aid][i].id===rid){Object.assign(allRecords[aid][i],vals);return;}}}};
+    updateRec(editingRecordId,upd);
+    if(editingPairedId)updateRec(editingPairedId,{amount:amt,record_date:newDate});
     closeModal('editModal');editingRecordId=editingPairedId=null;
-    await loadData();
+    render();
     toast('已修改','success');
   };
 
@@ -1325,8 +1344,13 @@ async function editRecord(id,accountId,actionType,amount,date,note){
     if(editingPairedId)await client.from('investment_records').delete().eq('id',editingPairedId);
     const{error}=await client.from('investment_records').delete().eq('id',id);
     if(error){toast(error.message,'error');return;}
+    // 本地删除
+    const findRecAcct=(rid)=>{for(const aid of Object.keys(allRecords)){for(const r of (allRecords[aid]||[])){if(r.id===rid)return aid;}}return null;};
+    const removeRec=(rid)=>{const aid=findRecAcct(rid);if(aid&&allRecords[aid])allRecords[aid]=allRecords[aid].filter(r=>r.id!==rid);};
+    removeRec(id);
+    if(editingPairedId)removeRec(editingPairedId);
     closeModal('editModal');editingRecordId=editingPairedId=null;
-    await loadData();
+    render();
     toast('已删除','success');
   };
 
