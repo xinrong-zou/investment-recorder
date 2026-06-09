@@ -664,12 +664,16 @@ function render(){
   // 检测新用户：仅1个现金账户且0条记录
   const totalAllRecs=Object.values(allRecords).reduce((sum,arr)=>sum+(arr||[]).length,0);
   const isNewUser=accounts.length===1&&accounts[0].account_type==='cash'&&totalAllRecs===0;
-  if(isNewUser)html=`<div style="grid-column:1/-1;text-align:center;padding:32px 20px 16px;background:linear-gradient(135deg,#f0f7ff 0%,#fdf2f8 100%);border-radius:12px;border:1px solid #e0e7ff;margin-bottom:16px;">
+  if(isNewUser)html=`<div style="grid-column:1/-1;text-align:center;padding:32px 20px 20px;background:linear-gradient(135deg,#f0f7ff 0%,#fdf2f8 100%);border-radius:12px;border:1px solid #e0e7ff;margin-bottom:16px;">
     <div style="font-size:2.2rem;margin-bottom:6px;">🕊</div>
     <h2 style="font-size:1.15rem;margin-bottom:4px;color:var(--text);">欢迎来到收益账本</h2>
-    <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:14px;line-height:1.5;">你已拥有一个现金账户，点击下方录入第一笔资金</p>
+    <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:16px;line-height:1.5;">你已拥有一个现金账户，只需两步即可开启投资追踪之旅</p>
+    <div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px;flex-wrap:wrap;">
+      <div style="background:var(--bg);border-radius:10px;padding:14px 18px;text-align:left;flex:1;max-width:220px;min-width:160px;"><div style="font-size:0.75rem;color:var(--primary);font-weight:700;margin-bottom:3px;">第一步</div><div style="font-size:0.85rem;font-weight:600;margin-bottom:2px;">💰 记录第一笔资金</div><div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5;">录入转入或转出，开始积累数据</div></div>
+      <div style="background:var(--bg);border-radius:10px;padding:14px 18px;text-align:left;flex:1;max-width:220px;min-width:160px;"><div style="font-size:0.75rem;color:var(--primary);font-weight:700;margin-bottom:3px;">第二步</div><div style="font-size:0.85rem;font-weight:600;margin-bottom:2px;">📈 查看资产走势</div><div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5;">图表自动生成，收益、净值一目了然</div></div>
+    </div>
     <button class="btn btn-primary" style="font-size:0.88rem;padding:8px 20px;" onclick="openRecord('${accounts[0].id}','transfer_in')">💰 录入第一笔记录</button>
-  </div>`;
+  </div>`+html;
   if(filtered.length===0&&!isNewUser)html=`<div class="empty-guide" style="grid-column:1/-1;">
     <div class="icon-big">📊</div>
     <h2>暂无账户</h2>
