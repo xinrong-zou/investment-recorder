@@ -450,7 +450,8 @@ const ACHIEVEMENTS=[
   {key:'profit_1m',   name:'富甲一方', msg:'百万利润，你已经财务自由',                                           icon:'🎯', check:(v,t,r,a)=>t>=1000000},
   {key:'profit_10m',  name:'点石成金', msg:'千万盈利——点石成金，莫过于此',                                       icon:'🎯', check:(v,t,r,a)=>t>=10000000},
   {key:'record_100',  name:'百炼成钢', msg:'100 笔记录，你已是资深投资者',                                      icon:'🏆', check:(v,t,r,a)=>r>=100},
-  {key:'export_1',    name:'有备无患', msg:'导出备份，数据多一份安心',                                          icon:'💾', check:()=>false}, // 由 exportData 手动触发
+  {key:'export_1',    name:'有备无患', msg:'导出备份，数据多一份安心',                                          icon:'💾', check:()=>false},
+  {key:'share_1',     name:'立此存照', msg:'截图留念，为努力的自己存一份见证',                                   icon:'📸', check:()=>false},
 ];
 // 内存缓存
 const queryCache={};
@@ -752,6 +753,12 @@ function closeAchievement(){
   closeModal('achievementModal');
   // 队列中还有下一个？0.4秒后弹出
   if(achievementQueue.length){setTimeout(flushAchievement,400);}else{achieving=false;}
+}
+function shareAchievement(){
+  if(achieved['share_1'])return;
+  achieved['share_1']=new Date().toISOString().substring(0,10);saveAchievements();
+  if(achieving){achievementQueue.push({key:'share_1',name:'立此存照',msg:'截图留念，为努力的自己存一份见证',icon:'📸'});}
+  else{achieving=true;displayAchievement({key:'share_1',name:'立此存照',msg:'截图留念，为努力的自己存一份见证',icon:'📸'});}
 }
 async function saveAchievements(){
   try{await client.from('user_settings').upsert({user_id:currentUser.id,achieved,last_return_sign:lastReturnSign,positive_return_count:positiveReturnCount},{onConflict:'user_id'});}catch(e){}
@@ -1647,12 +1654,14 @@ function shareSnapshot(){
     c.toBlob(blob=>{
       const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='收益账本_'+ds+'.png';a.click();
       URL.revokeObjectURL(a.href);toast('快照已保存','success');
+      shareAchievement();
     },'image/png');
   };
   img.onerror=function(){
     c.toBlob(blob=>{
       const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='收益账本_'+ds+'.png';a.click();
       URL.revokeObjectURL(a.href);toast('快照已保存','success');
+      shareAchievement();
     },'image/png');
   };
   img.src='https://api.qrserver.com/v1/create-qr-code/?size=100&data=https://qyit.eu.org';
