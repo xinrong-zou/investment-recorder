@@ -54,7 +54,8 @@
       },
       investors() { return this.store.investors || []; },
       showInvestorEdit() {
-        return (this.editingActionType === 'transfer_in' || this.editingActionType === 'transfer_out')
+        return window.__store.fundMode
+          && (this.editingActionType === 'transfer_in' || this.editingActionType === 'transfer_out')
           && this.investors.length > 0;
       },
     },

@@ -336,7 +336,11 @@
     const investors = store.investors || [];
     if (!investors.length) return [];
 
-    // 收集所有投资人相关记录
+    // 利用 buildSeries 获得每日收盘 NAV
+    const series = window.calcUtils.buildSeries(accounts, allRecords);
+    if (!series) return [];
+
+    // 收集投资人记录（转入/转出且有关联投资人）
     const recs = [];
     for (const aid of Object.keys(allRecords)) {
       for (const r of (allRecords[aid] || [])) {
@@ -346,72 +350,34 @@
       }
     }
     if (!recs.length) return [];
-    const invRecIds = new Set(recs.map(r => r.id));
+    recs.sort((a, b) => new Date(a.record_date) - new Date(b.record_date));
 
-    // 全量记录排序（与 buildSeries 一致）
-    const allSorted = [];
-    for (const aid of Object.keys(allRecords)) {
-      for (const r of (allRecords[aid] || [])) allSorted.push(r);
-    }
-    allSorted.sort((a, b) => {
-      const d = new Date(a.record_date) - new Date(b.record_date);
-      if (d !== 0) return d;
-      // 基金计算：先确定当日收盘市值，再按收盘净值做申购赎回
-      const order = { revalue: 0, transfer_in: 1, transfer_out: 2 };
-      return (order[a.action_type] || 0) - (order[b.action_type] || 0);
-    });
-
-    // 增量扫描
-    const acctState = {};
-    for (const a of accounts) acctState[a.id] = { cost: 0, lastRevalue: null };
-    const memberShares = {};   // { investorId: totalShares }
-    const memberInvested = {}; // { investorId: totalCash }
-
-    for (const r of allSorted) {
-      const st = acctState[r.account_id];
-      const acct = accounts.find(a => a.id === r.account_id);
-      const isCash = acct ? acct.account_type === 'cash' : false;
-
-      // 处理此条记录前的 NAV
-      const beforeV = isCash ? st.cost : (st.lastRevalue != null ? st.lastRevalue : st.cost);
-      const beforeC = st.cost;
-      const beforeNav = beforeC > 0 ? beforeV / beforeC : 1.0;
-
-      // 投资人记录：按交易前 NAV 折算份额
-      if (invRecIds.has(r.id)) {
-        const amt = Number(r.amount);
-        if (r.action_type === 'transfer_in') {
-          const shares = amt / beforeNav;
-          memberShares[r.investor_id] = (memberShares[r.investor_id] || 0) + shares;
-          memberInvested[r.investor_id] = (memberInvested[r.investor_id] || 0) + amt;
-        } else if (r.action_type === 'transfer_out') {
-          const shares = amt / beforeNav;
-          memberShares[r.investor_id] = (memberShares[r.investor_id] || 0) - shares;
-          memberInvested[r.investor_id] = (memberInvested[r.investor_id] || 0) - amt;
-        }
+    // 查找指定日期前一天的 NAV
+    // 如为第一个有记录的日期则返回 1.0
+    function prevNav(date) {
+      for (let i = series.dates.length - 1; i >= 0; i--) {
+        if (series.dates[i] < date) return series.nav[i];
       }
+      return 1.0;
+    }
 
-      // 更新组合状态
+    const memberShares = {};
+    const memberInvested = {};
+
+    for (const r of recs) {
+      const amt = Number(r.amount);
+      const nav = prevNav(r.record_date);
       if (r.action_type === 'transfer_in') {
-        st.cost += Number(r.amount);
-        if (st.lastRevalue != null) st.lastRevalue += Number(r.amount);
-      } else if (r.action_type === 'transfer_out') {
-        st.cost -= Number(r.amount);
-        if (st.lastRevalue != null) st.lastRevalue -= Number(r.amount);
-      } else if (r.action_type === 'revalue') {
-        st.lastRevalue = Number(r.amount);
+        memberShares[r.investor_id] = (memberShares[r.investor_id] || 0) + (amt / nav);
+        memberInvested[r.investor_id] = (memberInvested[r.investor_id] || 0) + amt;
+      } else {
+        memberShares[r.investor_id] = (memberShares[r.investor_id] || 0) - (amt / nav);
+        memberInvested[r.investor_id] = (memberInvested[r.investor_id] || 0) - amt;
       }
     }
 
-    // 当前组合总市值、成本、NAV
-    let curV = 0, curC = 0;
-    for (const a of accounts) {
-      const st = acctState[a.id];
-      const isCash = a.account_type === 'cash';
-      curV += isCash ? st.cost : (st.lastRevalue != null ? st.lastRevalue : st.cost);
-      curC += st.cost;
-    }
-    const curNav = curC > 0 ? curV / curC : 1.0;
+    // 当前最新 NAV
+    const curNav = series.nav[series.nav.length - 1];
 
     return investors.map(inv => {
       const shares = memberShares[inv.id] || 0;

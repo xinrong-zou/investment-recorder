@@ -85,7 +85,8 @@
       allAccounts() { return this.store.accounts || []; },
       investors() { return this.store.investors || []; },
       showInvestor() {
-        // 仅在外部资金（非账户间转账）时显示投资人选择
+        // 仅在基金模式+外部资金时显示投资人选择
+        if (!window.__store.fundMode) return false;
         if (this.recordType === 'transfer_in' && !this.srcId) return true;
         if (this.recordType === 'transfer_out' && !this.destId) return true;
         return false;
