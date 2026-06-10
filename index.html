@@ -279,6 +279,18 @@
         </div>
       </div>
       <summary-card></summary-card>
+      <!-- 基金成员管理 -->
+      <div id="fundPanel" style="display:none;margin-bottom:24px;">
+        <div class="card" style="padding:16px 20px;border:1px solid var(--border);border-radius:var(--radius-sm);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="font-size:1rem;">👥 基金成员</h3>
+            <button class="btn btn-sm btn-primary" onclick="openAddInvestor()">+ 添加成员</button>
+          </div>
+          <div id="investorList" style="display:flex;flex-direction:column;gap:6px;">
+            <!-- 由 JS 动态渲染 -->
+          </div>
+        </div>
+      </div>
 
       <total-chart></total-chart>
 
@@ -295,18 +307,6 @@
       </div>
 
       <account-grid></account-grid>
-      <!-- 基金成员管理 -->
-      <div id="fundPanel" style="display:none;margin-bottom:24px;">
-        <div class="card" style="padding:16px 20px;border:1px solid var(--border);border-radius:var(--radius-sm);">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-            <h3 style="font-size:1rem;">👥 基金成员</h3>
-            <button class="btn btn-sm btn-primary" onclick="openAddInvestor()">+ 添加成员</button>
-          </div>
-          <div id="investorList" style="display:flex;flex-direction:column;gap:6px;">
-            <!-- 由 JS 动态渲染 -->
-          </div>
-        </div>
-      </div>
       <encourage-text></encourage-text>
     </div>
   </div>

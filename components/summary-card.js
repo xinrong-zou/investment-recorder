@@ -8,20 +8,20 @@
 
   const SummaryCard = {
     template: `
-      <div class="summary-card">
+      <div class="summary-card" style="position:relative;">
+        <!-- 个人/基金切换开关 - 右上角 -->
+        <div @click="toggleFundMode" style="position:absolute;top:12px;right:14px;display:flex;align-items:center;gap:3px;cursor:pointer;user-select:none;z-index:1;">
+          <span :style="{fontSize:'0.68rem',color:fundMode?'var(--text-muted)':'var(--text)',fontWeight:fundMode?400:600,transition:'all 0.2s'}">个</span>
+          <div :style="{width:'36px',height:'18px',borderRadius:'9px',background:fundMode?'#1e40af':'#cbd5e1',padding:'2px',transition:'background 0.2s',display:'flex',justifyContent:fundMode?'flex-end':'flex-start'}">
+            <div style="width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.15);transition:all 0.2s;"></div>
+          </div>
+          <span :style="{fontSize:'0.68rem',color:fundMode?'var(--text)':'var(--text-muted)',fontWeight:fundMode?600:400,transition:'all 0.2s'}">基</span>
+        </div>
         <div class="total-row">
           <div class="v">{{ fmtS(totalVal) }}
             <button class="eye-btn" @click="togglePrivacy" :title="'切换隐私模式'" v-html="privacyMode ? EYE_SLASH : EYE_OPEN"></button>
           </div>
-          <div class="l" style="display:flex;align-items:center;gap:6px;justify-content:space-between;">
-            <span>总资产 <span class="fund-toggle" @click.stop="toggleFundMode" style="cursor:pointer;font-size:0.7rem;padding:1px 6px;border-radius:8px;border:1px solid var(--border);margin-left:4px;" :style="toggleStyle">{{ toggleLabel }}</span></span>
-            <span :class="['sync-indicator', syncClass]" :title="syncTitle" @click="onSyncClick" style="font-size:0.72rem;color:var(--text-muted);cursor:pointer;display:inline-flex;align-items:center;gap:3px;">
-              <template v-if="offline">📡 离线</template>
-              <template v-else>☁️ {{ syncTime }}
-                <span v-if="pendingCount > 0" :class="['sync-badge', hasFailed ? 'warn' : '']" style="display:inline-flex;align-items:center;justify-content:center;background:#f59e0b;color:#fff;font-size:0.65rem;font-weight:700;border-radius:50%;width:16px;height:16px;line-height:16px;margin-left:2px;">{{ pendingCount }}</span>
-              </template>
-            </span>
-          </div>
+          <div class="l">总资产</div>
         </div>
         <div class="sub-row">
           <div class="stat">
@@ -46,6 +46,13 @@
             <div class="sub">{{ ddStart }} ~ {{ ddEnd }}</div>
           </div>
         </div>
+        <!-- 同步状态 - 右下角 -->
+        <div :class="['sync-indicator', syncClass]" :title="syncTitle" @click="onSyncClick" style="position:absolute;bottom:8px;right:14px;font-size:0.7rem;color:var(--text-muted);cursor:pointer;display:inline-flex;align-items:center;gap:3px;transition:all 0.2s;">
+          <template v-if="offline">📡 离线</template>
+          <template v-else>☁️ {{ syncTime }}
+            <span v-if="pendingCount > 0" :class="['sync-badge', hasFailed ? 'warn' : '']" style="display:inline-flex;align-items:center;justify-content:center;background:#f59e0b;color:#fff;font-size:0.6rem;font-weight:700;border-radius:50%;width:15px;height:15px;line-height:15px;margin-left:1px;">{{ pendingCount }}</span>
+          </template>
+        </div>
       </div>
     `,
     data() {
@@ -65,12 +72,6 @@
       privacyMode() { return this.s.privacyMode; },
       retColorClass() { return this.totalRet >= 0 ? 'profit' : 'loss'; },
       fundMode() { return this.s.fundMode; },
-      toggleLabel() { return this.fundMode ? '基金' : '个人'; },
-      toggleStyle() {
-        return this.fundMode
-          ? { background: '#1e40af', color: '#fff', borderColor: '#1e40af' }
-          : { background: 'transparent', color: 'var(--text-muted)', borderColor: 'var(--border)' };
-      },
       // 同步状态
       ss() { return this.s.syncState; },
       pendingCount() { return this.ss.pendingCount; },
