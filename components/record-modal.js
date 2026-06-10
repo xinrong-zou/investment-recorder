@@ -109,7 +109,12 @@
     },
     watch: {
       targetType(val) { this.recordType = val || 'transfer_in'; },
-      visible(val) { if (val) { this.recordType = this.targetType || 'transfer_in'; this.amount = null; this.recordDate = new Date().toISOString().substring(0,10); this.note = ''; this.srcId = ''; this.destId = ''; this.investorId = ''; } },
+      visible(val) { if (val) { this.recordType = this.targetType || 'transfer_in'; this.amount = null; this.recordDate = new Date().toISOString().substring(0,10); this.note = ''; this.investorId = ''; 
+        // 默认选中现金账户
+        const cash = this.allAccounts.find(a => a.account_type === 'cash' && a.id !== this.targetId);
+        this.srcId = cash ? cash.id : '';
+        this.destId = cash ? cash.id : '';
+      } },
     },
     methods: {
       onOverlayClick(e) { if (e.target === e.currentTarget) this.close(); },

@@ -56,6 +56,7 @@
       showInvestorEdit() {
         return window.__store.fundMode
           && (this.editingActionType === 'transfer_in' || this.editingActionType === 'transfer_out')
+          && !this.editingPairedId
           && this.investors.length > 0;
       },
     },
