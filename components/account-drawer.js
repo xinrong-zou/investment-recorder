@@ -7,7 +7,7 @@
     template: `
       <div>
         <!-- 遮罩 -->
-        <div class="drawer-overlay" :class="{open: open}" @click="close"></div>
+        <div class="drawer-overlay" :class="{open: open}" @mousedown="onOverlayClick"></div>
         <!-- 抽屉 -->
         <div class="drawer" :class="{open: open}">
           <div class="drawer-header">
@@ -56,13 +56,14 @@
             <!-- 记录表格 -->
             <h3 style="font-size:0.9rem;margin-bottom:8px;">操作记录</h3>
             <table class="record-table" v-if="filteredRecords.length > 0">
-              <thead><tr><th>日期</th><th>类型</th><th>金额</th><th>备注</th></tr></thead>
+              <thead><tr><th>日期</th><th>类型</th><th>金额</th><th>备注</th><th style="width:32px;"></th></tr></thead>
               <tbody>
                 <tr v-for="r in filteredRecords" :key="r.id" @click="edit(r)" style="cursor:pointer;">
                   <td>{{ r.record_date }}</td>
                   <td><span :class="tagClass(r)">{{ tagLabel(r) }}</span></td>
                   <td :style="{color: amtColor(r), fontWeight:600}">{{ amtPrefix(r) }}{{ fmt(r.amount) }}</td>
                   <td style="color:var(--text-muted);font-size:0.8rem;">{{ r.note || '' }}</td>
+                  <td style="text-align:center;font-size:0.85rem;" :title="syncTitle(r)" @click.stop>{{ syncIcon(r) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -91,6 +92,20 @@
       records() { return this.acctId ? (this.allRecords[this.acctId] || []) : []; },
       acctName() { return this.acct ? this.acct.name : '账户详情'; },
       isInvestment() { return this.acct ? this.acct.account_type === 'investment' : false; },
+      failedRecordIds() {
+        // 从 sync queue 中收集失败的记录 ID
+        try {
+          const q = JSON.parse(localStorage.getItem('hermes_sync_queue_v1') || '[]');
+          const ids = {};
+          q.forEach(op => {
+            if (op.status === 'failed' && op.payload) {
+              if (op.payload.recordId) ids[op.payload.recordId] = true;
+              if (op.payload.pairedId) ids[op.payload.pairedId] = true;
+            }
+          });
+          return ids;
+        } catch (e) { return {}; }
+      },
       calc() {
         if (!this.acct) return { currentValue: 0, totalReturn: 0, nav: 1 };
         return window.calcAccount(this.acct, this.records);
@@ -154,6 +169,17 @@
       chartMode() { this.$nextTick(() => this.renderChart()); },
     },
     methods: {
+      onOverlayClick(e) { if (e.target === e.currentTarget) this.close(); },
+      syncIcon(r) {
+        if (window.isTempId && window.isTempId(r.id)) return '⏳';
+        if (this.failedRecordIds[r.id]) return '❌';
+        return '✅';
+      },
+      syncTitle(r) {
+        if (window.isTempId && window.isTempId(r.id)) return '待同步';
+        if (this.failedRecordIds[r.id]) return '同步失败';
+        return '已同步';
+      },
       fmt(v) { return window.calcUtils.fmt(v); },
       fmtS(v) {
         const pm = this.store.privacyMode;

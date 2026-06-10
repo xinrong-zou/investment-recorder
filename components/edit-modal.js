@@ -5,7 +5,7 @@
 
   const EditModal = {
     template: `
-      <div class="modal-overlay" :class="{open: visible}">
+        <div class="modal-overlay" :class="{open: visible}" @mousedown="onOverlayClick">
         <div class="modal-box" @click.stop>
           <h2>{{ title }}</h2>
           <div class="input-group"><label>操作类型</label><div style="font-size:0.9rem;font-weight:600;color:var(--text);">{{ actionLabel }}</div></div>
@@ -51,7 +51,7 @@
         if (!val) return;
         // Load record data from store
         const parts = val.split('|');
-        const id = parseInt(parts[0]);
+        const id = parts[0];
         const accountId = parts[1];
         const actionType = parts[2];
         const amount = parseFloat(parts[3]);
@@ -76,6 +76,7 @@
       },
     },
     methods: {
+      onOverlayClick(e) { if (e.target === e.currentTarget) this.close(); },
       close() { window.__store.showEditModal = false; },
       async save() {
         const amt = this.editAmount;

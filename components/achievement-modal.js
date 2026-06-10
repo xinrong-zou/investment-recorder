@@ -5,7 +5,7 @@
 
   const AchievementModal = {
     template: `
-      <div class="modal-overlay" :class="{open: visible}" @mousedown="if($event.target===$el) closeAchievement()">
+      <div class="modal-overlay" :class="{open: visible}" @mousedown="onOverlayClick">
         <div class="achievement-box" @click.stop>
           <div class="achievement-bg" ref="bg"></div>
           <div class="achievement-icon">{{ icon }}</div>
@@ -46,6 +46,7 @@
       },
     },
     methods: {
+      onOverlayClick(e) { if (e.target === e.currentTarget) this.closeAchievement(); },
       generateStars() {
         this.$nextTick(() => {
           const bg = this.$refs.bg;

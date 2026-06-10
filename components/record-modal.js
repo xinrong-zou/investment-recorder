@@ -5,7 +5,7 @@
 
   const RecordModal = {
     template: `
-      <div class="modal-overlay" :class="{open: visible}">
+      <div class="modal-overlay" :class="{open: visible}" @mousedown="onOverlayClick">
         <div class="modal-box" @click.stop>
           <h2>{{ title }}</h2>
           <p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:12px;">{{ accountName }}</p>
@@ -95,7 +95,7 @@
       visible(val) { if (val) { this.recordType = this.targetType || 'transfer_in'; this.amount = null; this.recordDate = new Date().toISOString().substring(0,10); this.note = ''; this.srcId = ''; this.destId = ''; } },
     },
     methods: {
-      onTypeChange() { /* Vue handles v-if show/hide automatically */ },
+      onOverlayClick(e) { if (e.target === e.currentTarget) this.close(); },
       close() { window.__store.showRecordModal = false; },
       async save() {
         // Validate
