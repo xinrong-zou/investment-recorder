@@ -365,7 +365,8 @@
 <script src="data-service.js"></script>
 <script src="achievement-system.js"></script>
 <script>
-if(typeof mountNavBar==='function')mountNavBar('#nav-app');
+if(typeof mountNavBar!=='function'){window.mountNavBar=function(){};}
+mountNavBar('#nav-app');
 const SUPABASE_URL='https://spb-cl9n18iof0i9qxjh.supabase.opentrust.net', SUPABASE_ANON_KEY='eyJ0eX...Ukwk';
 const client=window.__supabaseClient||supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 if(!window.__supabaseClient)window.__supabaseClient=client;
