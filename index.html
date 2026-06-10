@@ -310,6 +310,7 @@
 
       <account-grid></account-grid>
       <encourage-text></encourage-text>
+      <app-footer></app-footer>
     </div>
   </div>
 </div>
@@ -364,6 +365,7 @@
 <script src="components/dash-app.js"></script>
 <script src="data-service.js"></script>
 <script src="achievement-system.js"></script>
+<script src="components/app-footer.js"></script>
 <script>
 if(typeof mountNavBar!=='function'){window.mountNavBar=function(){};}
 mountNavBar('#nav-app');
@@ -404,6 +406,7 @@ async function loadData(){
   store.investors=invs||[];
   // 恢复基金模式状态
   try{const fm=localStorage.getItem('hermes_fund_mode');if(fm==='1'){store.fundMode=true;}}catch(e){}
+  try{const pm=localStorage.getItem('hermes_privacy_mode');if(pm==='1'){store.privacyMode=true;}}catch(e){}
   const hasCash=store.accounts.some(a=>a.account_type==='cash');
   if(!hasCash){
     const{data:newAcct}=await client.from('investment_accounts').insert({user_id:store.currentUser.id,name:'现金账户',account_type:'cash'}).select().single();
@@ -455,7 +458,7 @@ function render(){
 }
 
 // ====== 账户操作 ======
-function togglePrivacy(){window.__store.privacyMode=!window.__store.privacyMode;render();}
+function togglePrivacy(){window.__store.privacyMode=!window.__store.privacyMode;try{localStorage.setItem('hermes_privacy_mode',window.__store.privacyMode?'1':'0');}catch(e){}render();}
 function toggleHidden(){window.__store.showHidden=$('showHiddenCheck').checked;render();}
 async function hideAccount(id){
   const s=window.__store;

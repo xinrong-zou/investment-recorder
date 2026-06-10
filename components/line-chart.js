@@ -56,6 +56,8 @@
       allRecords: { deep: true, handler() { this.$nextTick(() => this.renderChart()); } },
       csi300Map() { this.$nextTick(() => this.renderChart()); },
       csi500Map() { this.$nextTick(() => this.renderChart()); },
+      // 隐私模式变化时刷新图表刻度
+      // 在 mounted 中通过 $watch 处理
     },
     mounted() {
       // 直接监听 store 变化（比 computed watcher 更可靠）
@@ -63,6 +65,7 @@
       this._unwatch500 = this.$watch(() => window.__store.csi500Map, () => { this.scheduleRender(); }, { deep: true });
       this._unwatchAccounts = this.$watch(() => window.__store.accounts, () => { this.scheduleRender(); }, { deep: true });
       this._unwatchRecords = this.$watch(() => window.__store.allRecords, () => { this.scheduleRender(); }, { deep: true });
+      this._unwatchPrivacy = this.$watch(() => window.__store.privacyMode, () => { this.scheduleRender(); });
       this.$nextTick(() => this.renderChart());
     },
     beforeUnmount() {
@@ -72,6 +75,7 @@
       if (this._unwatch500) this._unwatch500();
       if (this._unwatchAccounts) this._unwatchAccounts();
       if (this._unwatchRecords) this._unwatchRecords();
+      if (this._unwatchPrivacy) this._unwatchPrivacy();
     },
     methods: {
       scheduleRender() { this.$nextTick(() => this.renderChart()); },
@@ -153,7 +157,7 @@
             legend: { data: [this.scope === 'single' ? '余额' : '总资产', '净投入'], icon: 'rect', itemWidth: 12, itemHeight: 2, top: 0, right: 0, textStyle: { fontSize: 8, color: '#94a3b8' } },
             grid: { left: 42, right: 10, top: 18, bottom: 28 },
             xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 9, rotate: 30, color: '#94a3b8', margin: 4 }, axisLine: { show: false }, axisTick: { show: false } },
-            yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' } }, axisLabel: { fontSize: 9, color: '#94a3b8', formatter: v => v >= 10000 ? (v / 10000).toFixed(1) + '万' : v } },
+            yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' } }, axisLabel: { fontSize: 9, color: '#94a3b8', formatter: v => window.__store.privacyMode ? '******' : (v >= 10000 ? (v / 10000).toFixed(1) + '万' : v) } },
             series: [
               { name: this.scope === 'single' ? '余额' : '总资产', type: 'line', data: valData, smooth: true, showSymbol: true, symbol: 'none', color: '#3b82f6', lineStyle: { width: 1.5, color: '#3b82f6' }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(59,130,246,0.3)' }, { offset: 1, color: 'rgba(59,130,246,0)' }] } } },
               { name: '净投入', type: 'line', data: totalCost, smooth: true, symbol: 'none', color: '#f59e0b', lineStyle: { width: 1, color: '#f59e0b' } }
@@ -199,7 +203,7 @@
             legend: { data: ['累计收益'], icon: 'rect', itemWidth: 12, itemHeight: 2, top: 0, right: 0, textStyle: { fontSize: 8, color: '#94a3b8' } },
             grid: { left: 42, right: 10, top: 18, bottom: 28 },
             xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 9, rotate: 30, color: '#94a3b8', margin: 4 }, axisLine: { show: false }, axisTick: { show: false } },
-            yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' } }, axisLabel: { fontSize: 9, color: '#94a3b8', formatter: v => v >= 10000 ? (v / 10000).toFixed(1) + '万' : v } },
+            yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' } }, axisLabel: { fontSize: 9, color: '#94a3b8', formatter: v => window.__store.privacyMode ? '******' : (v >= 10000 ? (v / 10000).toFixed(1) + '万' : v) } },
             series: [{ name: '累计收益', type: 'line', data: cumRet, smooth: true, symbol: 'none', color: '#dc2626', lineStyle: { width: 1.5, color: '#dc2626' }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(220,38,38,0.3)' }, { offset: 1, color: 'rgba(220,38,38,0)' }] } } }]
           };
         }

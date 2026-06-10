@@ -14,12 +14,23 @@
     '💡 牛市赚钱，熊市赚股。下跌时买的每一份都是未来的利润。',
     '🌊 市场短期是投票机，长期是称重机。——本杰明·格雷厄姆',
     '🏔️ 别人贪婪时恐惧，别人恐惧时贪婪。——沃伦·巴菲特',
+    '📖 风险来自你不知道自己在做什么。——沃伦·巴菲特',
+    '🔑 投资的秘诀不是评估某一行业对社会的影响有多大，而是确定任何给定企业的竞争优势。——查理·芒格',
+    '🎲 价格是你支付的，价值是你得到的。——沃伦·巴菲特',
+    '🌉 预测下雨不重要，重要的是建造方舟。——投资谚语',
+    '⛰️ 没有人能通过做空自己的国家而赚钱。——查理·芒格',
   ];
 
   const EncourageText = {
-    template: `<div class="encourage-text">{{ text }}</div>`,
+    template: `<div class="encourage-text" @click="next" style="text-align:center;cursor:pointer;user-select:none;padding:12px 20px;font-size:0.82rem;color:var(--text-muted);line-height:1.6;max-width:600px;margin:0 auto;">{{ current }}</div>`,
     data() {
-      return { text: QUOTES[Math.floor(Math.random() * QUOTES.length)] };
+      return { idx: Math.floor(Math.random() * QUOTES.length) };
+    },
+    computed: {
+      current() { return QUOTES[this.idx]; },
+    },
+    methods: {
+      next() { this.idx = (this.idx + 1) % QUOTES.length; },
     },
   };
 
