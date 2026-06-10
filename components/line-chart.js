@@ -144,13 +144,30 @@
         // 最大回撤区间标注
         const store = window.__store;
         let markAreaData = [];
-        const ddStart = store.ddStart || '';
-        const ddEnd = store.ddEnd || '';
-        if (ddStart && ddEnd && ddStart !== ddEnd && this.scope === 'all') {
-          const si = dates.indexOf(ddStart);
-          const ei = dates.indexOf(ddEnd);
-          if (si >= 0 && ei >= 0 && si < ei) {
-            markAreaData = [[{ xAxis: ddStart, itemStyle: { color: 'rgba(220,38,38,0.06)' } }, { xAxis: ddEnd }]];
+        if (this.scope === 'all') {
+          const ddStart = store.ddStart || '';
+          const ddEnd = store.ddEnd || '';
+          if (ddStart && ddEnd && ddStart !== ddEnd) {
+            const si = dates.indexOf(ddStart);
+            const ei = dates.indexOf(ddEnd);
+            if (si >= 0 && ei >= 0 && si < ei) {
+              markAreaData = [[{ xAxis: ddStart, itemStyle: { color: 'rgba(220,38,38,0.06)' } }, { xAxis: ddEnd }]];
+            }
+          }
+        } else if (this.scope === 'single' && dates.length >= 2) {
+          // 单账户从当前数据计算回撤区间
+          let peak = nav[0], peakIdx = 0, minDd = 0, ddS = 0, ddE = 0;
+          for (let i = 1; i < nav.length; i++) {
+            if (nav[i] > peak) { peak = nav[i]; peakIdx = i; }
+            const dd = (nav[i] - peak) / peak;
+            if (dd < minDd) { minDd = dd; ddS = dates[peakIdx]; ddE = dates[i]; }
+          }
+          if (minDd < 0 && ddS && ddE && ddS !== ddE) {
+            const si = dates.indexOf(ddS);
+            const ei = dates.indexOf(ddE);
+            if (si >= 0 && ei >= 0 && si < ei) {
+              markAreaData = [[{ xAxis: ddS, itemStyle: { color: 'rgba(220,38,38,0.06)' } }, { xAxis: ddE }]];
+            }
           }
         }
 
