@@ -1,8 +1,11 @@
-const CACHE_NAME = '收益账本-v1';
+// 收益账本 Service Worker v2 — 家族基金模式
+const CACHE_NAME = '收益账本-v2';
 const STATIC_ASSETS = [
   'index.html',
   'style.css',
   'nav-bar.js',
+  'data-service.js',
+  'achievement-system.js',
   'favicon.svg',
   'manifest.json',
   'offline.html',
