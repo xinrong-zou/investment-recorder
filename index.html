@@ -814,7 +814,7 @@ function buildSeries(){
   }
   // 过滤 netIn===netOut（内部转账不显示标记）
   for(const d of Object.keys(dailyTransfers)){
-    if(dailyTransfers[d].netIn===dailyTransfers[d].netOut)delete dailyTransfers[d];
+    if(Math.abs(dailyTransfers[d].netIn-dailyTransfers[d].netOut)<0.005)delete dailyTransfers[d];
   }
   // 增量计算：每个账户维护当前状态指针
   const acctState={}; // account_id -> {ptr, cost, lastRevalue, records}
@@ -966,9 +966,9 @@ function renderChart(){
       const tf=dailyTransfers[dt];
       if(!tf)return v;
       const net=tf.netIn-tf.netOut;
+      if(Math.abs(net)<0.005)return v;
       if(net>0)return {value:v,symbol:'circle',symbolSize:6,itemStyle:{color:'#dc2626',borderColor:'#dc2626'}};
-      if(net<0)return {value:v,symbol:'circle',symbolSize:6,itemStyle:{color:'#2563eb',borderColor:'#2563eb'}};
-      return v;
+      return {value:v,symbol:'circle',symbolSize:6,itemStyle:{color:'#2563eb',borderColor:'#2563eb'}};
     });
     option={
       tooltip:{z:800,trigger:'axis',formatter:function(p){
@@ -977,7 +977,7 @@ function renderChart(){
         const cv=typeof p[1].value==='object'?p[1].value.value:p[1].value;
         let lines=[date,'总资产: ¥'+av.toLocaleString(),'净投入: ¥'+cv.toLocaleString()];
         const tf=dailyTransfers[date];
-        if(tf){const net=tf.netIn-tf.netOut;lines.push('当日净'+(net>0?'转入: +¥':'转出: -¥')+Math.abs(net).toLocaleString());}
+        if(tf){const net=tf.netIn-tf.netOut;if(Math.abs(net)>=0.005)lines.push('当日净'+(net>0?'转入: +¥':'转出: -¥')+Math.abs(net).toLocaleString());}
         return lines.join('<br/>');
       }},
       legend:{data:['总资产','净投入'],icon:'rect',itemWidth:14,itemHeight:2.5,bottom:0,textStyle:{fontSize:10,color:'#94a3b8'}},
@@ -1368,16 +1368,16 @@ function renderDrawerChart(accountId,acct,filteredRecs){
       const tf=dailyTransfers[dates[i]];
       if(!tf)return v;
       const net=tf.netIn-tf.netOut;
+      if(Math.abs(net)<0.005)return v;
       if(net>0)return {value:v,symbol:'circle',symbolSize:4,itemStyle:{color:'#dc2626',borderColor:'#dc2626'}};
-      if(net<0)return {value:v,symbol:'circle',symbolSize:4,itemStyle:{color:'#2563eb',borderColor:'#2563eb'}};
-      return v;
+      return {value:v,symbol:'circle',symbolSize:4,itemStyle:{color:'#2563eb',borderColor:'#2563eb'}};
     });
     option={
       tooltip:{z:800,trigger:'axis',formatter:function(p){
         const idx=p[0].dataIndex,date=dates[idx];
         const lines=[date,...p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':'¥'+Number(d.value).toFixed(2)))];
         const tf=dailyTransfers[date];
-        if(tf){const net=tf.netIn-tf.netOut;lines.push('当日净'+(net>0?'转入: +¥':'转出: -¥')+Math.abs(net).toLocaleString());}
+        if(tf){const net=tf.netIn-tf.netOut;if(Math.abs(net)>=0.005)lines.push('当日净'+(net>0?'转入: +¥':'转出: -¥')+Math.abs(net).toLocaleString());}
         return lines.join('<br/>');
       }},
       legend:{data:['余额','净投入'],icon:'rect',itemWidth:12,itemHeight:2,top:0,right:0,textStyle:{fontSize:8,color:'#94a3b8'}},
