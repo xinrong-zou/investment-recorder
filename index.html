@@ -537,6 +537,11 @@ function toggleFundMode(){
   try{localStorage.setItem('hermes_fund_mode',store.fundMode?'1':'0');}catch(e){}
   const panel=$('fundPanel');
   if(store.fundMode){
+    window.triggerAchievement('fund_open','开基立业','基业初成，家族基金从今天起航','🏛️');
+    const cnt=store.investors.length;
+    if(cnt>=5)window.triggerAchievement('inviter_5','八方来财','五方汇聚，财源广进','🌟');
+    else if(cnt>=3)window.triggerAchievement('inviter_3','群策群力','三人同心，其利断金','👥');
+    else if(cnt>=1)window.triggerAchievement('inviter_1','二人同心','一个篱笆三个桩，一个好汉三个帮','🤝');
     panel.style.display='block';
     renderInvestorList();
   }else{
@@ -558,6 +563,10 @@ async function openAddInvestor(){
     const {data,error}=await client.from('fund_investors').insert({user_id:store.currentUser.id,name:n}).select().single();
     if(error){window.toast('添加失败: '+error.message,'error');return;}
     store.investors.push(data);
+    const cnt=store.investors.length;
+    if(cnt===1)window.triggerAchievement('inviter_1','二人同心','一个篱笆三个桩，一个好汉三个帮','🤝');
+    else if(cnt===3)window.triggerAchievement('inviter_3','群策群力','三人同心，其利断金','👥');
+    else if(cnt===5)window.triggerAchievement('inviter_5','八方来财','五方汇聚，财源广进','🌟');
     renderInvestorList();
     window.toast('已添加成员: '+n,'success');
   }catch(e){window.toast('添加失败','error');}
