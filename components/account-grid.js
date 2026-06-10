@@ -47,7 +47,7 @@
               <button class="btn btn-ghost btn-sm" @click.stop="openRecord(a.id, 'transfer_out')">转出</button>
               <button v-if="a.account_type === 'investment'" class="btn btn-ghost btn-sm" @click.stop="openRecord(a.id, 'revalue')">更新</button>
               <div class="dot-menu">
-                <button class="dot-btn" @click.stop="toggleMenu($event)">⋮</button>
+                <button class="dot-btn" @click.stop="toggleMenu(a.id)">⋮</button>
                 <div class="dot-dropdown" :class="{open: menuOpen === a.id}">
                   <div @click.stop="showRecords(a.id)">📋 查看记录</div>
                   <div @click.stop="a.hidden ? unhideAccount(a.id) : hideAccount(a.id)">{{ a.hidden ? '👁 取消隐藏' : '🙈 隐藏' }}</div>
@@ -116,10 +116,8 @@
       negBalance(id) { return checkNegativeBalance(id, this.allAccounts, this.allRecords); },
       fmt(v) { return fmt(v); },
       fmtS(v, pm) { return fmtS(v, pm); },
-      toggleMenu(e) {
-        const id = e.currentTarget.closest('.account-card').__vueParentComponent?.props?.key || '';
+      toggleMenu(id) {
         if (this.menuOpen === id) { this.menuOpen = null; return; }
-        // 关闭其他打开的菜单
         this.menuOpen = id;
       },
       openRecord(id, type) { if (window.openRecord) window.openRecord(id, type); },
