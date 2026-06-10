@@ -34,6 +34,9 @@
     chartRange: 'all',
     drawerAccountId: null,
     drawerChartMode: 'assets',
+    fundMode: false,
+    investors: [],
+    fundMembers: [],  // 实时计算的投资人权益数据
 
     // ---- 同步状态 ----
     syncState: { status: 'synced', lastSyncTime: null, pendingCount: 0, lastError: null },
@@ -72,6 +75,8 @@
     store.achieved = {};
     store.lastReturnSign = 'negative';
     store.positiveReturnCount = 0;
+    store.investors = [];
+    store.fundMembers = [];
     store.clearCache();
   };
 

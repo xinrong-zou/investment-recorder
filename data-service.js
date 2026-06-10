@@ -143,13 +143,13 @@
     const store = window.__store;
 
     if (op.type === 'create_record') {
-      const { data, error } = await client.from('investment_records').insert(p.record).select('id,account_id,record_date,action_type,amount,note,paired_id,updated_at').single();
+      const { data, error } = await client.from('investment_records').insert(p.record).select('id,account_id,record_date,action_type,amount,note,investor_id,paired_id,updated_at').single();
       if (error) throw new Error(error.message);
       if (!data) throw new Error('插入返回空');
       data.amount = data.amount / 100;
       // 如果有配对记录，插入并关联
       if (p.pairedRecord) {
-        const { data: d2, error: e2 } = await client.from('investment_records').insert({...p.pairedRecord, paired_id: data.id}).select('id,account_id,record_date,action_type,amount,note,paired_id,updated_at').single();
+        const { data: d2, error: e2 } = await client.from('investment_records').insert({...p.pairedRecord, paired_id: data.id}).select('id,account_id,record_date,action_type,amount,note,investor_id,paired_id,updated_at').single();
         if (e2) throw new Error(e2.message);
         d2.amount = d2.amount / 100;
         await client.from('investment_records').update({paired_id: d2.id}).eq('id', data.id);
@@ -319,6 +319,114 @@
         positive_return_count: store.positiveReturnCount,
       }, { onConflict: 'user_id' });
     } catch(e) {}
+  };
+
+  // ===================================================================
+  // 家族基金 — 计算投资人权益
+  // ===================================================================
+  /**
+   * 实时扫描所有有 investor_id 的记录，按当日 NAV（交易前）折算份额。
+   * 不依赖申赎表，始终与流水表保持同步。
+   * 返回: [{ id, name, shares, totalInvested, currentValue, return, returnPct }]
+   */
+  window.calcFundMembers = function() {
+    const store = window.__store;
+    const accounts = store.accounts || [];
+    const allRecords = store.allRecords || {};
+    const investors = store.investors || [];
+    if (!investors.length) return [];
+
+    // 收集所有投资人相关记录
+    const recs = [];
+    for (const aid of Object.keys(allRecords)) {
+      for (const r of (allRecords[aid] || [])) {
+        if (r.investor_id && (r.action_type === 'transfer_in' || r.action_type === 'transfer_out')) {
+          recs.push(r);
+        }
+      }
+    }
+    if (!recs.length) return [];
+    const invRecIds = new Set(recs.map(r => r.id));
+
+    // 全量记录排序（与 buildSeries 一致）
+    const allSorted = [];
+    for (const aid of Object.keys(allRecords)) {
+      for (const r of (allRecords[aid] || [])) allSorted.push(r);
+    }
+    allSorted.sort((a, b) => {
+      const d = new Date(a.record_date) - new Date(b.record_date);
+      if (d !== 0) return d;
+      const order = { transfer_in: 0, transfer_out: 1, revalue: 2 };
+      return (order[a.action_type] || 0) - (order[b.action_type] || 0);
+    });
+
+    // 增量扫描
+    const acctState = {};
+    for (const a of accounts) acctState[a.id] = { cost: 0, lastRevalue: null };
+    const memberShares = {};   // { investorId: totalShares }
+    const memberInvested = {}; // { investorId: totalCash }
+
+    for (const r of allSorted) {
+      const st = acctState[r.account_id];
+      const acct = accounts.find(a => a.id === r.account_id);
+      const isCash = acct ? acct.account_type === 'cash' : false;
+
+      // 处理此条记录前的 NAV
+      const beforeV = isCash ? st.cost : (st.lastRevalue != null ? st.lastRevalue : st.cost);
+      const beforeC = st.cost;
+      const beforeNav = beforeC > 0 ? beforeV / beforeC : 1.0;
+
+      // 投资人记录：按交易前 NAV 折算份额
+      if (invRecIds.has(r.id)) {
+        const amt = Number(r.amount);
+        if (r.action_type === 'transfer_in') {
+          const shares = amt / beforeNav;
+          memberShares[r.investor_id] = (memberShares[r.investor_id] || 0) + shares;
+          memberInvested[r.investor_id] = (memberInvested[r.investor_id] || 0) + amt;
+        } else if (r.action_type === 'transfer_out') {
+          const shares = amt / beforeNav;
+          memberShares[r.investor_id] = (memberShares[r.investor_id] || 0) - shares;
+          memberInvested[r.investor_id] = (memberInvested[r.investor_id] || 0) - amt;
+        }
+      }
+
+      // 更新组合状态
+      if (r.action_type === 'transfer_in') {
+        st.cost += Number(r.amount);
+        if (st.lastRevalue != null) st.lastRevalue += Number(r.amount);
+      } else if (r.action_type === 'transfer_out') {
+        st.cost -= Number(r.amount);
+        if (st.lastRevalue != null) st.lastRevalue -= Number(r.amount);
+      } else if (r.action_type === 'revalue') {
+        st.lastRevalue = Number(r.amount);
+      }
+    }
+
+    // 当前组合总市值、成本、NAV
+    let curV = 0, curC = 0;
+    for (const a of accounts) {
+      const st = acctState[a.id];
+      const isCash = a.account_type === 'cash';
+      curV += isCash ? st.cost : (st.lastRevalue != null ? st.lastRevalue : st.cost);
+      curC += st.cost;
+    }
+    const curNav = curC > 0 ? curV / curC : 1.0;
+
+    return investors.map(inv => {
+      const shares = memberShares[inv.id] || 0;
+      const invested = memberInvested[inv.id] || 0;
+      const val = shares * curNav;
+      const ret = val - invested;
+      return {
+        id: inv.id,
+        name: inv.name,
+        shares,
+        totalInvested: invested,
+        currentValue: val,
+        return: ret,
+        returnPct: invested > 0 ? (ret / invested) * 100 : 0,
+      };
+    }).sort((a, b) => a.name.localeCompare(b.name));
   };
 
   console.log('[data-service] loaded');

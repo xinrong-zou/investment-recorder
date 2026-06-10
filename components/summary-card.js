@@ -14,7 +14,7 @@
             <button class="eye-btn" @click="togglePrivacy" :title="'切换隐私模式'" v-html="privacyMode ? EYE_SLASH : EYE_OPEN"></button>
           </div>
           <div class="l" style="display:flex;align-items:center;gap:6px;justify-content:space-between;">
-            <span>总资产</span>
+            <span>总资产 <span class="fund-toggle" @click.stop="toggleFundMode" style="cursor:pointer;font-size:0.7rem;padding:1px 6px;border-radius:8px;border:1px solid var(--border);margin-left:4px;" :style="toggleStyle">{{ toggleLabel }}</span></span>
             <span :class="['sync-indicator', syncClass]" :title="syncTitle" @click="onSyncClick" style="font-size:0.72rem;color:var(--text-muted);cursor:pointer;display:inline-flex;align-items:center;gap:3px;">
               <template v-if="offline">📡 离线</template>
               <template v-else>☁️ {{ syncTime }}
@@ -64,6 +64,13 @@
       ddEnd() { return this.s.ddEnd || ''; },
       privacyMode() { return this.s.privacyMode; },
       retColorClass() { return this.totalRet >= 0 ? 'profit' : 'loss'; },
+      fundMode() { return this.s.fundMode; },
+      toggleLabel() { return this.fundMode ? '基金' : '个人'; },
+      toggleStyle() {
+        return this.fundMode
+          ? { background: '#1e40af', color: '#fff', borderColor: '#1e40af' }
+          : { background: 'transparent', color: 'var(--text-muted)', borderColor: 'var(--border)' };
+      },
       // 同步状态
       ss() { return this.s.syncState; },
       pendingCount() { return this.ss.pendingCount; },
@@ -106,6 +113,9 @@
       },
       onSyncClick() {
         if (typeof window.forceSync === 'function') window.forceSync();
+      },
+      toggleFundMode() {
+        if (typeof window.toggleFundMode === 'function') window.toggleFundMode();
       },
     },
   };

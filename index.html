@@ -295,6 +295,18 @@
       </div>
 
       <account-grid></account-grid>
+      <!-- 基金成员管理 -->
+      <div id="fundPanel" style="display:none;margin-bottom:24px;">
+        <div class="card" style="padding:16px 20px;border:1px solid var(--border);border-radius:var(--radius-sm);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="font-size:1rem;">👥 基金成员</h3>
+            <button class="btn btn-sm btn-primary" onclick="openAddInvestor()">+ 添加成员</button>
+          </div>
+          <div id="investorList" style="display:flex;flex-direction:column;gap:6px;">
+            <!-- 由 JS 动态渲染 -->
+          </div>
+        </div>
+      </div>
       <encourage-text></encourage-text>
     </div>
   </div>
@@ -385,6 +397,9 @@ async function loadData(){
   store.positiveReturnCount=s?.positive_return_count||0;
   const{data:accts}=await window.cachedQuery('accts_'+store.currentUser.id,()=>client.from('investment_accounts').select('*').eq('user_id',store.currentUser.id).order('created_at'));
   store.accounts=accts||[];
+  // 加载投资人
+  const{data:invs}=await window.cachedQuery('invs_'+store.currentUser.id,()=>client.from('fund_investors').select('*').eq('user_id',store.currentUser.id).order('sort_order').order('created_at'));
+  store.investors=invs||[];
   const hasCash=store.accounts.some(a=>a.account_type==='cash');
   if(!hasCash){
     const{data:newAcct}=await client.from('investment_accounts').insert({user_id:store.currentUser.id,name:'现金账户',account_type:'cash'}).select().single();
@@ -392,7 +407,7 @@ async function loadData(){
   }
   store.allRecords={};
   await Promise.all(store.accounts.map(async a=>{
-    const{data:recs}=await window.cachedQuery('recs_'+a.id,()=>client.from('investment_records').select('id,account_id,record_date,action_type,amount,note,paired_id,updated_at').eq('account_id',a.id).order('record_date',{ascending:true}).order('id',{ascending:true}));
+    const{data:recs}=await window.cachedQuery('recs_'+a.id,()=>client.from('investment_records').select('id,account_id,record_date,action_type,amount,note,investor_id,paired_id,updated_at').eq('account_id',a.id).order('record_date',{ascending:true}).order('id',{ascending:true}));
     (recs||[]).forEach(r=>{r.amount=r.amount/100;});
     store.allRecords[a.id]=recs||[];
   }));
@@ -425,6 +440,8 @@ function render(){
   store.accounts.forEach(a=>{(store.allRecords[a.id]||[]).forEach(r=>{allFlows.push(r);});});
   store.totalXirr=calcXIRR(allFlows,'investment', totalVal);
   const hasHidden=store.accounts.some(a=>a.hidden);$('showHiddenToggle').style.display=hasHidden?'':'none';
+  // 计算投资人权益
+  store.fundMembers = window.calcFundMembers();
   window.checkAchievements(totalVal,totalRet);
 }
 
@@ -504,6 +521,93 @@ function drawerAction(type){
 function editRecord(id,accountId,actionType,amount,date,note){
   window.__store.editRecordId=id+"|"+accountId+"|"+actionType+"|"+amount+"|"+date+"|"+(note||"");
   window.__store.showEditModal=true;
+}
+
+// ====== 家族基金模式 ======
+function toggleFundMode(){
+  const store=window.__store;
+  store.fundMode=!store.fundMode;
+  const panel=$('fundPanel');
+  if(store.fundMode){
+    // 首次启用：提示规则
+    if(!store._fundIntroShown){
+      store._fundIntroShown=true;
+      setTimeout(()=>{
+        alert('📋 基金模式说明\n\n1. 外部转入/转出可关联投资人\n2. 关联投资人的资金按当日净值折算份额\n3. 净值上涨/下跌时，份额不变，每人持仓价值同比例变化\n4. 编辑备注等不影响投资人关联\n\n可在录入操作时选择投资人。');
+      },100);
+    }
+    panel.style.display='block';
+    renderInvestorList();
+  }else{
+    panel.style.display='none';
+  }
+}
+
+// 添加投资人
+async function openAddInvestor(){
+  const name=prompt('输入成员称呼（如：妈妈、爸爸）：');
+  if(!name||!name.trim())return;
+  const n=name.trim();
+  const store=window.__store;
+  try{
+    const {data,error}=await client.from('fund_investors').insert({user_id:store.currentUser.id,name:n}).select().single();
+    if(error){window.toast('添加失败: '+error.message,'error');return;}
+    store.investors.push(data);
+    renderInvestorList();
+    window.toast('已添加成员: '+n,'success');
+  }catch(e){window.toast('添加失败','error');}
+}
+
+// 删除投资人
+async function deleteInvestor(id,name){
+  if(!confirm('确认删除成员「'+name+'」？已关联的流水记录不会删除，但将不再计算该成员权益。'))return;
+  try{
+    const {error}=await client.from('fund_investors').delete().eq('id',id);
+    if(error){window.toast('删除失败','error');return;}
+    const store=window.__store;
+    store.investors=store.investors.filter(i=>i.id!==id);
+    renderInvestorList();
+    window.toast('已删除成员','success');
+  }catch(e){window.toast('删除失败','error');}
+}
+
+// 渲染投资人列表
+function renderInvestorList(){
+  const store=window.__store;
+  const el=$('investorList');
+  if(!el)return;
+  const members=store.fundMembers||[];
+  if(!store.investors.length){
+    el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.85rem;">暂无成员，点击上方按钮添加</div>';
+    return;
+  }
+  const totalVal=store.totalVal||0;
+  let html='';
+  for(const inv of store.investors){
+    const m=members.find(x=>x.id===inv.id);
+    const val=m?m.currentValue:0;
+    const invested=m?m.totalInvested:0;
+    const ret=m?m['return']:0;
+    const pct=m?m.returnPct:0;
+    const pctStr=pct>=0?'+'+pct.toFixed(2)+'%':pct.toFixed(2)+'%';
+    const sharePct=totalVal>0?((val/totalVal)*100).toFixed(1):'0.0';
+    html+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:8px;">
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:0.9rem;">${inv.name}</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">
+          份额 ${m?m.shares.toFixed(2):'0.00'} · 占比 ${sharePct}%
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-weight:700;font-size:0.95rem;">${window.calcUtils.fmt(val)}</div>
+        <div style="font-size:0.75rem;color:${ret>=0?'#dc2626':'#2563eb'};">
+          投入 ${window.calcUtils.fmt(invested)} · ${pctStr}
+        </div>
+      </div>
+      <button class="btn btn-sm btn-ghost" onclick="deleteInvestor('${inv.id}','${inv.name}')" style="padding:2px 6px;font-size:0.8rem;color:var(--text-muted);" title="删除">✕</button>
+    </div>`;
+  }
+  el.innerHTML=html;
 }
 
 // ====== 导出 Excel ======

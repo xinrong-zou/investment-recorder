@@ -26,6 +26,14 @@
             </select>
           </div>
           
+          <div class="input-group" v-if="showInvestor">
+            <label>投资人（选填）</label>
+            <select class="input" v-model="investorId">
+              <option value="">管理人名下</option>
+              <option v-for="inv in investors" :key="inv.id" :value="inv.id">{{ inv.name }}</option>
+            </select>
+          </div>
+          
           <div class="input-group" v-if="recordType==='transfer_out'">
             <label>转出至</label>
             <select class="input" v-model="destId">
@@ -66,6 +74,7 @@
         note: '',
         srcId: '',
         destId: '',
+        investorId: '',
       };
     },
     computed: {
@@ -74,6 +83,13 @@
       targetType() { return window.__store.recordTargetType || 'transfer_in'; },
       store() { return window.__store; },
       allAccounts() { return this.store.accounts || []; },
+      investors() { return this.store.investors || []; },
+      showInvestor() {
+        // 仅在外部资金（非账户间转账）时显示投资人选择
+        if (this.recordType === 'transfer_in' && !this.srcId) return true;
+        if (this.recordType === 'transfer_out' && !this.destId) return true;
+        return false;
+      },
       title() {
         const acct = this.allAccounts.find(a => a.id === this.targetId);
         return (acct ? acct.name : '') + ' — 录入操作';
@@ -92,7 +108,7 @@
     },
     watch: {
       targetType(val) { this.recordType = val || 'transfer_in'; },
-      visible(val) { if (val) { this.recordType = this.targetType || 'transfer_in'; this.amount = null; this.recordDate = new Date().toISOString().substring(0,10); this.note = ''; this.srcId = ''; this.destId = ''; } },
+      visible(val) { if (val) { this.recordType = this.targetType || 'transfer_in'; this.amount = null; this.recordDate = new Date().toISOString().substring(0,10); this.note = ''; this.srcId = ''; this.destId = ''; this.investorId = ''; } },
     },
     methods: {
       onOverlayClick(e) { if (e.target === e.currentTarget) this.close(); },
@@ -142,10 +158,10 @@
             });
           } else {
             const rId = genTempId();
-            const r = {id:rId,account_id:acctId,action_type:'transfer_in',amount:amtYuan,record_date:date,note:note||'外部转入',paired_id:null};
+            const r = {id:rId,account_id:acctId,action_type:'transfer_in',amount:amtYuan,record_date:date,note:note||'外部转入',investor_id: this.investorId || null, paired_id:null};
             if (!this.store.allRecords[acctId]) this.store.allRecords[acctId] = [];
             this.store.allRecords[acctId].push(r);
-            enqueueOp('create_record',{record:{account_id:acctId,action_type:'transfer_in',amount,record_date:date,note:r.note},localAcct:acctId});
+            enqueueOp('create_record',{record:{account_id:acctId,action_type:'transfer_in',amount,record_date:date,note:r.note,investor_id: this.investorId || null},localAcct:acctId});
           }
         } else if (type === 'transfer_out') {
           const outCalc = window.calcAccount(
@@ -168,10 +184,10 @@
             });
           } else {
             const rId = genTempId();
-            const r = {id:rId,account_id:acctId,action_type:'transfer_out',amount:amtYuan,record_date:date,note:note||'转出',paired_id:null};
+            const r = {id:rId,account_id:acctId,action_type:'transfer_out',amount:amtYuan,record_date:date,note:note||'转出',investor_id: this.investorId || null,paired_id:null};
             if (!this.store.allRecords[acctId]) this.store.allRecords[acctId] = [];
             this.store.allRecords[acctId].push(r);
-            enqueueOp('create_record',{record:{account_id:acctId,action_type:'transfer_out',amount,record_date:date,note:r.note},localAcct:acctId});
+            enqueueOp('create_record',{record:{account_id:acctId,action_type:'transfer_out',amount,record_date:date,note:r.note,investor_id: this.investorId || null},localAcct:acctId});
           }
         } else {
           // revalue
