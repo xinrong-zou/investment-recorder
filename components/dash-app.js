@@ -13,6 +13,9 @@
   if (window.__encourageTextComponent) app.component('encourage-text', window.__encourageTextComponent);
   if (window.__accountGridComponent) app.component('account-grid', window.__accountGridComponent);
   if (window.__recordModalComponent) app.component('record-modal', window.__recordModalComponent);
+  if (window.__editModalComponent) app.component('edit-modal', window.__editModalComponent);
+  if (window.__achievementModalComponent) app.component('achievement-modal', window.__achievementModalComponent);
+  if (window.__accountDrawerComponent) app.component('account-drawer', window.__accountDrawerComponent);
   
   // 挂载到 #app 容器
   app.mount('#app');
