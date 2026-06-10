@@ -584,6 +584,7 @@ function renderInvestorList(){
   const members=store.fundMembers||[];
   const totalVal=store.totalVal||0;
   const totalCost=store.totalCost||0;
+  const pm=store.privacyMode;
   if(!store.investors.length&&!totalVal){
     el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.85rem;">暂无成员，点击上方按钮添加</div>';
     return;
@@ -604,9 +605,12 @@ function renderInvestorList(){
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">权益占比 ${mgrSharePct}%</div>
     </div>
     <div style="text-align:right;">
-      <div style="font-weight:700;font-size:0.95rem;">${window.calcUtils.fmt(mgrVal)}</div>
-      <div style="font-size:0.75rem;color:${mgrRet>=0?'#dc2626':'#2563eb'};">
-        投入 ${window.calcUtils.fmt(mgrInvested)} · ${mgrPctStr}
+      <div style="font-weight:700;font-size:0.95rem;">${window.fmtS(mgrVal)}</div>
+      <div style="font-size:0.7rem;color:${mgrRet>=0?'#dc2626':'#2563eb'};margin-top:1px;">
+        浮盈 ${window.fmtS(mgrRet)}
+      </div>
+      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:1px;">
+        投入 ${window.fmtS(mgrInvested)} · ${mgrPctStr}
       </div>
     </div>
   </div>`;
@@ -626,9 +630,12 @@ function renderInvestorList(){
         </div>
       </div>
       <div style="text-align:right;">
-        <div style="font-weight:700;font-size:0.95rem;">${window.calcUtils.fmt(val)}</div>
-        <div style="font-size:0.75rem;color:${ret>=0?'#dc2626':'#2563eb'};">
-          投入 ${window.calcUtils.fmt(invested)} · ${pctStr}
+        <div style="font-weight:700;font-size:0.95rem;">${window.fmtS(val)}</div>
+        <div style="font-size:0.7rem;color:${ret>=0?'#dc2626':'#2563eb'};margin-top:1px;">
+          浮盈 ${window.fmtS(ret)}
+        </div>
+        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:1px;">
+          投入 ${window.fmtS(invested)} · ${pctStr}
         </div>
       </div>
       <button class="btn btn-sm btn-ghost" onclick="deleteInvestor('${inv.id}','${inv.name}')" style="padding:2px 6px;font-size:0.8rem;color:var(--text-muted);" title="删除">✕</button>
