@@ -795,32 +795,67 @@ document.addEventListener('click',()=>{document.querySelectorAll('.dot-dropdown.
 function toggleDotMenu(btn){btn.nextElementSibling.classList.toggle('open');}
 
 // ====== ECharts 图表 ======
-// 构建时间序列数据
+// 构建时间序列数据（增量算法 O(n)）
 function buildSeries(){
   const dset=new Set();
   accounts.forEach(a=>{(allRecords[a.id]||[]).forEach(r=>dset.add(r.record_date));});
   const dates=[...dset].sort();
   if(dates.length<2)return null;
-  const totalVal=[],totalCost=[],nav=[],cumRet=[];
-  const dailyTransfers={}; // date -> {netIn, netOut}
-  for(const d of dates){
-    let v=0,c=0;
-    let dayNetIn=0,dayNetOut=0;
-    accounts.forEach(a=>{
-      const upTo=(allRecords[a.id]||[]).filter(r=>r.record_date<=d);
-      const cal=calcAccount(a,upTo);
-      v+=cal.currentValue;c+=cal.costBasis;
-      // 统计当天净转入/净转出
-      (allRecords[a.id]||[]).filter(r=>r.record_date===d).forEach(r=>{
-        if(r.action_type==='transfer_in')dayNetIn+=Number(r.amount);
-        else if(r.action_type==='transfer_out')dayNetOut+=Number(r.amount);
-      });
-    });
-    totalVal.push(v);totalCost.push(c);
-    nav.push(c>0?v/c:1);cumRet.push(v-c);
-    if(dayNetIn!==dayNetOut)dailyTransfers[d]={netIn:dayNetIn,netOut:dayNetOut};
+  // 预计算每日净转入/净转出
+  const dailyTransfers={};
+  for(const aid of Object.keys(allRecords)){
+    for(const r of (allRecords[aid]||[])){
+      if(r.action_type==='transfer_in'||r.action_type==='transfer_out'){
+        if(!dailyTransfers[r.record_date])dailyTransfers[r.record_date]={netIn:0,netOut:0};
+        if(r.action_type==='transfer_in')dailyTransfers[r.record_date].netIn+=Number(r.amount);
+        else dailyTransfers[r.record_date].netOut+=Number(r.amount);
+      }
+    }
   }
-  return {dates,totalVal,totalCost,nav,cumRet,dailyTransfers};
+  // 过滤 netIn===netOut（内部转账不显示标记）
+  for(const d of Object.keys(dailyTransfers)){
+    if(dailyTransfers[d].netIn===dailyTransfers[d].netOut)delete dailyTransfers[d];
+  }
+  // 增量计算：每个账户维护当前状态指针
+  const acctState={}; // account_id -> {ptr, cost, lastRevalue, records}
+  let totalVal=0,totalCost=0;
+  const totalValArr=[],totalCostArr=[],navArr=[],cumRetArr=[];
+  // 初始化每个账户的状态
+  for(const a of accounts){
+    const recs=allRecords[a.id]||[];
+    acctState[a.id]={ptr:0,cost:0,lastRevalue:null,records:recs};
+  }
+  // 逐日推进
+  for(const d of dates){
+    for(const a of accounts){
+      const st=acctState[a.id];
+      // 推进到当天（处理当天所有记录）
+      while(st.ptr<st.records.length&&st.records[st.ptr].record_date<=d){
+        const r=st.records[st.ptr];
+        if(r.action_type==='transfer_in'){
+          st.cost+=Number(r.amount);
+          if(st.lastRevalue!=null)st.lastRevalue+=Number(r.amount);
+        }else if(r.action_type==='transfer_out'){
+          st.cost-=Number(r.amount);
+          if(st.lastRevalue!=null)st.lastRevalue-=Number(r.amount);
+        }else if(r.action_type==='revalue'){
+          st.lastRevalue=Number(r.amount);
+        }
+        st.ptr++;
+      }
+    }
+    // 汇总所有账户
+    let v=0,c=0;
+    for(const a of accounts){
+      const st=acctState[a.id];
+      const isCash=a.account_type==='cash';
+      const val=isCash?st.cost:(st.lastRevalue!=null?st.lastRevalue:st.cost);
+      v+=val;c+=st.cost;
+    }
+    totalValArr.push(v);totalCostArr.push(c);
+    navArr.push(c>0?v/c:1);cumRetArr.push(v-c);
+  }
+  return {dates:dates,totalVal:totalValArr,totalCost:totalCostArr,nav:navArr,cumRet:cumRetArr,dailyTransfers};
 }
 
 // 计算最大回撤
