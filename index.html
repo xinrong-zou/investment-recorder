@@ -44,6 +44,8 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('service-worker.js').then(reg => {
+          // 立即检查更新（PWA 冷启动时触发）
+          reg.update();
           reg.addEventListener('updatefound', () => {
             const newWorker = reg.installing;
             newWorker.addEventListener('statechange', () => {
