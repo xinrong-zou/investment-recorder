@@ -430,6 +430,7 @@ async function loadData(){
 }
 
 function render(){
+  console.log('[render] start');
   const store=window.__store;
   $('dashSkeleton').style.display='none';
   let totalVal=0,totalCost=0;
@@ -452,6 +453,7 @@ function render(){
     renderInvestorList();
   }
   window.checkAchievements(totalVal,totalRet);
+  console.log('[render] done');
 }
 
 // ====== 账户操作 ======
