@@ -8,7 +8,6 @@
   const app = Vue.createApp({});
   
   // 注册已加载的组件
-  if (window.__syncStatusComponent) app.component('sync-status', window.__syncStatusComponent);
   if (window.__summaryCardComponent) app.component('summary-card', window.__summaryCardComponent);
   if (window.__encourageTextComponent) app.component('encourage-text', window.__encourageTextComponent);
   if (window.__accountGridComponent) app.component('account-grid', window.__accountGridComponent);

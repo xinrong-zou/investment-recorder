@@ -13,7 +13,15 @@
           <div class="v">{{ fmtS(totalVal) }}
             <button class="eye-btn" @click="togglePrivacy" :title="'切换隐私模式'" v-html="privacyMode ? EYE_SLASH : EYE_OPEN"></button>
           </div>
-          <div class="l">总资产</div>
+          <div class="l" style="display:flex;align-items:center;gap:6px;justify-content:space-between;">
+            <span>总资产</span>
+            <span :class="['sync-indicator', syncClass]" :title="syncTitle" @click="onSyncClick" style="font-size:0.72rem;color:var(--text-muted);cursor:pointer;display:inline-flex;align-items:center;gap:3px;">
+              <template v-if="offline">📡 离线</template>
+              <template v-else>☁️ {{ syncTime }}
+                <span v-if="pendingCount > 0" :class="['sync-badge', hasFailed ? 'warn' : '']" style="display:inline-flex;align-items:center;justify-content:center;background:#f59e0b;color:#fff;font-size:0.65rem;font-weight:700;border-radius:50%;width:16px;height:16px;line-height:16px;margin-left:2px;">{{ pendingCount }}</span>
+              </template>
+            </span>
+          </div>
         </div>
         <div class="sub-row">
           <div class="stat">
@@ -56,6 +64,33 @@
       ddEnd() { return this.s.ddEnd || ''; },
       privacyMode() { return this.s.privacyMode; },
       retColorClass() { return this.totalRet >= 0 ? 'profit' : 'loss'; },
+      // 同步状态
+      ss() { return this.s.syncState; },
+      pendingCount() { return this.ss.pendingCount; },
+      hasFailed() { return this.ss.lastError != null; },
+      offline() { return this.ss.status === 'offline'; },
+      lastSyncTime() { return this.ss.lastSyncTime; },
+      syncClass() {
+        if (this.offline) return 'offline';
+        if (this.pendingCount > 0) return this.hasFailed ? 'warning' : 'pending';
+        return 'synced';
+      },
+      syncTitle() {
+        if (this.offline) return '网络离线';
+        if (this.pendingCount > 0) return this.hasFailed ? this.pendingCount + '条同步失败，点击重试' : this.pendingCount + '条待同步';
+        const ts = this.lastSyncTime;
+        return '已同步 · ' + (ts ? new Date(ts).toLocaleString('zh-CN') : '尚未同步');
+      },
+      syncTime() {
+        const ts = this.lastSyncTime;
+        if (!ts) return '—';
+        const diff = (Date.now() - ts) / 1000;
+        if (diff < 10) return '刚刚';
+        if (diff < 60) return Math.floor(diff) + '秒前';
+        if (diff < 3600) return Math.floor(diff/60) + '分钟前';
+        if (diff < 86400) return Math.floor(diff/3600) + '小时前';
+        return new Date(ts).toLocaleDateString('zh-CN', {month:'short',day:'numeric'});
+      },
     },
     methods: {
       fmtS(v) {
@@ -68,6 +103,9 @@
       },
       togglePrivacy() {
         window.__store.privacyMode = !window.__store.privacyMode;
+      },
+      onSyncClick() {
+        if (typeof window.forceSync === 'function') window.forceSync();
       },
     },
   };
