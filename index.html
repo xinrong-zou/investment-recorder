@@ -220,6 +220,17 @@
     .empty-guide .step-desc { font-size: 0.78rem; color: var(--text-muted); }
     /* XIRR summary display */
     .xirr { font-size: 0.7rem; color: var(--text-muted); margin-top: 1px; }
+    /* Sync icon */
+    .sync-icon { transition: all 0.2s; }
+    .sync-icon:hover { border-color: var(--primary) !important; }
+    .sync-icon.synced { opacity: 0.7; }
+    .sync-icon.synced:hover { opacity: 1; }
+    .sync-icon.pending { border-color: #f59e0b !important; background: #fffbeb !important; }
+    .sync-icon.warning { border-color: #ef4444 !important; background: #fef2f2 !important; }
+    .sync-icon.offline { border-color: #6b7280 !important; background: #f3f4f6 !important; }
+    .sync-badge { display:inline-flex;align-items:center;justify-content:center;background:#f59e0b;color:#fff;font-size:0.7rem;font-weight:700;border-radius:50%;width:18px;height:18px;line-height:18px; }
+    .sync-badge.warn { background:#ef4444; }
+    .sync-ts { color: var(--text-muted); font-size: 0.72rem; white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -407,6 +418,8 @@
 </div>
 
 <div id="toastContainer" style="position:fixed;bottom:20px;right:20px;z-index:2000;"></div>
+<!-- 同步状态云图标 -->
+<div id="syncStatusIcon" onclick="forceSync()" class="sync-icon synced" title="点击刷新" style="position:fixed;bottom:54px;right:20px;z-index:1999;cursor:pointer;font-size:0.82rem;background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:4px 12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);display:flex;align-items:center;gap:4px;transition:all 0.2s;user-select:none;">☁️ <span class="sync-ts">—</span></div>
 
 <!-- 成就庆祝弹窗 -->
 <div class="modal-overlay" id="achievementModal">
@@ -473,6 +486,255 @@ function cachedQuery(key,fn){
   return fn().then(r=>{queryCache[key]=r;return r;});
 }
 function clearCache(){for(const k in queryCache)delete queryCache[k];}
+
+// ====== 乐观写入同步队列系统 ======
+const SYNC_QUEUE_KEY = 'hermes_sync_queue_v1';
+let syncQueueTimer = null;
+window._syncState = { status: 'synced', lastSyncTime: null, pendingCount: 0, lastError: null };
+
+function getSyncQueue() {
+  try { return JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]'); } catch(e) { return []; }
+}
+function saveSyncQueue(q) { localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(q)); }
+
+// 唯一ID生成（避免与服务器UUID冲突）
+let _tempIdCounter = Date.now();
+function genTempId() { return '_temp_' + (++_tempIdCounter); }
+function isTempId(id) { return typeof id === 'string' && id.startsWith('_temp_'); }
+
+function enqueueOp(type, payload) {
+  const queue = getSyncQueue();
+  const op = {
+    syncId: genTempId() + '_op',
+    type: type,        // 'create_record' | 'update_record' | 'delete_record' | 'create_account' | 'delete_account' | 'update_account'
+    payload: payload,
+    status: 'pending',
+    createdAt: Date.now(),
+    retryCount: 0,
+    lastError: null,
+  };
+  queue.push(op);
+  saveSyncQueue(queue);
+  updateSyncUI();
+  // 立即尝试消费
+  if (!syncQueueTimer) syncQueueTimer = setTimeout(consumeSyncQueue, 100);
+  return op;
+}
+
+function removeSyncOp(syncId) {
+  const q = getSyncQueue().filter(o => o.syncId !== syncId);
+  saveSyncQueue(q);
+  updateSyncUI();
+}
+
+function updateSyncUI() {
+  const q = getSyncQueue();
+  const pending = q.filter(o => o.status !== 'done').length;
+  window._syncState.pendingCount = pending;
+  const icon = $('syncStatusIcon');
+  if (!icon) return;
+  const ts = window._syncState.lastSyncTime;
+  const timeStr = ts ? formatSyncTime(ts) : '—';
+  if (pending === 0) {
+    icon.innerHTML = '☁️ <span class="sync-ts">' + timeStr + '</span>';
+    icon.className = 'sync-icon synced';
+    icon.title = '已同步 · ' + (ts ? new Date(ts).toLocaleString('zh-CN') : '尚未同步');
+  } else {
+    const fail = q.some(o => o.status === 'failed');
+    icon.innerHTML = fail ? '☁️ <span class="sync-badge warn">' + pending + '</span> <span class="sync-ts">' + timeStr + '</span>'
+                         : '☁️ <span class="sync-badge">' + pending + '</span> <span class="sync-ts">' + timeStr + '</span>';
+    icon.className = 'sync-icon ' + (fail ? 'warning' : 'pending');
+    icon.title = fail ? pending + '条同步失败，点击重试' : pending + '条待同步';
+  }
+}
+
+async function consumeSyncQueue() {
+  syncQueueTimer = null;
+  let q = getSyncQueue();
+  // 清理已完成条目
+  const doneCount = q.filter(o => o.status === 'done').length;
+  if (doneCount > 0) {
+    q = q.filter(o => o.status !== 'done');
+    saveSyncQueue(q);
+  }
+  const pending = q.filter(o => o.status === 'pending' || o.status === 'failed');
+  if (pending.length === 0) { updateSyncUI(); return; }
+  
+  // 逐条消费（串行保证顺序）
+  for (const op of pending) {
+    if (op.status === 'done') continue;
+    op.status = 'syncing';
+    saveSyncQueue(q);
+    updateSyncUI();
+    try {
+      await executeSyncOp(op);
+      op.status = 'done';
+      op.lastError = null;
+      window._syncState.lastSyncTime = Date.now();
+      saveSyncQueue(q);
+      updateSyncUI();
+    } catch(e) {
+      op.status = 'failed';
+      op.retryCount++;
+      op.lastError = e.message;
+      saveSyncQueue(q);
+      updateSyncUI();
+      // 如果是冲突，立即停止队列，等待用户处理
+      if (e.message.startsWith('CONFLICT:')) {
+        showSyncConflict(e.message.replace('CONFLICT:', ''), op);
+        return;
+      }
+      // 指数退避重试
+      const delay = Math.min(5000 * Math.pow(2, op.retryCount - 1), 60000);
+      syncQueueTimer = setTimeout(consumeSyncQueue, delay);
+      return;
+    }
+  }
+  // 全部完成，清理已完成的条目
+  const done = q.filter(o => o.status === 'done');
+  done.forEach(o => removeSyncOp(o.syncId));
+}
+
+async function executeSyncOp(op) {
+  const p = op.payload;
+  
+  if (op.type === 'create_record') {
+    const { data, error } = await client.from('investment_records').insert(p.record).select('id,account_id,record_date,action_type,amount,note,paired_id,updated_at').single();
+    if (error) throw new Error(error.message);
+    if (!data) throw new Error('插入返回空');
+    data.amount = data.amount / 100;
+    // 如果有配对记录，插入并关联
+    if (p.pairedRecord) {
+      const { data: d2, error: e2 } = await client.from('investment_records').insert({...p.pairedRecord, paired_id: data.id}).select('id,account_id,record_date,action_type,amount,note,paired_id,updated_at').single();
+      if (e2) throw new Error(e2.message);
+      d2.amount = d2.amount / 100;
+      await client.from('investment_records').update({paired_id: d2.id}).eq('id', data.id);
+      data.paired_id = d2.id;
+      // 更新本地配对记录（替换temp ID）
+      if (p.pairedLocalAcct && (allRecords[p.pairedLocalAcct]||[]).length > 0) {
+        const pairIdx = (allRecords[p.pairedLocalAcct]||[]).findIndex(r => isTempId(r.id));
+        if (pairIdx >= 0) {
+          Object.assign(allRecords[p.pairedLocalAcct][pairIdx], d2);
+        }
+      }
+    }
+    // 更新本地主记录（替换temp ID）
+    if (p.localAcct && (allRecords[p.localAcct]||[]).length > 0) {
+      const idx = (allRecords[p.localAcct]||[]).findIndex(r => isTempId(r.id));
+      if (idx >= 0) {
+        Object.assign(allRecords[p.localAcct][idx], data);
+      }
+    }
+    return data;
+  }
+  
+  if (op.type === 'update_record') {
+    const { error, count } = await client.from('investment_records')
+      .update(p.updates)
+      .eq('id', p.recordId)
+      .eq('updated_at', p.version);
+    if (error) throw new Error(error.message);
+    if (count === 0) throw new Error('CONFLICT:' + p.recordId);
+    // 同步更新配对记录
+    if (p.pairedId) {
+      const e = await client.from('investment_records').update(p.pairedUpdates || p.updates).eq('id', p.pairedId);
+      if (e.error) console.warn('配对记录同步失败:', e.error.message);
+    }
+  }
+  
+  if (op.type === 'delete_record') {
+    if (p.pairedId) {
+      await client.from('investment_records').delete().eq('id', p.pairedId);
+    }
+    const { error, count } = await client.from('investment_records')
+      .delete()
+      .eq('id', p.recordId);
+    if (error) throw new Error(error.message);
+    if (count === 0) throw new Error('CONFLICT:' + p.recordId);
+  }
+  
+  if (op.type === 'create_account') {
+    const { data, error } = await client.from('investment_accounts').insert(p.account).select().single();
+    if (error) throw new Error(error.message);
+    // 替换本地temp account数据
+    const localIdx = accounts.findIndex(a => isTempId(a.id));
+    if (localIdx >= 0) {
+      Object.assign(accounts[localIdx], data);
+    }
+  }
+  
+  if (op.type === 'delete_account') {
+    await client.from('investment_records').delete().eq('account_id', p.accountId);
+    const { error } = await client.from('investment_accounts').delete().eq('id', p.accountId);
+    if (error) throw new Error(error.message);
+  }
+  
+  if (op.type === 'update_account') {
+    const { error } = await client.from('investment_accounts').update(p.updates).eq('id', p.accountId);
+    if (error) throw new Error(error.message);
+  }
+}
+
+function showSyncConflict(recordId, op) {
+  // 弹窗告知用户冲突
+  const msg = '检测到数据冲突：其他设备可能已修改了此记录。\n\n点击「同步」将重新拉取最新数据覆盖本地。';
+  if (confirm(msg + '\n\n确定同步？')) {
+    // 用户选择覆盖 → 全量拉取
+    op.status = 'done';
+    saveSyncQueue(getSyncQueue());
+    loadData();
+    toast('已同步服务器数据','success');
+  } else {
+    // 保留本地，稍后重试
+    op.status = 'failed';
+    saveSyncQueue(getSyncQueue());
+    toast('已保留本地修改，稍后重试','warning');
+  }
+}
+
+// 主动触发全量同步
+window.forceSync = function() {
+  const q = getSyncQueue();
+  const pending = q.filter(o => o.status !== 'done');
+  if (pending.length === 0) {
+    // 无待同步→重新拉取全量
+    loadData();
+    toast('已刷新数据','success');
+    return;
+  }
+  if (!syncQueueTimer) consumeSyncQueue();
+};
+
+function formatSyncTime(ts) {
+  const diff = (Date.now() - ts) / 1000;
+  if (diff < 10) return '刚刚';
+  if (diff < 60) return Math.floor(diff) + '秒前';
+  if (diff < 3600) return Math.floor(diff/60) + '分钟前';
+  if (diff < 86400) return Math.floor(diff/3600) + '小时前';
+  return new Date(ts).toLocaleDateString('zh-CN', {month:'short',day:'numeric'});
+}
+
+// 联网状态监听
+window.addEventListener('online', () => { updateSyncUI(); consumeSyncQueue(); });
+window.addEventListener('offline', () => {
+  window._syncState.status = 'offline';
+  const icon = $('syncStatusIcon');
+  if (icon) { icon.innerHTML = '📡 <span style="color:#ef4444;">离线</span>'; icon.className = 'sync-icon offline'; icon.title = '网络离线'; }
+});
+document.addEventListener('visibilitychange', () => { if (!document.hidden) consumeSyncQueue(); });
+
+// 退出登录时清空用户数据（保留指数缓存和主题设置）
+const USER_CLEAR_KEYS = ['hermes_sync_queue_v1', 'privacy_mode'];
+client.auth.onAuthStateChange((event) => {
+  if (event === 'SIGNED_OUT') {
+    USER_CLEAR_KEYS.forEach(k => { try{localStorage.removeItem(k);}catch(e){} });
+    // 清空内存数据
+    currentUser=null; accounts=[]; allRecords={}; settings=null;
+    window._syncState = { status: 'synced', lastSyncTime: null, pendingCount: 0, lastError: null };
+    for(const k in queryCache) delete queryCache[k];
+  }
+});
+
 function fmtS(v){return privacyMode?'******':fmt(v);}
 
 const $=id=>document.getElementById(id);
@@ -482,14 +744,22 @@ function openModal(id){$(id).classList.add('open');}
 function closeModal(id){$(id).classList.remove('open');}
 document.querySelectorAll('.modal-overlay').forEach(el=>{el.addEventListener('mousedown',e=>{if(e.target===el)el.classList.remove('open');});});
 
-function calcAccount(acct,records){
-  const sorted=[...records].sort((a,b)=>{
+function sortRecords(records){
+  return [...records].sort((a,b)=>{
     const d=new Date(a.record_date)-new Date(b.record_date);
     if(d!==0)return d;
-    // 同一天：先处理转入转出，更新市值最后（代表当天最终市值）
+    // 同一天：转入(0)→转出(1)→市值更新(2)
     const order={transfer_in:0,transfer_out:1,revalue:2};
-    return (order[a.action_type]||0)-(order[b.action_type]||0);
+    const ao=(order[a.action_type]||0)-(order[b.action_type]||0);
+    if(ao!==0)return ao;
+    // 同一天同类型：用id确保稳定顺序，后面的覆盖前面的（多条市值更新取最后一条）
+    if(a.id<b.id)return -1;
+    if(a.id>b.id)return 1;
+    return 0;
   });
+}
+function calcAccount(acct,records){
+  const sorted=sortRecords(records);
   let cost=0,lastRevalue=null;
   sorted.forEach(r=>{
     if(r.action_type==='transfer_in'){
@@ -543,15 +813,49 @@ function calcXIRR(records, accountType, currentValue){
   return null;
 }
 
-// 获取指数数据（通过Worker代理解决CORS，东方财富→腾讯兜底）
+// ====== 指数数据持久化（localStorage缓存，退出登录不清除） ======
+const INDEX_CACHE_KEY = 'hermes_index_cache_v1';
+function loadIndexCache(){
+  try{const d=localStorage.getItem(INDEX_CACHE_KEY);return d?JSON.parse(d):{};}catch(e){return {};}
+}
+function saveIndexCache(cache){
+  try{localStorage.setItem(INDEX_CACHE_KEY,JSON.stringify(cache));}catch(e){}
+}
+// 计算缓存中最晚日期
+function cacheLatestDate(map){
+  let latest='';
+  for(const d of Object.keys(map))if(d>latest)latest=d;
+  return latest;
+}
+// 获取指数数据：优先用缓存，后台检查是否需要更新
 async function fetchIndexData(code){
+  const today=new Date();
+  const todayStr=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+  const cache=loadIndexCache();
+  const cached=cache[code]||{};
+  const latest=cacheLatestDate(cached);
+  // 如果有缓存且最近日期在昨天及以内，直接返回
+  if(latest&&latest>=formatDateOffset(-1)){
+    return cached;
+  }
+  // 缓存过期→从API拉取
   try{
     const apiBase=window.__API_BASE||'';
     const r=await fetch(apiBase+'/api/index-data?code='+code,{cache:'no-store'});
-    if(!r.ok)return {};
+    if(!r.ok) return cached;
     const d=await r.json();
-    return d.data||{};
-  }catch(e){return {};}
+    const fresh=d.data||{};
+    // 合并：新数据覆盖旧数据
+    const merged={...cached};
+    for(const k of Object.keys(fresh))merged[k]=fresh[k];
+    cache[code]=merged;
+    saveIndexCache(cache);
+    return merged;
+  }catch(e){return cached;}
+}
+function formatDateOffset(days){
+  const d=new Date();d.setDate(d.getDate()+days);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 async function loadData(){
   const{data:{session}}=await client.auth.getSession();
@@ -569,19 +873,27 @@ async function loadData(){
   allRecords={};
   // 并行加载所有账户记录（比串行快N倍）
   await Promise.all(accounts.map(async a=>{
-    const{data:recs}=await cachedQuery('recs_'+a.id,()=>client.from('investment_records').select('id,account_id,record_date,action_type,amount,note,paired_id').eq('account_id',a.id).order('record_date',{ascending:true}).order('id',{ascending:true}));
+    const{data:recs}=await cachedQuery('recs_'+a.id,()=>client.from('investment_records').select('id,account_id,record_date,action_type,amount,note,paired_id,updated_at').eq('account_id',a.id).order('record_date',{ascending:true}).order('id',{ascending:true}));
     (recs||[]).forEach(r=>{r.amount=r.amount/100;});
     allRecords[a.id]=recs||[];
   }));
-  // CRUD 操作直接本地更新 allRecords，无需重新请求
-  // 不阻塞渲染，后台加载指数数据
+  // 先加载缓存的指数数据（立即渲染，不等待网络）
+  const cache=loadIndexCache();
+  csi300Map=cache.hs300||{};
+  csi500Map=cache.zz500||{};
+  // 不阻塞渲染，后台刷新指数数据
   const indexPromise = Promise.all([fetchIndexData('hs300'), fetchIndexData('zz500')]);
   render();
-  // 指数数据到齐后，刷新图表加上对比线
+  // 指数数据到齐后，刷新图表加上对比线（缓存数据已有则图表更准确）
   const [hs300, zz500] = await indexPromise;
-  csi300Map = hs300; csi500Map = zz500;
+  if(Object.keys(hs300).length) csi300Map = hs300;
+  if(Object.keys(zz500).length) csi500Map = zz500;
   if(chartInstance) renderChart();
   if(drawerAccountId) renderDrawerChart();
+  // 初始化同步状态
+  window._syncState.lastSyncTime = Date.now();
+  updateSyncUI();
+  consumeSyncQueue();
 }
 
 // 检查现金账户历史中是否有余额为负的情况
@@ -633,7 +945,7 @@ function render(){
     const neg=checkNegativeBalance(a.id);
     const warnBadge=neg?' <span title="'+neg.date+' 余额 '+fmt(neg.balance)+'，查看折线图定位问题" style="display:inline-flex;align-items:center;gap:3px;font-size:0.72rem;color:#d97706;background:#fef3c7;padding:1px 8px;border-radius:10px;font-weight:500;cursor:help;">⚠ 余额异常</span>':'';
     // 计算该账户XIRR
-    const acctRecs=(allRecords[a.id]||[]).slice().sort((x,y)=>{const d=new Date(x.record_date)-new Date(y.record_date);return d!==0?d:(x.id||0)-(y.id||0);});
+    const acctRecs=sortRecords(allRecords[a.id]||[]);
     const acctXirr=calcXIRR(acctRecs,a.account_type,calc.currentValue);
     const xirrStr=acctXirr!=null&&!isNaN(acctXirr)?(acctXirr*100).toFixed(2)+'%':'—';
     const xirrColor=acctXirr!=null?(acctXirr>=0?'#dc2626':'#2563eb'):'var(--text-secondary)';
@@ -821,9 +1133,9 @@ function buildSeries(){
   const acctState={}; // account_id -> {ptr, cost, lastRevalue, records}
   let totalVal=0,totalCost=0;
   const totalValArr=[],totalCostArr=[],navArr=[],cumRetArr=[];
-  // 初始化每个账户的状态
+  // 初始化每个账户的状态（预排序确保同一天内 revalue 最后处理）
   for(const a of accounts){
-    const recs=allRecords[a.id]||[];
+    const recs=sortRecords(allRecords[a.id]||[]);
     acctState[a.id]={ptr:0,cost:0,lastRevalue:null,records:recs};
   }
   // 逐日推进
@@ -1090,8 +1402,18 @@ function renderPieChart(){
 // ====== 账户操作 ======
 function togglePrivacy(){privacyMode=!privacyMode;render();}
 function toggleHidden(){showHidden=$('showHiddenCheck').checked;render();}
-async function hideAccount(id){await client.from('investment_accounts').update({hidden:true}).eq('id',id);const a=accounts.find(x=>x.id===id);if(a)a.hidden=true;toast('已隐藏','success');hideAchievement();render();}
-async function unhideAccount(id){await client.from('investment_accounts').update({hidden:false}).eq('id',id);const a=accounts.find(x=>x.id===id);if(a)a.hidden=false;toast('已取消隐藏','success');render();}
+async function hideAccount(id){
+  const a=accounts.find(x=>x.id===id);
+  if(a)a.hidden=true;
+  enqueueOp('update_account',{accountId:id,updates:{hidden:true}});
+  toast('已隐藏','success');hideAchievement();render();
+}
+async function unhideAccount(id){
+  const a=accounts.find(x=>x.id===id);
+  if(a)a.hidden=false;
+  enqueueOp('update_account',{accountId:id,updates:{hidden:false}});
+  toast('已取消隐藏','success');render();
+}
 function openAddAccount(){$('accountModalTitle').textContent='新建账户';$('saveAccountBtn').textContent='创建';$('accountName').value='';$('accountType').value='investment';openModal('accountModal');}
 async function getUserPlan(){
   try{
@@ -1119,7 +1441,6 @@ function isFrozenAccount(accountId){
 async function saveAccount(){
   const name=$('accountName').value.trim();if(!name){toast('请输入账户名称','error');return;}
   const type=$('accountType').value;
-  // 检查账户数量限制
   const plan=await getUserPlan();
   if(plan!=='pro'){
     const cashCount=accounts.filter(a=>a.account_type==='cash').length;
@@ -1127,11 +1448,13 @@ async function saveAccount(){
     if(type==='cash'&&cashCount>=1){toast('免费用户只能拥有1个现金账户','error');return;}
     if(type==='investment'&&investCount>=5){toast('免费用户最多5个投资账户，赞助后可解锁无限','error');return;}
   }
-  const{data:newAcct,error}=await client.from('investment_accounts').insert({user_id:currentUser.id,name,account_type:type}).select().single();
-  if(error){toast(error.message,'error');return;}
-  accounts.push(newAcct);
-  allRecords[newAcct.id]=[];
-  closeModal('accountModal');toast('账户已创建','success');render();
+  // 乐观创建：先本地加temp账户
+  const tempId=genTempId();
+  const tempAcct={id:tempId,name,account_type:type,user_id:currentUser.id,hidden:false,created_at:new Date().toISOString()};
+  accounts.push(tempAcct);
+  allRecords[tempId]=[];
+  enqueueOp('create_account',{account:{user_id:currentUser.id,name,account_type:type}});
+  closeModal('accountModal');toast('账户已创建（同步中）','success');render();
 }
 
 let recordAccountId=null;
@@ -1181,11 +1504,10 @@ async function saveRecord(){
   if(type==='revalue'){if(isNaN(amount)||amount<0){toast('请输入有效市值','error');return;}
   }else{if(!amount||amount<=0){toast('请输入有效金额','error');return;}}
   const date=$('recordDate').value||new Date().toISOString().substring(0,10),note=$('recordNote').value.trim()||'';
-  const recs=[];
 
   if(!recordAccountId){toast('系统错误：缺少账户信息','error');return;}
 
-  // 检查账户是否被冻结
+  // 检查账户是否被冻结（仍需要实时检查，因为依赖服务器端账户数据）
   const plan=await getUserPlan();
   if(plan!=='pro'){
     if(isFrozenAccount(recordAccountId)){toast('该账户已超出免费额度，操作被冻结','error');return;}
@@ -1195,59 +1517,92 @@ async function saveRecord(){
     if(destId&&isFrozenAccount(destId)){toast('目标账户已超出免费额度','error');return;}
   }
 
+  // —— 乐观写入：先本地更新 + 入队，再同步服务器 ——
   if(type==='transfer_in'){
     const srcId=$('srcAccount').value;
     if(srcId){
-      // 检查来源账户在指定日期的余额（仅警告，不阻止）
       const srcCalc=calcAccount(accounts.find(a=>a.id===srcId),(allRecords[srcId]||[]).filter(r=>r.record_date<=date));
       if(srcCalc.currentValue<amtYuan)toast('警告：来源账户在 '+date+' 余额不足（'+fmt(srcCalc.currentValue)+'），已保存但建议检查','warning');
-      recs.push({account_id:srcId,action_type:'transfer_out',amount,record_date:date,note:(note||'转至 '+(accounts.find(a=>a.id===recordAccountId)?.name||'其他账户'))});
-      recs.push({account_id:recordAccountId,action_type:'transfer_in',amount,record_date:date,note:note||'来自 '+(accounts.find(a=>a.id===srcId)?.name||'其他账户')});
+      // 本地创建两条记录（temp ID）
+      const r1Id=genTempId(),r2Id=genTempId();
+      const r1={id:r1Id,account_id:srcId,action_type:'transfer_out',amount:amtYuan,record_date:date,note:note||'转至 '+(accounts.find(a=>a.id===recordAccountId)?.name||'其他账户'),paired_id:null};
+      const r2={id:r2Id,account_id:recordAccountId,action_type:'transfer_in',amount:amtYuan,record_date:date,note:note||'来自 '+(accounts.find(a=>a.id===srcId)?.name||'其他账户'),paired_id:null};
+      // 本地追加
+      if(!allRecords[srcId])allRecords[srcId]=[];
+      if(!allRecords[recordAccountId])allRecords[recordAccountId]=[];
+      allRecords[srcId].push(r1);
+      allRecords[recordAccountId].push(r2);
+      // 入队
+      enqueueOp('create_record',{
+        record:{account_id:srcId,action_type:'transfer_out',amount,record_date:date,note:r1.note},
+        pairedRecord:{account_id:recordAccountId,action_type:'transfer_in',amount,record_date:date,note:r2.note},
+        localAcct:srcId,
+        pairedLocalAcct:recordAccountId,
+      });
     }else{
-      recs.push({account_id:recordAccountId,action_type:'transfer_in',amount,record_date:date,note:note||'外部转入'});
+      const rId=genTempId();
+      const r={id:rId,account_id:recordAccountId,action_type:'transfer_in',amount:amtYuan,record_date:date,note:note||'外部转入',paired_id:null};
+      if(!allRecords[recordAccountId])allRecords[recordAccountId]=[];
+      allRecords[recordAccountId].push(r);
+      enqueueOp('create_record',{
+        record:{account_id:recordAccountId,action_type:'transfer_in',amount,record_date:date,note:r.note},
+        localAcct:recordAccountId,
+      });
     }
   }else if(type==='transfer_out'){
-    // 检查账户在指定日期的余额（仅警告，不阻止）
     const outCalc=calcAccount(accounts.find(a=>a.id===recordAccountId),(allRecords[recordAccountId]||[]).filter(r=>r.record_date<=date));
     if(outCalc.currentValue<amtYuan)toast('警告：账户在 '+date+' 余额不足（'+fmt(outCalc.currentValue)+'），已保存但建议检查','warning');
-    recs.push({account_id:recordAccountId,action_type:'transfer_out',amount,record_date:date,note:note||'转出'});
     const destId=$('destAccount').value;
-    if(destId){recs.push({account_id:destId,action_type:'transfer_in',amount,record_date:date,note:note||'来自 '+(accounts.find(a=>a.id===recordAccountId)?.name||'其他账户')});}
+    if(destId){
+      const r1Id=genTempId(),r2Id=genTempId();
+      const r1={id:r1Id,account_id:recordAccountId,action_type:'transfer_out',amount:amtYuan,record_date:date,note:note||'转出',paired_id:null};
+      const r2={id:r2Id,account_id:destId,action_type:'transfer_in',amount:amtYuan,record_date:date,note:note||'来自 '+(accounts.find(a=>a.id===recordAccountId)?.name||'其他账户'),paired_id:null};
+      if(!allRecords[recordAccountId])allRecords[recordAccountId]=[];
+      if(!allRecords[destId])allRecords[destId]=[];
+      allRecords[recordAccountId].push(r1);
+      allRecords[destId].push(r2);
+      enqueueOp('create_record',{
+        record:{account_id:recordAccountId,action_type:'transfer_out',amount,record_date:date,note:r1.note},
+        pairedRecord:{account_id:destId,action_type:'transfer_in',amount,record_date:date,note:r2.note},
+        localAcct:recordAccountId,
+        pairedLocalAcct:destId,
+      });
+    }else{
+      const rId=genTempId();
+      const r={id:rId,account_id:recordAccountId,action_type:'transfer_out',amount:amtYuan,record_date:date,note:note||'转出',paired_id:null};
+      if(!allRecords[recordAccountId])allRecords[recordAccountId]=[];
+      allRecords[recordAccountId].push(r);
+      enqueueOp('create_record',{
+        record:{account_id:recordAccountId,action_type:'transfer_out',amount,record_date:date,note:r.note},
+        localAcct:recordAccountId,
+      });
+    }
   }else{
-    recs.push({account_id:recordAccountId,action_type:'revalue',amount,record_date:date,note});
+    // revalue
+    const rId=genTempId();
+    const r={id:rId,account_id:recordAccountId,action_type:'revalue',amount:amtYuan,record_date:date,note,paired_id:null};
+    if(!allRecords[recordAccountId])allRecords[recordAccountId]=[];
+    allRecords[recordAccountId].push(r);
+    enqueueOp('create_record',{
+      record:{account_id:recordAccountId,action_type:'revalue',amount,record_date:date,note},
+      localAcct:recordAccountId,
+    });
   }
-
-  // 先插入第一条拿到 id
-  const firstRec=recs[0];
-  const{data:r1}=await client.from('investment_records').insert(firstRec).select().single();
-  if(!r1){toast('保存失败','error');return;}
-  // 如果有多条（成对交易），设置 paired_id
-  if(recs.length>1){
-    const{data:r2}=await client.from('investment_records').insert({...recs[1],paired_id:r1.id}).select().single();
-    if(!r2){toast('保存失败','error');return;}
-    // 更新第一条的 paired_id
-    const{error:pairErr}=await client.from('investment_records').update({paired_id:r2.id}).eq('id',r1.id);
-    if(pairErr)toast('配对关联失败:'+pairErr.message,'error');
-    r1.paired_id=r2.id;
-    // 本地追加配对记录
-    if(!allRecords[r2.account_id])allRecords[r2.account_id]=[];
-    allRecords[r2.account_id].push(r2);
-  }
-  // 本地追加主记录
-  if(!allRecords[r1.account_id])allRecords[r1.account_id]=[];
-  allRecords[r1.account_id].push(r1);
-  // 刷新缓存键，下次全量加载时跳过
-  if(queryCache['recs_'+r1.account_id]!==undefined)delete queryCache['recs_'+r1.account_id];
-  closeModal('recordModal');toast('记录已保存','success');render();
+  // 刷新缓存
+  if(queryCache['recs_'+recordAccountId]!==undefined)delete queryCache['recs_'+recordAccountId];
+  closeModal('recordModal');
+  toast('记录已保存（同步中）','success');
+  render();
 }
 async function deleteAccount(id){
   if(!confirm('确定删除此账户？所有流水也会一并删除'))return;
-  await client.from('investment_records').delete().eq('account_id',id);await client.from('investment_accounts').delete().eq('id',id);
-  // 本地删除
+  // 本地删除（乐观）
   accounts=accounts.filter(a=>a.id!==id);
   delete allRecords[id];
   if(queryCache['recs_'+id]!==undefined)delete queryCache['recs_'+id];
-  toast('已删除','success');render();
+  // 入队，后台同步到服务器
+  enqueueOp('delete_account',{accountId:id});
+  toast('已删除（同步中）','success');render();
 }
 
 // ====== 抽屉（账户详情） ======
@@ -1258,7 +1613,7 @@ async function showRecords(accountId){
   $('drawerBtnRevalue').style.display=acct.account_type==='investment'?'':'none';
   const calc=calcAccount(acct,allRecords[accountId]||[]);
   // 计算该账户的最大回撤
-  const allRecs=(allRecords[accountId]||[]).slice().sort((a,b)=>{const d=new Date(a.record_date)-new Date(b.record_date);return d!==0?d:(a.id||0)-(b.id||0);});
+  const allRecs=sortRecords(allRecords[accountId]||[]);
   let ddPeak=1,ddVal=0,ddStart='',ddEnd='',maxDd=0;
   if(allRecs.length>=2){
     let val=0,cost=0,peak=1,peakIdx=0;
@@ -1491,30 +1846,28 @@ async function editRecord(id,accountId,actionType,amount,date,note){
     const ePlan=await getUserPlan();
     if(ePlan!=='pro'){
       if(isFrozenAccount(accountId)){toast('该账户已超出免费额度，无法修改','error');return;}
-      // 如果配对记录在另一个账户上，也检查
       if(editingPairedId){
         try{const{data:pr}=await client.from('investment_records').select('account_id').eq('id',editingPairedId).single();if(pr&&isFrozenAccount(pr.account_id)){toast('关联账户已超出免费额度','error');return;}}catch(e){}
       }
     }
 
-    // 通用余额校验：所有账户用更新后的数据重算
+    // 通用余额校验
     const allTestRecords={};
     for(const aid of Object.keys(allRecords)){
       allTestRecords[aid]=(allRecords[aid]||[]).filter(r=>r.id!==id&&r.id!==editingPairedId);
     }
-    // 添加当前编辑的模拟记录
     if(!allTestRecords[accountId])allTestRecords[accountId]=[];
     allTestRecords[accountId].push({action_type:actionType,amount:amt,record_date:newDate});
-    // 如果有配对，也添加配对端的模拟记录
     if(editingPairedId){
-      const{data:pair}=await client.from('investment_records').select('account_id,action_type').eq('id',editingPairedId).single();
-      if(pair){
-        if(!allTestRecords[pair.account_id])allTestRecords[pair.account_id]=[];
-        const pairAction=pair.action_type==='transfer_out'?'transfer_in':'transfer_out';
-        allTestRecords[pair.account_id].push({action_type:pairAction,amount:amt,record_date:newDate});
-      }
+      try{
+        const{data:pair}=await client.from('investment_records').select('account_id,action_type').eq('id',editingPairedId).single();
+        if(pair){
+          if(!allTestRecords[pair.account_id])allTestRecords[pair.account_id]=[];
+          const pairAction=pair.action_type==='transfer_out'?'transfer_in':'transfer_out';
+          allTestRecords[pair.account_id].push({action_type:pairAction,amount:amt,record_date:newDate});
+        }
+      }catch(e){}
     }
-    // 检查所有账户余额是否非负（仅警告，不阻止）
     for(const aid of Object.keys(allTestRecords)){
       const acct=accounts.find(a=>a.id===aid);
       if(acct&&acct.account_type==='cash'&&calcAccount(acct,allTestRecords[aid]).currentValue<0){
@@ -1522,41 +1875,64 @@ async function editRecord(id,accountId,actionType,amount,date,note){
       }
     }
 
-    const upd={amount:amtCents,record_date:newDate,note:$('editNote').value.trim()||''};
-    const{error}=await client.from('investment_records').update(upd).eq('id',editingRecordId);
-    if(error){toast(error.message,'error');return;}
-    // 同步更新配对记录
-    if(editingPairedId){
-      const{error:pairErr}=await client.from('investment_records').update({amount:amtCents,record_date:newDate}).eq('id',editingPairedId);
-      if(pairErr)toast('配对记录未能同步更新','error');
+    const upd={amount:amt,record_date:newDate,note:$('editNote').value.trim()||''};
+    // 获取当前记录的版本号（updated_at）
+    let version=null;
+    for(const aid of Object.keys(allRecords)){
+      for(const r of (allRecords[aid]||[])){
+        if(r.id===editingRecordId){version=r.updated_at;break;}
+      }
     }
-    // 本地更新
-    const updateRec=(rid,vals)=>{for(const aid of Object.keys(allRecords)){for(let i=0;i<(allRecords[aid]||[]).length;i++){if(allRecords[aid][i].id===rid){Object.assign(allRecords[aid][i],vals);return;}}}};
-    updateRec(editingRecordId,upd);
+    // 乐观更新：先本地修改
+    const updateRec=(rid,vals,acctId)=>{
+      for(const a of [acctId||accountId,...Object.keys(allRecords)]){
+        for(let i=0;i<(allRecords[a]||[]).length;i++){
+          if(allRecords[a][i].id===rid){
+            Object.assign(allRecords[a][i],vals);
+            if(vals.amount!==undefined)allRecords[a][i].amount=vals.amount;
+            return a;
+          }
+        }
+      }
+      return null;
+    };
+    updateRec(editingRecordId,upd,accountId);
     if(editingPairedId)updateRec(editingPairedId,{amount:amt,record_date:newDate});
+    // 入队同步
+    enqueueOp('update_record',{
+      recordId:editingRecordId,
+      updates:{amount:amtCents,record_date:newDate,note:upd.note},
+      version:version,
+      pairedId:editingPairedId,
+      pairedUpdates:editingPairedId?{amount:amtCents,record_date:newDate}:null,
+    });
     closeModal('editModal');editingRecordId=editingPairedId=null;
     render();
-    toast('已修改','success');
+    toast('已修改（同步中）','success');
   };
 
   // 删除按钮
   $('editDeleteBtn').onclick=async function(){
-    // 检查账户是否被冻结
     const dPlan=await getUserPlan();
     if(dPlan!=='pro'&&isFrozenAccount(accountId)){toast('该账户已超出免费额度，无法删除','error');return;}
     if(!confirm('确定删除此记录？'))return;
-    // 先删配对记录
-    if(editingPairedId)await client.from('investment_records').delete().eq('id',editingPairedId);
-    const{error}=await client.from('investment_records').delete().eq('id',id);
-    if(error){toast(error.message,'error');return;}
-    // 本地删除
+    // 获取版本号
+    let version=null;
+    for(const aid of Object.keys(allRecords)){
+      for(const r of (allRecords[aid]||[])){
+        if(r.id===id){version=r.updated_at;break;}
+      }
+    }
+    // 乐观删除：先本地删除
     const findRecAcct=(rid)=>{for(const aid of Object.keys(allRecords)){for(const r of (allRecords[aid]||[])){if(r.id===rid)return aid;}}return null;};
     const removeRec=(rid)=>{const aid=findRecAcct(rid);if(aid&&allRecords[aid])allRecords[aid]=allRecords[aid].filter(r=>r.id!==rid);};
     removeRec(id);
     if(editingPairedId)removeRec(editingPairedId);
+    // 入队同步
+    enqueueOp('delete_record',{recordId:id,pairedId:editingPairedId,version});
     closeModal('editModal');editingRecordId=editingPairedId=null;
     render();
-    toast('已删除','success');
+    toast('已删除（同步中）','success');
   };
 
   openModal('editModal');
