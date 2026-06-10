@@ -141,6 +141,19 @@
           return { value: v, symbol: 'circle', symbolSize: this.scope === 'single' ? 4 : 6, itemStyle: { color: net > 0 ? '#dc2626' : '#2563eb', borderColor: net > 0 ? '#dc2626' : '#2563eb' } };
         });
 
+        // 最大回撤区间标注
+        const store = window.__store;
+        let markAreaData = [];
+        const ddStart = store.ddStart || '';
+        const ddEnd = store.ddEnd || '';
+        if (ddStart && ddEnd && ddStart !== ddEnd && this.scope === 'all') {
+          const si = dates.indexOf(ddStart);
+          const ei = dates.indexOf(ddEnd);
+          if (si >= 0 && ei >= 0 && si < ei) {
+            markAreaData = [[{ xAxis: ddStart, itemStyle: { color: 'rgba(220,38,38,0.06)' } }, { xAxis: ddEnd }]];
+          }
+        }
+
         let option;
         if (this.mode === 'assets') {
           option = {
@@ -159,7 +172,7 @@
             xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 9, rotate: 30, color: '#94a3b8', margin: 4 }, axisLine: { show: false }, axisTick: { show: false } },
             yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' } }, axisLabel: { fontSize: 9, color: '#94a3b8', formatter: v => window.__store.privacyMode ? '******' : (v >= 10000 ? (v / 10000).toFixed(1) + '万' : v) } },
             series: [
-              { name: this.scope === 'single' ? '余额' : '总资产', type: 'line', data: valData, smooth: true, showSymbol: true, symbol: 'none', color: '#3b82f6', lineStyle: { width: 1.5, color: '#3b82f6' }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(59,130,246,0.3)' }, { offset: 1, color: 'rgba(59,130,246,0)' }] } } },
+              { name: this.scope === 'single' ? '余额' : '总资产', type: 'line', data: valData, smooth: true, showSymbol: true, symbol: 'none', color: '#3b82f6', lineStyle: { width: 1.5, color: '#3b82f6' }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(59,130,246,0.3)' }, { offset: 1, color: 'rgba(59,130,246,0)' }] } }, markArea: { data: markAreaData, silent: true } },
               { name: '净投入', type: 'line', data: totalCost, smooth: true, symbol: 'none', color: '#f59e0b', lineStyle: { width: 1, color: '#f59e0b' } }
             ]
           };
@@ -186,7 +199,7 @@
             xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 9, rotate: 30, color: '#94a3b8', margin: 4 }, axisLine: { show: false }, axisTick: { show: false } },
             yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' } }, axisLabel: { fontSize: 9, color: '#94a3b8', formatter: v => v.toFixed(3) } },
             series: [
-              { name: '净值', type: 'line', data: nav, smooth: true, symbol: 'none', color: '#1e293b', lineStyle: { width: 1.5, color: '#1e293b' }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(30,41,59,0.15)' }, { offset: 1, color: 'rgba(30,41,59,0)' }] } } },
+              { name: '净值', type: 'line', data: nav, smooth: true, symbol: 'none', color: '#1e293b', lineStyle: { width: 1.5, color: '#1e293b' }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(30,41,59,0.15)' }, { offset: 1, color: 'rgba(30,41,59,0)' }] } }, markArea: { data: markAreaData, silent: true } },
               { name: '沪深300', type: 'line', data: hN, smooth: true, symbol: 'none', color: '#f97316', lineStyle: { width: 1, color: '#f97316' } },
               { name: '中证500', type: 'line', data: zN, smooth: true, symbol: 'none', color: '#22c55e', lineStyle: { width: 1, color: '#22c55e' } }
             ]
@@ -204,7 +217,7 @@
             grid: { left: 42, right: 10, top: 18, bottom: 28 },
             xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 9, rotate: 30, color: '#94a3b8', margin: 4 }, axisLine: { show: false }, axisTick: { show: false } },
             yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' } }, axisLabel: { fontSize: 9, color: '#94a3b8', formatter: v => window.__store.privacyMode ? '******' : (v >= 10000 ? (v / 10000).toFixed(1) + '万' : v) } },
-            series: [{ name: '累计收益', type: 'line', data: cumRet, smooth: true, symbol: 'none', color: '#dc2626', lineStyle: { width: 1.5, color: '#dc2626' }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(220,38,38,0.3)' }, { offset: 1, color: 'rgba(220,38,38,0)' }] } } }]
+            series: [{ name: '累计收益', type: 'line', data: cumRet, smooth: true, symbol: 'none', color: '#dc2626', lineStyle: { width: 1.5, color: '#dc2626' }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(220,38,38,0.3)' }, { offset: 1, color: 'rgba(220,38,38,0)' }] } }, markArea: { data: markAreaData, silent: true } }]
           };
         }
         chart.setOption(option, true);
