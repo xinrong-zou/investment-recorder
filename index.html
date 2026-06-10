@@ -280,33 +280,7 @@
       </div>
       <summary-card></summary-card>
 
-      <div class="chart-container">
-        <div class="chart-tabs">
-          <button class="chart-tab active" data-mode="assets" onclick="switchChartMode('assets')">总资产</button>
-          <button class="chart-tab" data-mode="nav" onclick="switchChartMode('nav')">净值</button>
-          <button class="chart-tab" data-mode="return" onclick="switchChartMode('return')">累计收益</button>
-          <button class="chart-tab" data-mode="pie" onclick="switchChartMode('pie')">配置</button>
-        </div>
-        <div class="chart-range-btns" id="chartRangeBtns">
-          <button class="chart-range-btn active" data-range="all" onclick="setChartRange('all')">全部</button>
-          <button class="chart-range-btn" data-range="thisYear" onclick="setChartRange('thisYear')">今年</button>
-          <button class="chart-range-btn" data-range="1y" onclick="setChartRange('1y')">近1年</button>
-          <button class="chart-range-btn" data-range="3y" onclick="setChartRange('3y')">近3年</button>
-          <button class="chart-range-btn" data-range="custom" onclick="setChartRange('custom')">自定义</button>
-        </div>
-        <div id="chartRangeCustom" style="display:none;margin-bottom:6px;">
-          <input type="date" id="chartRangeStart" onchange="applyChartCustomRange()" style="font-size:0.8rem;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);">
-          <span style="color:var(--text-muted);font-size:0.78rem;margin:0 2px;">至</span>
-          <input type="date" id="chartRangeEnd" onchange="applyChartCustomRange()" style="font-size:0.8rem;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);">
-          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('chartRangeStart').value='';document.getElementById('chartRangeEnd').value='';setChartRange('all')">✕ 清除</button>
-        </div>
-        <div id="totalChart" class="chart-area"></div>
-        <div id="pieChartContainer" class="chart-area" style="display:none;">
-          <div id="pieChart" class="pie-chart-area" style="height:200px;"></div>
-          <div class="chart-empty" id="pieChartEmpty" style="display:none;">至少2个可见账户才能显示资产配置</div>
-        </div>
-        <div class="chart-empty" id="chartEmpty" style="display:none;">暂无数据</div>
-      </div>
+      <total-chart></total-chart>
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
         <h2 style="font-size:1.1rem;">我的账户</h2>
@@ -374,6 +348,7 @@
 <script src="components/edit-modal.js"></script>
 <script src="components/achievement-modal.js"></script>
 <script src="components/account-drawer.js"></script>
+<script src="components/total-chart.js"></script>
 <script src="components/dash-app.js"></script>
 <script>
 mountNavBar('#nav-app');
@@ -393,9 +368,7 @@ let positiveReturnCount=0; Object.defineProperty(window,'positiveReturnCount',{g
 let privacyMode=false; Object.defineProperty(window,'privacyMode',{get(){return S().privacyMode;},set(v){S().privacyMode=v;}});
 let showHidden=false; Object.defineProperty(window,'showHidden',{get(){return S().showHidden;},set(v){S().showHidden=v;}});
 let chartInstance=null; Object.defineProperty(window,'chartInstance',{get(){return S().chartInstance;},set(v){S().chartInstance=v;}});
-let pieChartInstance=null;
 let drawerAccountId=null; Object.defineProperty(window,'drawerAccountId',{get(){return S().drawerAccountId;},set(v){S().drawerAccountId=v;}});
-let chartMode='assets'; Object.defineProperty(window,'chartMode',{get(){return S().chartMode;},set(v){S().chartMode=v;}});
 let drawerChartMode='assets'; Object.defineProperty(window,'drawerChartMode',{get(){return S().drawerChartMode;},set(v){S().drawerChartMode=v;}});
 let csi300Map={}; Object.defineProperty(window,'csi300Map',{get(){return S().csi300Map;},set(v){S().csi300Map=v;}});
 let csi500Map={}; Object.defineProperty(window,'csi500Map',{get(){return S().csi500Map;},set(v){S().csi500Map=v;}});
@@ -412,12 +385,8 @@ window._syncState = null; Object.defineProperty(window,'_syncState',{get(){retur
 window.fmt = window.calcUtils.fmt;
 window.fmtPct = window.calcUtils.fmtPct;
 window.fmtS = function(v){return privacyMode?'******':calcUtils.fmt(v);};
-window.sortRecords = window.calcUtils.sortRecords;
-window.calcAccount = window.calcUtils.calcAccount;
-window.calcXIRR = window.calcUtils.calcXIRR;
 window.buildSeries = function(){return calcUtils.buildSeries(accounts,allRecords);};
 window.calcMaxDrawdown = function(){return calcUtils.calcMaxDrawdown(accounts,allRecords);};
-window.checkNegativeBalance = function(id){return calcUtils.checkNegativeBalance(id,accounts,allRecords);};
 
 // 成就系统
 const ACHIEVEMENTS=[
@@ -757,7 +726,6 @@ async function loadData(){
   const [hs300, zz500] = await indexPromise;
   if(Object.keys(hs300).length) csi300Map = hs300;
   if(Object.keys(zz500).length) csi500Map = zz500;
-  if(chartInstance) renderChart();
   // 初始化同步状态
   window._syncState.lastSyncTime = Date.now();
   updateSyncUI();
@@ -793,10 +761,7 @@ function render(){
   accounts.forEach(a=>{(allRecords[a.id]||[]).forEach(r=>{allFlows.push(r);});});
   const totalXirr=calcXIRR(allFlows,'investment', totalVal);
   window.__store.totalXirr = totalXirr;
-  const retColor=totalRet>=0?'profit':'loss';
   const hasHidden=accounts.some(a=>a.hidden);$('showHiddenToggle').style.display=hasHidden?'':'none';
-  renderChart();
-  renderPieChart();
   // 成就检查
   checkAchievements(totalVal,totalRet);
 }
@@ -930,151 +895,6 @@ function editRecord(id,accountId,actionType,amount,date,note){
 }
 // ====== ECharts 图表 ======
 // 切换主页图表模式
-function computeRangeStart(range){
-  if(range==='custom'){
-    const s=$('chartRangeStart').value,e=$('chartRangeEnd').value;
-    if(s&&e&&s<=e)return s;
-    if(s)return s;
-    return '';
-  }
-  const n=new Date();
-  if(range==='thisYear')return new Date(n.getFullYear(),0,1).toISOString().slice(0,10);
-  if(range==='1y'){n.setFullYear(n.getFullYear()-1);return n.toISOString().slice(0,10);}
-  if(range==='3y'){n.setFullYear(n.getFullYear()-3);return n.toISOString().slice(0,10);}
-  return '';
-}
-function setChartRange(range){
-  chartRange=range;
-  document.querySelectorAll('.chart-range-btn').forEach(b=>b.classList.toggle('active',b.dataset.range===range));
-  $('chartRangeCustom').style.display=range==='custom'?'block':'none';
-  // 重新设置图标实例（避免切换后图表不显示）
-  if(chartInstance){chartInstance.dispose();chartInstance=null;}
-  renderChart();
-}
-function applyChartCustomRange(){
-  chartRange='custom';
-  renderChart();
-}
-function renderChart(){
-  const data=buildSeries();
-  if(!data){if(chartInstance){chartInstance.dispose();chartInstance=null;}$('chartEmpty').style.display='block';return;}
-  $('chartEmpty').style.display='none';
-  const {dates,totalVal,totalCost,nav,cumRet,dailyTransfers}=data;
-  const rangeStart=computeRangeStart(chartRange);
-  if(rangeStart){
-    const idx=dates.findIndex(d=>d>=rangeStart);
-    if(idx>0){
-      dates.splice(0,idx);totalVal.splice(0,idx);totalCost.splice(0,idx);nav.splice(0,idx);cumRet.splice(0,idx);
-      Object.keys(dailyTransfers).forEach(k=>{if(k<rangeStart)delete dailyTransfers[k];});
-    }
-  }
-  if(chartRange==='custom'){
-    const end=$('chartRangeEnd').value;
-    if(end){
-      const idx=dates.findIndex(d=>d>end);
-      if(idx>=0){
-        dates.splice(idx);totalVal.splice(idx);totalCost.splice(idx);nav.splice(idx);cumRet.splice(idx);
-        Object.keys(dailyTransfers).forEach(k=>{if(k>end)delete dailyTransfers[k];});
-      }
-    }
-  }
-  if(!chartInstance){chartInstance=echarts.init($('totalChart'));}
-  let option;
-  if(chartMode==='assets'){
-    const assetData=totalVal.map((v,i)=>{
-      const dt=dates[i];
-      const tf=dailyTransfers[dt];
-      if(!tf)return v;
-      const net=tf.netIn-tf.netOut;
-      if(Math.abs(net)<0.005)return v;
-      if(net>0)return {value:v,symbol:'circle',symbolSize:6,itemStyle:{color:'#dc2626',borderColor:'#dc2626'}};
-      return {value:v,symbol:'circle',symbolSize:6,itemStyle:{color:'#2563eb',borderColor:'#2563eb'}};
-    });
-    option={
-      tooltip:{z:800,trigger:'axis',formatter:function(p){
-        const idx=p[0].dataIndex,date=dates[idx];
-        const av=typeof p[0].value==='object'?p[0].value.value:p[0].value;
-        const cv=typeof p[1].value==='object'?p[1].value.value:p[1].value;
-        let lines=[date,'总资产: ¥'+av.toLocaleString(),'净投入: ¥'+cv.toLocaleString()];
-        const tf=dailyTransfers[date];
-        if(tf){const net=tf.netIn-tf.netOut;if(Math.abs(net)>=0.005)lines.push('当日净'+(net>0?'转入: +¥':'转出: -¥')+Math.abs(net).toLocaleString());}
-        return lines.join('<br/>');
-      }},
-      legend:{data:['总资产','净投入'],icon:'rect',itemWidth:14,itemHeight:2.5,textStyle:{fontSize:10,color:'#94a3b8'}},
-      grid:{left:48,right:16,top:28,bottom:28},
-      xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8',margin:6,rotate:30},axisLine:{show:false},axisTick:{show:false}},
-      yAxis:{type:'value',scale:true,splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:10,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(1)+'万':v}},
-      series:[
-        {name:'总资产',type:'line',data:assetData,smooth:true,showSymbol:true,symbol:'none',color:'#3b82f6',lineStyle:{width:1.5,color:'#3b82f6'},
-          areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(59,130,246,0.25)'},{offset:1,color:'rgba(59,130,246,0)'}]}}},
-        {name:'净投入',type:'line',data:totalCost,smooth:true,symbol:'none',color:'#f59e0b',lineStyle:{width:1,color:'#f59e0b'}}
-      ]
-    };
-  }else if(chartMode==='nav'){
-    let lastV=null;
-    const hs300Raw=dates.map(d=>{const v=csi300Map[d];if(v!=null)lastV=v;return v;});
-    const firstGood=hs300Raw.find(v=>v!=null);
-    const hs300Fill=hs300Raw.map(v=>v!=null?v:(firstGood||null));
-    const base=firstGood||1;
-    const hs300Norm=hs300Fill.map(v=>v!=null?v/base:null);
-    let lastV5=null;
-    const zz500Raw=dates.map(d=>{const v=csi500Map[d];if(v!=null)lastV5=v;return v;});
-    const firstGood5=zz500Raw.find(v=>v!=null);
-    const zz500Fill=zz500Raw.map(v=>v!=null?v:(firstGood5||null));
-    const base5=firstGood5||1;
-    const zz500Norm=zz500Fill.map(v=>v!=null?v/base5:null);
-    option={
-      tooltip:{z:800,trigger:'axis',formatter:function(p){
-        return [p[0].axisValue,...p.map(d=>d.seriesName+': '+(isNaN(d.value)?'—':d.value.toFixed(4)))].join('<br/>');
-      }},
-      legend:{data:['净值','沪深300','中证500'],selected:{'净值':true,'沪深300':true,'中证500':false},icon:'rect',itemWidth:14,itemHeight:2.5,textStyle:{fontSize:10,color:'#94a3b8'}},
-      grid:{left:48,right:16,top:28,bottom:28},
-      xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8',margin:6,rotate:30},axisLine:{show:false},axisTick:{show:false}},
-      yAxis:{type:'value',scale:true,splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:10,color:'#94a3b8',formatter:v=>v.toFixed(3)}},
-      series:[
-        {name:'净值',type:'line',data:nav,smooth:true,symbol:'none',color:'#1e293b',lineStyle:{width:1.5,color:'#1e293b'},
-          areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(30,41,59,0.1)'},{offset:1,color:'rgba(30,41,59,0)'}]}}},
-        {name:'沪深300',type:'line',data:hs300Norm,smooth:true,symbol:'none',color:'#f97316',lineStyle:{width:1,color:'#f97316'}},
-        {name:'中证500',type:'line',data:zz500Norm,smooth:true,symbol:'none',color:'#22c55e',lineStyle:{width:1,color:'#22c55e'}}
-      ]
-    };
-  }else if(chartMode==='return'){
-    option={
-      tooltip:{z:800,trigger:'axis',formatter:function(p){
-        const d=p[0];const dt=dates[d.dataIndex];
-        let lines=[dt,'累计收益: '+(isNaN(d.value)?'—':'¥'+Number(d.value).toLocaleString())];
-        const tf=dailyTransfers[dt];
-        if(tf){const net=tf.netIn-tf.netOut;if(Math.abs(net)>=0.005)lines.push('当日净'+(net>0?'转入: +¥':'转出: -¥')+Math.abs(net).toLocaleString());}
-        return lines.join('<br/>');
-      }},
-      legend:{data:['累计收益'],icon:'rect',itemWidth:14,itemHeight:2.5,textStyle:{fontSize:10,color:'#94a3b8'}},
-      grid:{left:48,right:16,top:28,bottom:28},
-      xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,color:'#94a3b8',margin:6,rotate:30},axisLine:{show:false},axisTick:{show:false}},
-      yAxis:{type:'value',scale:true,splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{fontSize:10,color:'#94a3b8',formatter:v=>v>=10000?(v/10000).toFixed(1)+'万':v}},
-      series:[{name:'累计收益',type:'line',data:cumRet,smooth:true,symbol:'none',color:'#dc2626',lineStyle:{width:1.5,color:'#dc2626'},
-        areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(220,38,38,0.2)'},{offset:1,color:'rgba(220,38,38,0)'}]}}}]
-    };
-  }
-  chartInstance.setOption(option,true);
-  $('pieChartContainer').style.display='none';$('totalChart').style.display='block';
-}
-function renderPieChart(){
-  const el=$('pieChart');if(!el)return;
-  const visible=accounts.filter(a=>showHidden||!a.hidden);
-  if(pieChartInstance){pieChartInstance.dispose();pieChartInstance=null;}
-  if(visible.length<2){$('pieChartEmpty').style.display='block';el.style.display='none';return;}
-  $('pieChartEmpty').style.display='none';el.style.display='block';
-  const data=visible.map(a=>{
-    const calc=calcAccount(a,allRecords[a.id]||[]);
-    return {name:a.name,value:Math.abs(calc.currentValue)};
-  }).filter(d=>d.value>0);
-  if(data.length<2){$('pieChartEmpty').style.display='block';el.style.display='none';return;}
-  pieChartInstance=echarts.init(el);
-  pieChartInstance.setOption({
-    tooltip:{trigger:'item',formatter:'{b}: ¥{c}'},
-    series:[{type:'pie',radius:['35%','65%'],center:['50%','50%'],data,label:{fontSize:9,color:'#94a3b8'}}]
-  },true);
-}
 // ====== 导出 Excel ======
 function exportData(){
   if(!accounts.length){toast('没有数据可导出','error');return;}

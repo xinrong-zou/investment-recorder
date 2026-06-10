@@ -229,9 +229,12 @@
   // 新代码建议用 calcUtils.xxx()，旧函数名暂时保留
 
   if (typeof window !== 'undefined') {
-    // 旧函数名保留（避免立即 break 现有代码）
-    // window.sortRecords = calcUtils.sortRecords; 等组件迁移后再替换
     window.calcUtils = calcUtils;
+    // 设置全局别名（供组件在 Vue mount 前使用）
+    window.sortRecords = calcUtils.sortRecords;
+    window.calcAccount = calcUtils.calcAccount;
+    window.calcXIRR = calcUtils.calcXIRR;
+    window.checkNegativeBalance = calcUtils.checkNegativeBalance;
   }
 
   console.log('[calc-utils] loaded');

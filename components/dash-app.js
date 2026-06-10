@@ -16,6 +16,7 @@
   if (window.__editModalComponent) app.component('edit-modal', window.__editModalComponent);
   if (window.__achievementModalComponent) app.component('achievement-modal', window.__achievementModalComponent);
   if (window.__accountDrawerComponent) app.component('account-drawer', window.__accountDrawerComponent);
+  if (window.__totalChartComponent) app.component('total-chart', window.__totalChartComponent);
   
   // 挂载到 #app 容器
   app.mount('#app');
