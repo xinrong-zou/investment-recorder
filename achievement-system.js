@@ -41,14 +41,17 @@
   // ===================================================================
   window.checkAchievements = function(totalVal, totalRet) {
     const store = window.__store;
-    if (!store.currentUser) return;
+    if (!store.currentUser) { console.log('[ach] no user, skip'); return; }
     const today = new Date().toISOString().substring(0, 10);
     // 计算总记录数
     let totalRecs = 0;
     for (const aid of Object.keys(store.allRecords)) totalRecs += (store.allRecords[aid] || []).length;
     const acctCount = store.accounts.length;
+    console.log('[ach] checking', {totalVal, totalRet, totalRecs, acctCount, achieved: Object.keys(store.achieved).length});
 
     for (const a of ACHIEVEMENTS) {
+      const wouldTrigger = !store.achieved[a.key] && a.check(totalVal, totalRet, totalRecs, acctCount);
+      if (wouldTrigger) console.log('[ach] WOULD_TRIGGER:', a.key, a.name);
       if (!store.achieved[a.key] && a.check(totalVal, totalRet, totalRecs, acctCount)) {
         store.achieved[a.key] = today;
         _achievementQueue.push(a);
@@ -81,7 +84,10 @@
       }).catch(() => {});
     }
 
-    if (_achievementQueue.length && !_achieving) _flushAchievement();
+    if (_achievementQueue.length && !_achieving) {
+      console.log('[ach] flushing queue, length:', _achievementQueue.length);
+      _flushAchievement();
+    }
   };
 
   function _flushAchievement() {
