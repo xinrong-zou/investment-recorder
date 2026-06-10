@@ -537,19 +537,16 @@ function toggleFundMode(){
   try{localStorage.setItem('hermes_fund_mode',store.fundMode?'1':'0');}catch(e){}
   const panel=$('fundPanel');
   if(store.fundMode){
-    // 首次启用：提示规则
-    if(!store._fundIntroShown){
-      store._fundIntroShown=true;
-      setTimeout(()=>{
-        alert('📋 基金模式说明\n\n1. 外部转入/转出可关联投资人\n2. 关联投资人的资金按「全部账户汇总净值」折算份额\n   （按前一天收盘净值·首日为1.0）\n3. 净值上涨/下跌时，份额不变，每人持仓价值同比例变化\n4. 资金进哪个账户不影响份额计算\n5. 编辑备注等不影响投资人关联\n\n可在录入操作时选择投资人。');
-      },100);
-    }
     panel.style.display='block';
     renderInvestorList();
   }else{
     panel.style.display='none';
   }
 }
+
+window.showFundIntro = function(){
+  alert('📋 基金模式说明\n\n1. 外部转入/转出可关联投资人\n2. 关联投资人的资金按「全部账户汇总净值」折算份额\n   （按前一天收盘净值·首日为1.0）\n3. 净值上涨/下跌时，份额不变，每人持仓价值同比例变化\n4. 资金进哪个账户不影响份额计算\n\n可在录入操作时选择投资人。');
+};
 
 // 添加投资人
 async function openAddInvestor(){

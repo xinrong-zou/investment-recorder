@@ -16,6 +16,7 @@
             <div style="width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.15);transition:all 0.2s;"></div>
           </div>
           <span :style="{fontSize:'0.68rem',color:fundMode?'var(--text)':'var(--text-muted)',fontWeight:fundMode?600:400,transition:'all 0.2s'}">基</span>
+          <span @click.stop="showIntro" style="font-size:0.7rem;color:var(--text-muted);cursor:pointer;margin-left:2px;width:14px;height:14px;border-radius:50%;border:1px solid var(--text-muted);display:inline-flex;align-items:center;justify-content:center;line-height:1;">i</span>
         </div>
         <div class="total-row">
           <div class="v">{{ fmtS(totalVal) }}
@@ -117,6 +118,9 @@
       },
       toggleFundMode() {
         if (typeof window.toggleFundMode === 'function') window.toggleFundMode();
+      },
+      showIntro() {
+        if (typeof window.showFundIntro === 'function') window.showFundIntro();
       },
     },
   };
