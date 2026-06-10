@@ -23,6 +23,20 @@
   <meta name="apple-mobile-web-app-title" content="收益账本">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <script>
+    const APP_VERSION = '3';
+    // 检测版本更新（不依赖 SW）
+    (function(){
+      try{
+        const v = localStorage.getItem('hermes_app_version');
+        if(v && v !== APP_VERSION){
+          localStorage.setItem('hermes_app_version', APP_VERSION);
+          const tc = document.getElementById('toastContainer');
+          if(tc)tc.innerHTML='<div style="background:#1e40af;color:#fff;padding:10px 16px;border-radius:8px;font-size:0.85rem;display:flex;align-items:center;gap:10px;box-shadow:0 4px 12px rgba(0,0,0,0.15);">🆕 新版本可用 <button onclick="location.reload()" style="background:#fff;color:#1e40af;border:none;padding:4px 12px;border-radius:6px;font-size:0.8rem;cursor:pointer;font-weight:600;">立即更新</button></div>';
+        } else {
+          localStorage.setItem('hermes_app_version', APP_VERSION);
+        }
+      }catch(e){}
+    })();
     let deferredPrompt=null;
     // PWA 安装提示
     window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;showInstallBanner();});
