@@ -400,6 +400,8 @@ async function loadData(){
   // 加载投资人
   const{data:invs}=await window.cachedQuery('invs_'+store.currentUser.id,()=>client.from('fund_investors').select('*').eq('user_id',store.currentUser.id).order('sort_order').order('created_at'));
   store.investors=invs||[];
+  // 恢复基金模式状态
+  try{const fm=localStorage.getItem('hermes_fund_mode');if(fm==='1'){store.fundMode=true;}}catch(e){}
   const hasCash=store.accounts.some(a=>a.account_type==='cash');
   if(!hasCash){
     const{data:newAcct}=await client.from('investment_accounts').insert({user_id:store.currentUser.id,name:'现金账户',account_type:'cash'}).select().single();
@@ -442,7 +444,11 @@ function render(){
   const hasHidden=store.accounts.some(a=>a.hidden);$('showHiddenToggle').style.display=hasHidden?'':'none';
   // 计算投资人权益
   store.fundMembers = window.calcFundMembers();
-  if (store.fundMode) renderInvestorList();
+  if (store.fundMode) {
+    const panel=$('fundPanel');
+    if(panel)panel.style.display='block';
+    renderInvestorList();
+  }
   window.checkAchievements(totalVal,totalRet);
 }
 
@@ -528,6 +534,7 @@ function editRecord(id,accountId,actionType,amount,date,note,invId){
 function toggleFundMode(){
   const store=window.__store;
   store.fundMode=!store.fundMode;
+  try{localStorage.setItem('hermes_fund_mode',store.fundMode?'1':'0');}catch(e){}
   const panel=$('fundPanel');
   if(store.fundMode){
     // 首次启用：提示规则
@@ -578,12 +585,34 @@ function renderInvestorList(){
   const el=$('investorList');
   if(!el)return;
   const members=store.fundMembers||[];
-  if(!store.investors.length){
+  const totalVal=store.totalVal||0;
+  const totalCost=store.totalCost||0;
+  if(!store.investors.length&&!totalVal){
     el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.85rem;">暂无成员，点击上方按钮添加</div>';
     return;
   }
-  const totalVal=store.totalVal||0;
   let html='';
+  // 管理人（剩余权益）
+  const invVal=members.reduce((s,m)=>s+m.currentValue,0);
+  const invInvested=members.reduce((s,m)=>s+m.totalInvested,0);
+  const mgrVal=totalVal-invVal;
+  const mgrInvested=totalCost-invInvested;
+  const mgrRet=mgrVal-mgrInvested;
+  const mgrPct=mgrInvested>0?(mgrRet/mgrInvested)*100:0;
+  const mgrPctStr=mgrPct>=0?'+'+mgrPct.toFixed(2)+'%':mgrPct.toFixed(2)+'%';
+  const mgrSharePct=totalVal>0?((mgrVal/totalVal)*100).toFixed(1):'0.0';
+  html+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:8px;border-left:3px solid #3b82f6;">
+    <div style="flex:1;">
+      <div style="font-weight:600;font-size:0.9rem;">管理人（我）</div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">权益占比 ${mgrSharePct}%</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-weight:700;font-size:0.95rem;">${window.calcUtils.fmt(mgrVal)}</div>
+      <div style="font-size:0.75rem;color:${mgrRet>=0?'#dc2626':'#2563eb'};">
+        投入 ${window.calcUtils.fmt(mgrInvested)} · ${mgrPctStr}
+      </div>
+    </div>
+  </div>`;
   for(const inv of store.investors){
     const m=members.find(x=>x.id===inv.id);
     const val=m?m.currentValue:0;
