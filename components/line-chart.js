@@ -163,6 +163,8 @@
               const cv = typeof p[1].value === 'object' ? p[1].value.value : p[1].value;
               const name = this.scope === 'single' ? '余额' : '总资产';
               const lines = [date, name + ': ¥' + av.toLocaleString(), '净投入: ¥' + cv.toLocaleString()];
+              const cr = cumRet[idx];
+              if (cr != null) lines.push('累计收益: ¥' + Number(cr).toLocaleString());
               const tf = dailyTransfers[date];
               if (tf) { const net = tf.netIn - tf.netOut; if (Math.abs(net) >= 0.005) lines.push('当日净' + (net > 0 ? '转入: +¥' : '转出: -¥') + Math.abs(net).toLocaleString()); }
               return lines.join('<br/>');
@@ -172,7 +174,7 @@
             xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 9, rotate: 30, color: '#94a3b8', margin: 4 }, axisLine: { show: false }, axisTick: { show: false } },
             yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' } }, axisLabel: { fontSize: 9, color: '#94a3b8', formatter: v => window.__store.privacyMode ? '******' : (v >= 10000 ? (v / 10000).toFixed(1) + '万' : v) } },
             series: [
-              { name: this.scope === 'single' ? '余额' : '总资产', type: 'line', data: valData, smooth: true, showSymbol: true, symbol: 'none', color: '#3b82f6', lineStyle: { width: 1.5, color: '#3b82f6' }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(59,130,246,0.3)' }, { offset: 1, color: 'rgba(59,130,246,0)' }] } }, markArea: { data: markAreaData, silent: true } },
+              { name: this.scope === 'single' ? '余额' : '总资产', type: 'line', data: valData, smooth: true, showSymbol: true, showAllSymbol: true, symbol: 'none', color: '#3b82f6', lineStyle: { width: 1.5, color: '#3b82f6' }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(59,130,246,0.3)' }, { offset: 1, color: 'rgba(59,130,246,0)' }] } }, markArea: { data: markAreaData, silent: true } },
               { name: '净投入', type: 'line', data: totalCost, smooth: true, symbol: 'none', color: '#f59e0b', lineStyle: { width: 1, color: '#f59e0b' } }
             ]
           };
