@@ -65,16 +65,7 @@
         });
       },
       closeAchievement() {
-        window.__store.showAchievementModal = false;
-        // 队列中还有下一个？
-        const achievementQueue = window.__store.achievementQueue || [];
-        if (achievementQueue.length) {
-          setTimeout(() => {
-            window.flushAchievement();
-          }, 400);
-        } else {
-          window.__store.achieving = false;
-        }
+        window.closeAchievement();
       },
     },
     beforeUnmount() {

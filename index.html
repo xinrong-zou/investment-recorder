@@ -351,503 +351,114 @@
 <script src="components/total-chart.js"></script>
 <script src="components/line-chart.js"></script>
 <script src="components/dash-app.js"></script>
+<script src="data-service.js"></script>
+<script src="achievement-system.js"></script>
 <script>
 mountNavBar('#nav-app');
 const SUPABASE_URL='https://spb-cl9n18iof0i9qxjh.supabase.opentrust.net', SUPABASE_ANON_KEY='eyJ0eX...Ukwk';
 const client=window.__supabaseClient||supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 if(!window.__supabaseClient)window.__supabaseClient=client;
 
-// ====== 全局变量 → 从 __store 读取（逐步迁移到 __store） ======
-const S = ()=>window.__store;
-let currentUser=null; Object.defineProperty(window,'currentUser',{get(){return S().currentUser;},set(v){S().currentUser=v;}});
-let accounts=[]; Object.defineProperty(window,'accounts',{get(){return S().accounts;},set(v){S().accounts=v;}});
-let allRecords={}; Object.defineProperty(window,'allRecords',{get(){return S().allRecords;},set(v){S().allRecords=v;}});
-let settings=null; Object.defineProperty(window,'settings',{get(){return S().settings;},set(v){S().settings=v;}});
-let achieved={}; Object.defineProperty(window,'achieved',{get(){return S().achieved;},set(v){S().achieved=v;}});
-let lastReturnSign='negative'; Object.defineProperty(window,'lastReturnSign',{get(){return S().lastReturnSign;},set(v){S().lastReturnSign=v;}});
-let positiveReturnCount=0; Object.defineProperty(window,'positiveReturnCount',{get(){return S().positiveReturnCount;},set(v){S().positiveReturnCount=v;}});
-let privacyMode=false; Object.defineProperty(window,'privacyMode',{get(){return S().privacyMode;},set(v){S().privacyMode=v;}});
-let showHidden=false; Object.defineProperty(window,'showHidden',{get(){return S().showHidden;},set(v){S().showHidden=v;}});
-let chartInstance=null; Object.defineProperty(window,'chartInstance',{get(){return S().chartInstance;},set(v){S().chartInstance=v;}});
-let drawerAccountId=null; Object.defineProperty(window,'drawerAccountId',{get(){return S().drawerAccountId;},set(v){S().drawerAccountId=v;}});
-let drawerChartMode='assets'; Object.defineProperty(window,'drawerChartMode',{get(){return S().drawerChartMode;},set(v){S().drawerChartMode=v;}});
-let csi300Map={}; Object.defineProperty(window,'csi300Map',{get(){return S().csi300Map;},set(v){S().csi300Map=v;}});
-let csi500Map={}; Object.defineProperty(window,'csi500Map',{get(){return S().csi500Map;},set(v){S().csi500Map=v;}});
-let chartRange='all'; Object.defineProperty(window,'chartRange',{get(){return S().chartRange;},set(v){S().chartRange=v;}});
-// 编辑状态
-let editingRecordId=null; Object.defineProperty(window,'editingRecordId',{get(){return S().editingRecordId;},set(v){S().editingRecordId=v;}});
-let editingPairedId=null; Object.defineProperty(window,'editingPairedId',{get(){return S().editingPairedId;},set(v){S().editingPairedId=v;}});
-let recordAccountId=null; Object.defineProperty(window,'recordAccountId',{get(){return S().recordAccountId;},set(v){S().recordAccountId=v;}});
-// 同步状态
-let syncQueueTimer=null; Object.defineProperty(window,'syncQueueTimer',{get(){return S().syncQueueTimer;},set(v){S().syncQueueTimer=v;}});
-window._syncState = null; Object.defineProperty(window,'_syncState',{get(){return S().syncState;},set(v){S().syncState=v;}});
-
-// ====== 工具函数 → calcUtils（逐步迁移） ======
+// ====== 工具函数快捷引用 ======
 window.fmt = window.calcUtils.fmt;
 window.fmtPct = window.calcUtils.fmtPct;
-window.fmtS = function(v){return privacyMode?'******':calcUtils.fmt(v);};
-window.buildSeries = function(){return calcUtils.buildSeries(accounts,allRecords);};
-window.calcMaxDrawdown = function(){return calcUtils.calcMaxDrawdown(accounts,allRecords);};
+window.fmtS = function(v){ return window.__store.privacyMode ? '******' : calcUtils.fmt(v); };
+window.buildSeries = function(){ return calcUtils.buildSeries(window.__store.accounts, window.__store.allRecords); };
+window.calcMaxDrawdown = function(){ return calcUtils.calcMaxDrawdown(window.__store.accounts, window.__store.allRecords); };
 
-// 成就系统
-const ACHIEVEMENTS=[
-  // 按弹窗优先级排列（最优先的排前面）
-  {key:'record_1',    name:'千里之行', msg:'记账的第一笔，通往自由的第一步',                                  icon:'🏆', check:(v,t,r,a)=>r>=1},
-  {key:'account_3',   name:'三足鼎立', msg:'三个账户，三分天下，从容布局',                                      icon:'🏛️', check:(v,t,r,a)=>a>=3},
-  {key:'asset_10k',   name:'一勺之始', msg:'「万」事开头难，你已跨出第一步',                                     icon:'💰', check:(v,t,r,a)=>v>=10000},
-  {key:'asset_100k',  name:'六位征途', msg:'六位数，是底气也是新的起点',                                        icon:'💰', check:(v,t,r,a)=>v>=100000},
-  {key:'asset_500k',  name:'半壁江山', msg:'半百之数，已胜过九成路人',                                          icon:'💰', check:(v,t,r,a)=>v>=500000},
-  {key:'profit_1k',   name:'小试牛刀', msg:'赚到第一笔四位数利润，未来可期',                                     icon:'🎯', check:(v,t,r,a)=>t>=1000},
-  {key:'asset_1m',    name:'七位人生', msg:'百万不是终点，是自由的门票',                                        icon:'💰', check:(v,t,r,a)=>v>=1000000},
-  {key:'profit_10k',  name:'颇有斩获', msg:'万元利润，已超越多数散户',                                           icon:'🎯', check:(v,t,r,a)=>t>=10000},
-  {key:'asset_5m',    name:'积土成山', msg:'五百万，时间的朋友你当定了',                                        icon:'💰', check:(v,t,r,a)=>v>=5000000},
-  {key:'profit_100k', name:'盆满钵满', msg:'六位数盈利，这是实力的证明',                                        icon:'🎯', check:(v,t,r,a)=>t>=100000},
-  {key:'asset_10m',   name:'八荒之外', msg:'千万级玩家，请收下我的膝盖',                                        icon:'💰', check:(v,t,r,a)=>v>=10000000},
-  {key:'profit_1m',   name:'富甲一方', msg:'百万利润，你已经财务自由',                                           icon:'🎯', check:(v,t,r,a)=>t>=1000000},
-  {key:'profit_10m',  name:'点石成金', msg:'千万盈利——点石成金，莫过于此',                                       icon:'🎯', check:(v,t,r,a)=>t>=10000000},
-  {key:'record_100',  name:'百炼成钢', msg:'100 笔记录，你已是资深投资者',                                      icon:'🏆', check:(v,t,r,a)=>r>=100},
-  {key:'export_1',    name:'有备无患', msg:'导出备份，数据多一份安心',                                          icon:'💾', check:()=>false},
-  {key:'share_1',     name:'立此存照', msg:'截图留念，为努力的自己存一份见证',                                   icon:'📸', check:()=>false},
-  {key:'hide_1',      name:'藏之名山', msg:'藏之名山，传之其人——把秘密留给时间',                                 icon:'🗃️', check:()=>false},
-];
-// 内存缓存
-const queryCache={};
-function cachedQuery(key,fn){
-  if(queryCache[key]!==undefined)return Promise.resolve(queryCache[key]);
-  return fn().then(r=>{queryCache[key]=r;return r;});
-}
-function clearCache(){for(const k in queryCache)delete queryCache[k];}
-
-// ====== 乐观写入同步队列系统 ======
-const SYNC_QUEUE_KEY = 'hermes_sync_queue_v1';
-
-function getSyncQueue() {
-  try { return JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]'); } catch(e) { return []; }
-}
-function saveSyncQueue(q) { localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(q)); }
-
-// 唯一ID生成（避免与服务器UUID冲突）
-let _tempIdCounter = Date.now();
-function genTempId() { return '_temp_' + (++_tempIdCounter); }
-function isTempId(id) { return typeof id === 'string' && id.startsWith('_temp_'); }
-
-function enqueueOp(type, payload) {
-  const queue = getSyncQueue();
-  const op = {
-    syncId: genTempId() + '_op',
-    type: type,        // 'create_record' | 'update_record' | 'delete_record' | 'create_account' | 'delete_account' | 'update_account'
-    payload: payload,
-    status: 'pending',
-    createdAt: Date.now(),
-    retryCount: 0,
-    lastError: null,
-  };
-  queue.push(op);
-  saveSyncQueue(queue);
-  updateSyncUI();
-  // 立即尝试消费
-  if (!syncQueueTimer) syncQueueTimer = setTimeout(consumeSyncQueue, 100);
-  return op;
-}
-
-function removeSyncOp(syncId) {
-  const q = getSyncQueue().filter(o => o.syncId !== syncId);
-  saveSyncQueue(q);
-  updateSyncUI();
-}
-
-function updateSyncUI() {
-  const q = getSyncQueue();
-  const pending = q.filter(o => o.status !== 'done').length;
-  const failed = q.some(o => o.status === 'failed');
-  window._syncState.pendingCount = pending;
-  window._syncState.lastError = failed ? 'failed' : null;
-}
-
-async function consumeSyncQueue() {
-  syncQueueTimer = null;
-  let q = getSyncQueue();
-  // 清理已完成条目和无效条目（NaN ID等）
-  let changed = false;
-  q = q.filter(o => {
-    if (o.status === 'done') { changed = true; return false; }
-    if (o.type === 'delete_record' || o.type === 'update_record') {
-      const rid = o.payload?.recordId;
-      if (rid === null || rid === undefined || rid === 'NaN' || rid === '' || (typeof rid === 'number' && isNaN(rid))) {
-        changed = true; return false;
-      }
-    }
-    return true;
-  });
-  if (changed) saveSyncQueue(q);
-  const pending = q.filter(o => o.status === 'pending' || o.status === 'failed');
-  if (pending.length === 0) { updateSyncUI(); return; }
-  
-  // 逐条消费（串行保证顺序）
-  for (const op of pending) {
-    if (op.status === 'done') continue;
-    op.status = 'syncing';
-    saveSyncQueue(q);
-    updateSyncUI();
-    try {
-      await executeSyncOp(op);
-      op.status = 'done';
-      op.lastError = null;
-      window._syncState.lastSyncTime = Date.now();
-      saveSyncQueue(q);
-      updateSyncUI();
-    } catch(e) {
-      op.status = 'failed';
-      op.retryCount++;
-      op.lastError = e.message;
-      saveSyncQueue(q);
-      updateSyncUI();
-      // 如果是冲突，立即停止队列，等待用户处理
-      if (e.message.startsWith('CONFLICT:')) {
-        showSyncConflict(e.message.replace('CONFLICT:', ''), op);
-        return;
-      }
-      // 指数退避重试
-      const delay = Math.min(5000 * Math.pow(2, op.retryCount - 1), 60000);
-      syncQueueTimer = setTimeout(consumeSyncQueue, delay);
-      return;
-    }
-  }
-  // 全部完成，清理已完成的条目
-  const done = q.filter(o => o.status === 'done');
-  done.forEach(o => removeSyncOp(o.syncId));
-}
-
-async function executeSyncOp(op) {
-  const p = op.payload;
-  
-  if (op.type === 'create_record') {
-    const { data, error } = await client.from('investment_records').insert(p.record).select('id,account_id,record_date,action_type,amount,note,paired_id,updated_at').single();
-    if (error) throw new Error(error.message);
-    if (!data) throw new Error('插入返回空');
-    data.amount = data.amount / 100;
-    // 如果有配对记录，插入并关联
-    if (p.pairedRecord) {
-      const { data: d2, error: e2 } = await client.from('investment_records').insert({...p.pairedRecord, paired_id: data.id}).select('id,account_id,record_date,action_type,amount,note,paired_id,updated_at').single();
-      if (e2) throw new Error(e2.message);
-      d2.amount = d2.amount / 100;
-      await client.from('investment_records').update({paired_id: d2.id}).eq('id', data.id);
-      data.paired_id = d2.id;
-      // 更新本地配对记录（替换temp ID）
-      if (p.pairedLocalAcct && (allRecords[p.pairedLocalAcct]||[]).length > 0) {
-        const pairIdx = (allRecords[p.pairedLocalAcct]||[]).findIndex(r => isTempId(r.id));
-        if (pairIdx >= 0) {
-          Object.assign(allRecords[p.pairedLocalAcct][pairIdx], d2);
-        }
-      }
-    }
-    // 更新本地主记录（替换temp ID）
-    if (p.localAcct && (allRecords[p.localAcct]||[]).length > 0) {
-      const idx = (allRecords[p.localAcct]||[]).findIndex(r => isTempId(r.id));
-      if (idx >= 0) {
-        Object.assign(allRecords[p.localAcct][idx], data);
-      }
-    }
-    return data;
-  }
-  
-  if (op.type === 'update_record') {
-    const { error, count } = await client.from('investment_records')
-      .update(p.updates)
-      .eq('id', p.recordId)
-      .eq('updated_at', p.version);
-    if (error) throw new Error(error.message);
-    if (count === 0) throw new Error('CONFLICT:' + p.recordId);
-    // 同步更新配对记录
-    if (p.pairedId) {
-      const e = await client.from('investment_records').update(p.pairedUpdates || p.updates).eq('id', p.pairedId);
-      if (e.error) console.warn('配对记录同步失败:', e.error.message);
-    }
-  }
-  
-  if (op.type === 'delete_record') {
-    if (p.pairedId) {
-      await client.from('investment_records').delete().eq('id', p.pairedId);
-    }
-    const { error, count } = await client.from('investment_records')
-      .delete()
-      .eq('id', p.recordId);
-    if (error) throw new Error(error.message);
-    if (count === 0) throw new Error('CONFLICT:' + p.recordId);
-  }
-  
-  if (op.type === 'create_account') {
-    const { data, error } = await client.from('investment_accounts').insert(p.account).select().single();
-    if (error) throw new Error(error.message);
-    // 替换本地temp account数据
-    const localIdx = accounts.findIndex(a => isTempId(a.id));
-    if (localIdx >= 0) {
-      Object.assign(accounts[localIdx], data);
-    }
-  }
-  
-  if (op.type === 'delete_account') {
-    await client.from('investment_records').delete().eq('account_id', p.accountId);
-    const { error } = await client.from('investment_accounts').delete().eq('id', p.accountId);
-    if (error) throw new Error(error.message);
-  }
-  
-  if (op.type === 'update_account') {
-    const { error } = await client.from('investment_accounts').update(p.updates).eq('id', p.accountId);
-    if (error) throw new Error(error.message);
-  }
-}
-
-function showSyncConflict(recordId, op) {
-  // 弹窗告知用户冲突
-  const msg = '检测到数据冲突：其他设备可能已修改了此记录。\n\n点击「同步」将重新拉取最新数据覆盖本地。';
-  if (confirm(msg + '\n\n确定同步？')) {
-    // 用户选择覆盖 → 全量拉取
-    op.status = 'done';
-    saveSyncQueue(getSyncQueue());
-    loadData();
-    toast('已同步服务器数据','success');
-  } else {
-    // 保留本地，稍后重试
-    op.status = 'failed';
-    saveSyncQueue(getSyncQueue());
-    toast('已保留本地修改，稍后重试','warning');
-  }
-}
-
-// 主动触发全量同步
-window.forceSync = function() {
-  const q = getSyncQueue();
-  const pending = q.filter(o => o.status !== 'done');
-  if (pending.length === 0) {
-    // 无待同步→重新拉取全量
-    loadData();
-    toast('已刷新数据','success');
-    return;
-  }
-  if (!syncQueueTimer) consumeSyncQueue();
-};
-
-// 联网状态监听
-window.addEventListener('online', () => { updateSyncUI(); consumeSyncQueue(); });
-window.addEventListener('offline', () => {
-  window._syncState.status = 'offline';
-});
-document.addEventListener('visibilitychange', () => { if (!document.hidden) consumeSyncQueue(); });
-
-// 退出登录时清空用户数据（保留指数缓存和主题设置）
-const USER_CLEAR_KEYS = ['hermes_sync_queue_v1', 'privacy_mode'];
-client.auth.onAuthStateChange((event) => {
-  if (event === 'SIGNED_OUT') {
-    USER_CLEAR_KEYS.forEach(k => { try{localStorage.removeItem(k);}catch(e){} });
-    // 清空内存数据
-    currentUser=null; accounts=[]; allRecords={}; settings=null;
-    window._syncState = { status: 'synced', lastSyncTime: null, pendingCount: 0, lastError: null };
-    for(const k in queryCache) delete queryCache[k];
-  }
-});
-
+// ====== DOM 快捷操作 ======
 const $=id=>document.getElementById(id);
 function openModal(id){$(id).classList.add('open');}
 function closeModal(id){$(id).classList.remove('open');}
 document.querySelectorAll('.modal-overlay').forEach(el=>{el.addEventListener('mousedown',e=>{if(e.target===el)el.classList.remove('open');});});
 
-// ====== 指数数据持久化
-const INDEX_CACHE_KEY = 'hermes_index_cache_v1';
-function loadIndexCache(){
-  try{const d=localStorage.getItem(INDEX_CACHE_KEY);return d?JSON.parse(d):{};}catch(e){return {};}
-}
-function saveIndexCache(cache){
-  try{localStorage.setItem(INDEX_CACHE_KEY,JSON.stringify(cache));}catch(e){}
-}
-// 计算缓存中最晚日期
-function cacheLatestDate(map){
-  let latest='';
-  for(const d of Object.keys(map))if(d>latest)latest=d;
-  return latest;
-}
-// 获取指数数据：优先用缓存，后台检查是否需要更新
-async function fetchIndexData(code){
-  const today=new Date();
-  const todayStr=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
-  const cache=loadIndexCache();
-  const cached=cache[code]||{};
-  const latest=cacheLatestDate(cached);
-  // 如果有缓存且最近日期在昨天及以内，直接返回
-  if(latest&&latest>=formatDateOffset(-1)){
-    return cached;
-  }
-  // 缓存过期→从API拉取
-  try{
-    const apiBase=window.__API_BASE||'';
-    const r=await fetch(apiBase+'/api/index-data?code='+code,{cache:'no-store'});
-    if(!r.ok) return cached;
-    const d=await r.json();
-    const fresh=d.data||{};
-    // 合并：新数据覆盖旧数据
-    const merged={...cached};
-    for(const k of Object.keys(fresh))merged[k]=fresh[k];
-    cache[code]=merged;
-    saveIndexCache(cache);
-    return merged;
-  }catch(e){return cached;}
-}
-function formatDateOffset(days){
-  const d=new Date();d.setDate(d.getDate()+days);
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-}
+// ====== 主页渲染 ======
 async function loadData(){
   const{data:{session}}=await client.auth.getSession();
   if(!session){$('loginPrompt').style.display='block';$('dashContent').style.display='none';return;}
-  currentUser=session.user;$('loginPrompt').style.display='none';$('dashContent').style.display='block';$('dashSkeleton').style.display='block';
-  const{data:s}=await cachedQuery('settings_'+currentUser.id,()=>client.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle());settings=s;
-  // 解析成就数据
-  achieved=settings?.achieved||{};lastReturnSign=settings?.last_return_sign||'negative';positiveReturnCount=settings?.positive_return_count||0;
-  const{data:accts}=await cachedQuery('accts_'+currentUser.id,()=>client.from('investment_accounts').select('*').eq('user_id',currentUser.id).order('created_at'));accounts=accts||[];
-  const hasCash=accounts.some(a=>a.account_type==='cash');
+  const store = window.__store;
+  store.currentUser=session.user;
+  $('loginPrompt').style.display='none';$('dashContent').style.display='block';$('dashSkeleton').style.display='block';
+  const{data:s}=await window.cachedQuery('settings_'+store.currentUser.id,()=>client.from('user_settings').select('*').eq('user_id',store.currentUser.id).maybeSingle());
+  store.settings=s;
+  store.achieved=s?.achieved||{};
+  store.lastReturnSign=s?.last_return_sign||'negative';
+  store.positiveReturnCount=s?.positive_return_count||0;
+  const{data:accts}=await window.cachedQuery('accts_'+store.currentUser.id,()=>client.from('investment_accounts').select('*').eq('user_id',store.currentUser.id).order('created_at'));
+  store.accounts=accts||[];
+  const hasCash=store.accounts.some(a=>a.account_type==='cash');
   if(!hasCash){
-    const{data:newAcct}=await client.from('investment_accounts').insert({user_id:currentUser.id,name:'现金账户',account_type:'cash'}).select().single();
-    if(newAcct){accounts.push(newAcct);await client.from('user_settings').upsert({user_id:currentUser.id,default_cash_account_id:newAcct.id},{onConflict:'user_id'});settings={...(settings||{}),default_cash_account_id:newAcct.id};}
+    const{data:newAcct}=await client.from('investment_accounts').insert({user_id:store.currentUser.id,name:'现金账户',account_type:'cash'}).select().single();
+    if(newAcct){store.accounts.push(newAcct);await client.from('user_settings').upsert({user_id:store.currentUser.id,default_cash_account_id:newAcct.id},{onConflict:'user_id'});store.settings={...(store.settings||{}),default_cash_account_id:newAcct.id};}
   }
-  allRecords={};
-  // 并行加载所有账户记录（比串行快N倍）
-  await Promise.all(accounts.map(async a=>{
-    const{data:recs}=await cachedQuery('recs_'+a.id,()=>client.from('investment_records').select('id,account_id,record_date,action_type,amount,note,paired_id,updated_at').eq('account_id',a.id).order('record_date',{ascending:true}).order('id',{ascending:true}));
+  store.allRecords={};
+  await Promise.all(store.accounts.map(async a=>{
+    const{data:recs}=await window.cachedQuery('recs_'+a.id,()=>client.from('investment_records').select('id,account_id,record_date,action_type,amount,note,paired_id,updated_at').eq('account_id',a.id).order('record_date',{ascending:true}).order('id',{ascending:true}));
     (recs||[]).forEach(r=>{r.amount=r.amount/100;});
-    allRecords[a.id]=recs||[];
+    store.allRecords[a.id]=recs||[];
   }));
   // 先加载缓存的指数数据（立即渲染，不等待网络）
-  const cache=loadIndexCache();
-  window.__store.csi300Map = cache.hs300 || {};
-  window.__store.csi500Map = cache.zz500 || {};
-  // 不阻塞渲染，后台刷新指数数据
-  const indexPromise = Promise.all([fetchIndexData('hs300'), fetchIndexData('zz500')]);
+  const cache=window.loadIndexCache();
+  store.csi300Map=cache.hs300||{};
+  store.csi500Map=cache.zz500||{};
+  const indexPromise=Promise.all([window.fetchIndexData('hs300'),window.fetchIndexData('zz500')]);
   render();
-  // 指数数据到齐后，刷新图表加上对比线（缓存数据已有则图表更准确）
-  const [hs300, zz500] = await indexPromise;
-  if(Object.keys(hs300).length) window.__store.csi300Map = hs300;
-  if(Object.keys(zz500).length) window.__store.csi500Map = zz500;
-  // 初始化同步状态
-  window._syncState.lastSyncTime = Date.now();
-  updateSyncUI();
-  consumeSyncQueue();
-  console.log('[loadData] complete, accounts:', accounts.length, 'records:', Object.keys(allRecords).length);
+  const [hs300,zz500]=await indexPromise;
+  if(Object.keys(hs300).length) store.csi300Map=hs300;
+  if(Object.keys(zz500).length) store.csi500Map=zz500;
+  store.syncState.lastSyncTime=Date.now();
+  window.consumeSyncQueue();
+  console.log('[loadData] complete');
 }
 
 function render(){
-  // 鼓励语
+  const store=window.__store;
   $('dashSkeleton').style.display='none';
-  // 汇总用全部账户（含隐藏）
   let totalVal=0,totalCost=0;
-  accounts.forEach(a=>{const c=calcAccount(a,allRecords[a.id]||[]);totalVal+=c.currentValue;totalCost+=c.costBasis;});
-
+  store.accounts.forEach(a=>{const c=calcAccount(a,store.allRecords[a.id]||[]);totalVal+=c.currentValue;totalCost+=c.costBasis;});
   const totalRet=totalVal-totalCost,totalRetPct=totalCost>0?(totalRet/totalCost)*100:0;
   const totalNavVal=totalCost>0?(totalVal/totalCost):1;
-  const {maxDd,ddStart,ddEnd}=calcMaxDrawdown();
-  // 写入 __store 供 Vue 组件读取
-  window.__store.accounts = accounts;
-  window.__store.allRecords = allRecords;
-  window.__store.showHidden = showHidden;
-  window.__store.privacyMode = privacyMode;
-  window.__store.totalVal = totalVal;
-  window.__store.totalCost = totalCost;
-  window.__store.totalRet = totalRet;
-  window.__store.totalRetPct = totalRetPct;
-  window.__store.totalNavVal = totalNavVal;
-  window.__store.maxDd = maxDd;
-  window.__store.ddStart = ddStart;
-  window.__store.ddEnd = ddEnd;
-  // 汇总 XIRR
+  const {maxDd,ddStart,ddEnd}=window.calcMaxDrawdown();
+  store.totalVal=totalVal; store.totalCost=totalCost; store.totalRet=totalRet;
+  store.totalRetPct=totalRetPct; store.totalNavVal=totalNavVal;
+  store.maxDd=maxDd; store.ddStart=ddStart; store.ddEnd=ddEnd;
   const allFlows=[];
-  accounts.forEach(a=>{(allRecords[a.id]||[]).forEach(r=>{allFlows.push(r);});});
-  const totalXirr=calcXIRR(allFlows,'investment', totalVal);
-  window.__store.totalXirr = totalXirr;
-  const hasHidden=accounts.some(a=>a.hidden);$('showHiddenToggle').style.display=hasHidden?'':'none';
-  // 成就检查
-  checkAchievements(totalVal,totalRet);
-}
-
-// ====== 成就系统 ======
-let achievementQueue=[],achieving=false;
-function checkAchievements(totalVal,totalRet){
-  if(!currentUser)return;
-  const today=new Date().toISOString().substring(0,10);
-  // 通用数据
-  let totalRecs=0;
-  for(const aid of Object.keys(allRecords))totalRecs+=(allRecords[aid]||[]).length;
-  const acctCount=accounts.length;
-  // 按优先级依次检查每个成就
-  for(const a of ACHIEVEMENTS){
-    if(!achieved[a.key]&&a.check(totalVal,totalRet,totalRecs,acctCount)){achieved[a.key]=today;achievementQueue.push(a);}
-  }
-  // 翻红检测（特殊逻辑：每次翻红都庆祝）
-  if(lastReturnSign==='negative'&&totalRet>0){
-    positiveReturnCount++;lastReturnSign='positive';
-    achievementQueue.push({key:'positive_return',name:'拨云见日',msg:'第'+positiveReturnCount+'次翻红——守得云开见月明',icon:'🌅'});
-  }else{lastReturnSign=totalRet>0?'positive':'negative';}
-  // 赞助支持检测（异步查询）
-  if(!achieved['sponsor_1']){
-    cachedQuery('plan_'+currentUser.id,()=>client.from('subscriptions').select('plan').eq('user_id',currentUser.id).maybeSingle()).then(d=>{
-      if(d&&d.data&&d.data.plan==='pro'&&!achieved['sponsor_1']){achieved['sponsor_1']=today;achievementQueue.push({key:'sponsor_1',name:'雪中送炭',msg:'感恩你的支持，让这个工具变得更好',icon:'❤️'});saveAchievements();if(!achieving)flushAchievement();}
-    }).catch(()=>{});
-  }
-  if(achievementQueue.length&&!achieving)flushAchievement();
-}
-function flushAchievement(){
-  if(!achievementQueue.length){achieving=false;return;}
-  achieving=true;
-  displayAchievement(achievementQueue.shift());
-}
-function displayAchievement(a){
-  window.__store.currentAchievement={icon:a.icon||'🏆',name:a.name,msg:a.msg};
-  window.__store.showAchievementModal=true;
-}
-function closeAchievement(){
-  window.__store.showAchievementModal=false;
-  if(achievementQueue.length){setTimeout(flushAchievement,400);}else{achieving=false;}
-}
-function shareAchievement(){
-  if(achieved['share_1'])return;
-  achieved['share_1']=new Date().toISOString().substring(0,10);saveAchievements();
-  if(achieving){achievementQueue.push({key:'share_1',name:'立此存照',msg:'截图留念，为努力的自己存一份见证',icon:'📸'});}
-  else{achieving=true;displayAchievement({key:'share_1',name:'立此存照',msg:'截图留念，为努力的自己存一份见证',icon:'📸'});}
-}
-function hideAchievement(){
-  if(achieved['hide_1'])return;
-  achieved['hide_1']=new Date().toISOString().substring(0,10);saveAchievements();
-  if(achieving){achievementQueue.push({key:'hide_1',name:'藏之名山',msg:'藏之名山，传之其人——把秘密留给时间',icon:'🗃️'});}
-  else{achieving=true;displayAchievement({key:'hide_1',name:'藏之名山',msg:'藏之名山，传之其人——把秘密留给时间',icon:'🗃️'});}
-}
-async function saveAchievements(){
-  try{await client.from('user_settings').upsert({user_id:currentUser.id,achieved,last_return_sign:lastReturnSign,positive_return_count:positiveReturnCount},{onConflict:'user_id'});}catch(e){}
+  store.accounts.forEach(a=>{(store.allRecords[a.id]||[]).forEach(r=>{allFlows.push(r);});});
+  store.totalXirr=calcXIRR(allFlows,'investment', totalVal);
+  const hasHidden=store.accounts.some(a=>a.hidden);$('showHiddenToggle').style.display=hasHidden?'':'none';
+  window.checkAchievements(totalVal,totalRet);
 }
 
 // ====== 账户操作 ======
-function togglePrivacy(){privacyMode=!privacyMode;render();}
-function toggleHidden(){showHidden=$('showHiddenCheck').checked;render();}
+function togglePrivacy(){window.__store.privacyMode=!window.__store.privacyMode;render();}
+function toggleHidden(){window.__store.showHidden=$('showHiddenCheck').checked;render();}
 async function hideAccount(id){
-  const a=accounts.find(x=>x.id===id);
+  const s=window.__store;
+  const a=s.accounts.find(x=>x.id===id);
   if(a)a.hidden=true;
-  enqueueOp('update_account',{accountId:id,updates:{hidden:true}});
-  toast('已隐藏','success');hideAchievement();render();
+  window.enqueueOp('update_account',{accountId:id,updates:{hidden:true}});
+  window.toast('已隐藏','success');window.hideAchievement();render();
 }
 async function unhideAccount(id){
-  const a=accounts.find(x=>x.id===id);
+  const s=window.__store;
+  const a=s.accounts.find(x=>x.id===id);
   if(a)a.hidden=false;
-  enqueueOp('update_account',{accountId:id,updates:{hidden:false}});
-  toast('已取消隐藏','success');render();
+  window.enqueueOp('update_account',{accountId:id,updates:{hidden:false}});
+  window.toast('已取消隐藏','success');render();
 }
 function openAddAccount(){$('accountModalTitle').textContent='新建账户';$('saveAccountBtn').textContent='创建';$('accountName').value='';$('accountType').value='investment';openModal('accountModal');}
 async function getUserPlan(){
+  const store=window.__store;
   try{
-    const{data}=await cachedQuery('plan_'+currentUser.id,()=>client.from('subscriptions').select('plan,expires_at').eq('user_id',currentUser.id).maybeSingle());
+    const{data}=await window.cachedQuery('plan_'+store.currentUser.id,()=>client.from('subscriptions').select('plan,expires_at').eq('user_id',store.currentUser.id).maybeSingle());
     if(!data||data.plan!=='pro')return'free';
     if(!data.expires_at)return'pro';
     return new Date(data.expires_at)>new Date()?'pro':'free';
   }catch(e){return 'free';}
 }
 function isFrozenAccount(accountId){
-  const sorted=[...accounts].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+  const store=window.__store;
+  const sorted=[...store.accounts].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
   let cashCount=0,investCount=0;
   for(const a of sorted){
     if(a.account_type==='cash')cashCount++;
@@ -860,21 +471,22 @@ function isFrozenAccount(accountId){
   return false;
 }
 async function saveAccount(){
-  const name=$('accountName').value.trim();if(!name){toast('请输入账户名称','error');return;}
+  const store=window.__store;
+  const name=$('accountName').value.trim();if(!name){window.toast('请输入账户名称','error');return;}
   const type=$('accountType').value;
   const plan=await getUserPlan();
   if(plan!=='pro'){
-    const cashCount=accounts.filter(a=>a.account_type==='cash').length;
-    const investCount=accounts.filter(a=>a.account_type==='investment').length;
-    if(type==='cash'&&cashCount>=1){toast('免费用户只能拥有1个现金账户','error');return;}
-    if(type==='investment'&&investCount>=5){toast('免费用户最多5个投资账户，赞助后可解锁无限','error');return;}
+    const cashCount=store.accounts.filter(a=>a.account_type==='cash').length;
+    const investCount=store.accounts.filter(a=>a.account_type==='investment').length;
+    if(type==='cash'&&cashCount>=1){window.toast('免费用户只能拥有1个现金账户','error');return;}
+    if(type==='investment'&&investCount>=5){window.toast('免费用户最多5个投资账户，赞助后可解锁无限','error');return;}
   }
-  const tempId=genTempId();
-  const tempAcct={id:tempId,name,account_type:type,user_id:currentUser.id,hidden:false,created_at:new Date().toISOString()};
-  accounts.push(tempAcct);
-  allRecords[tempId]=[];
-  enqueueOp('create_account',{account:{user_id:currentUser.id,name,account_type:type}});
-  closeModal('accountModal');toast('账户已创建（同步中）','success');render();
+  const tempId=window.genTempId();
+  const tempAcct={id:tempId,name,account_type:type,user_id:store.currentUser.id,hidden:false,created_at:new Date().toISOString()};
+  store.accounts.push(tempAcct);
+  store.allRecords[tempId]=[];
+  window.enqueueOp('create_account',{account:{user_id:store.currentUser.id,name,account_type:type}});
+  closeModal('accountModal');window.toast('账户已创建（同步中）','success');render();
 }
 function openRecord(accountId,type){
   window.__store.recordTargetId=accountId;
@@ -887,25 +499,23 @@ function showRecords(accountId){
 }
 function drawerAction(type){
   const id=window.__store.drawerAccountId;
-  if(!id){toast('请先选择账户','error');return;}
+  if(!id){window.toast('请先选择账户','error');return;}
   openRecord(id,type);
 }
 function editRecord(id,accountId,actionType,amount,date,note){
   window.__store.editRecordId=id+"|"+accountId+"|"+actionType+"|"+amount+"|"+date+"|"+(note||"");
   window.__store.showEditModal=true;
 }
-// ====== ECharts 图表 ======
-// 切换主页图表模式
+
 // ====== 导出 Excel ======
 function exportData(){
-  if(!accounts.length){toast('没有数据可导出','error');return;}
+  const store=window.__store;
+  if(!store.accounts.length){window.toast('没有数据可导出','error');return;}
   try{
     const rows=[];
-    // 表头
     const header=['账户名称','账户类型','日期','操作类型','金额','备注'];
-    // 数据行
-    accounts.forEach(a=>{
-      const recs=allRecords[a.id]||[];
+    store.accounts.forEach(a=>{
+      const recs=store.allRecords[a.id]||[];
       if(recs.length===0){
         rows.push({账户名称:a.name,账户类型:a.account_type==='cash'?'现金':'投资',日期:'',操作类型:'',金额:'',备注:''});
       }else{
@@ -929,55 +539,49 @@ function exportData(){
     const now=new Date();
     const fn='收益记录_'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'.xlsx';
     XLSX.writeFile(wb,fn);
-    toast('已导出 '+fn,'success');
+    window.toast('已导出 '+fn,'success');
     // 有备无患成就
-    if(!achieved['export_1']){achieved['export_1']=new Date().toISOString().substring(0,10);saveAchievements();if(achieving){achievementQueue.push({key:'export_1',name:'有备无患',msg:'导出备份，数据多一份安心',icon:'💾'});}else{achieving=true;displayAchievement({key:'export_1',name:'有备无患',msg:'导出备份，数据多一份安心',icon:'💾'});}}
-  }catch(e){toast('导出失败: '+e.message,'error');}
+    if(!store.achieved['export_1']){window.triggerAchievement('export_1','有备无患','导出备份，数据多一份安心','💾');}
+  }catch(e){window.toast('导出失败: '+e.message,'error');}
 }
 // ====== 分享快照图 ======
 function shareSnapshot(){
+  const store=window.__store;
   const c=document.createElement('canvas');const W=540,H=960;c.width=W;c.height=H;
   const ctx=c.getContext('2d');
   const R=(x,y,w,h,r)=>{ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();};
-  // 计算数据
-  let tv=0,tc=0;accounts.forEach(a=>{const c2=calcAccount(a,allRecords[a.id]||[]);tv+=c2.currentValue;tc+=c2.costBasis;});
+  let tv=0,tc=0;store.accounts.forEach(a=>{const c2=calcAccount(a,store.allRecords[a.id]||[]);tv+=c2.currentValue;tc+=c2.costBasis;});
   const tr=tv-tc,trPct=tc>0?(tr/tc)*100:0,nav=tc>0?tv/tc:1;
-  const allF=[];accounts.forEach(a=>{(allRecords[a.id]||[]).forEach(r=>allF.push(r));});
+  const allF=[];store.accounts.forEach(a=>{(store.allRecords[a.id]||[]).forEach(r=>allF.push(r));});
   const xirr=calcXIRR(allF,'investment',tv);
   const today=new Date();const ds=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
-  const fmtN=v=>privacyMode?'******':'¥'+Number(v).toLocaleString('zh-CN',{minimumFractionDigits:2});
+  const fmtN=v=>store.privacyMode?'******':'¥'+Number(v).toLocaleString('zh-CN',{minimumFractionDigits:2});
   const clr=n=>n>=0?'#dc2626':'#2563eb';
-  const visible=accounts.filter(a=>showHidden||!a.hidden);
-  // ===== 背景 =====
+  const visible=store.accounts.filter(a=>store.showHidden||!a.hidden);
   const bg=ctx.createLinearGradient(0,0,W,H);bg.addColorStop(0,'#0b1120');bg.addColorStop(0.5,'#111827');bg.addColorStop(1,'#0b1120');
   ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
-  // 顶部光晕
   const glow=ctx.createRadialGradient(W/2,0,0,W/2,0,280);glow.addColorStop(0,'rgba(59,130,246,0.07)');glow.addColorStop(1,'rgba(59,130,246,0)');
   ctx.fillStyle=glow;ctx.fillRect(0,0,W,280);
-  // ===== 顶部品牌区 =====
   ctx.textAlign='center';
   ctx.font='26px sans-serif';ctx.fillText('🕊',W/2,52);
   ctx.fillStyle='rgba(255,255,255,0.85)';ctx.font='bold 18px sans-serif';ctx.fillText('收益账本',W/2,80);
   ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='12px sans-serif';ctx.fillText('个人投资理财 · 数据截至 '+ds,W/2,100);
-  // ===== 总资产卡 =====
   R(24,120,W-48,100,16);ctx.fillStyle='rgba(255,255,255,0.06)';ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,0.08)';ctx.lineWidth=1;ctx.stroke();
   ctx.textAlign='left';
   ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='12px sans-serif';ctx.fillText('总资产',44,148);
   ctx.fillStyle='#ffffff';ctx.font='bold 34px sans-serif';
-  ctx.fillText(privacyMode?'******':fmtN(tv),44,188);
+  ctx.fillText(store.privacyMode?'******':fmtN(tv),44,188);
   ctx.textAlign='right';
   ctx.fillStyle=clr(tr);ctx.font='bold 22px sans-serif';
   ctx.fillText((tr>=0?'+':'')+trPct.toFixed(2)+'%',W-44,148);
   ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='12px sans-serif';ctx.fillText('总收益率',W-44,170);
-  // ===== 三指标行 =====
   const metrics=[
-    {label:'累计收益',val:privacyMode?'******':fmtN(tr),color:clr(tr)},
+    {label:'累计收益',val:store.privacyMode?'******':fmtN(tr),color:clr(tr)},
     {label:'净值',val:nav.toFixed(4),color:'#60a5fa'},
     {label:'年化 XIRR',val:xirr!=null?(xirr>=0?'+':'')+(xirr*100).toFixed(2)+'%':'—',color:xirr!=null?clr(xirr):'rgba(255,255,255,0.4)'},
   ];
   const mY=270;const mW=W/3;
-  // 指标分隔线
   ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=1;
   for(let i=1;i<3;i++){ctx.beginPath();ctx.moveTo(mW*i,242);ctx.lineTo(mW*i,300);ctx.stroke();}
   metrics.forEach((m,i)=>{
@@ -985,15 +589,13 @@ function shareSnapshot(){
     ctx.fillStyle=m.color;ctx.font='bold 20px sans-serif';ctx.fillText(m.val,mW*i+mW/2,mY);
     ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='12px sans-serif';ctx.fillText(m.label,mW*i+mW/2,mY+22);
   });
-  // ===== 净值走势折线（简易 sparkline） =====
-  const series=buildSeries();
+  const series=window.buildSeries();
   if(series&&series.nav.length>=2){
     const sx=44,sy=330,sw=W-88,sh=88;
     R(sx-4,sy-4,sw+8,sh+8,12);ctx.fillStyle='rgba(255,255,255,0.04)';ctx.fill();
     ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='10px sans-serif';ctx.textAlign='left';ctx.fillText('净值走势',sx,sy+14);
     const nMin=Math.min(...series.nav),nMax=Math.max(...series.nav),nRange=nMax-nMin||1;
     const lineY=sy+32,lineH=sh-48;
-    // 面积填充
     ctx.beginPath();ctx.moveTo(sx,lineY+lineH);
     series.nav.forEach((v,i)=>{
       const x=sx+(i/(series.nav.length-1))*sw;
@@ -1001,46 +603,38 @@ function shareSnapshot(){
       i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
     });
     ctx.lineTo(sx+sw,lineY+lineH);ctx.closePath();ctx.fillStyle='rgba(96,165,250,0.08)';ctx.fill();
-    // 折线
     ctx.beginPath();ctx.strokeStyle='rgba(96,165,250,0.7)';ctx.lineWidth=1.5;
     series.nav.forEach((v,i)=>{
       const x=sx+(i/(series.nav.length-1))*sw;
       const y=lineY+lineH-((v-nMin)/nRange)*lineH;
       i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
     });ctx.stroke();
-    // 起止日期标签
     ctx.fillStyle='rgba(255,255,255,0.25)';ctx.font='9px sans-serif';ctx.textAlign='left';
     ctx.fillText(series.dates[0],sx,lineY+lineH+14);
     ctx.textAlign='right';ctx.fillText(series.dates[series.dates.length-1],sx+sw,lineY+lineH+14);
   }
-  // ===== 账户列表 =====
   let aY=450;
   ctx.fillStyle='rgba(255,255,255,0.35)';ctx.font='11px sans-serif';ctx.textAlign='left';ctx.fillText('账户 ('+visible.length+')',44,aY-10);
   visible.forEach((a,i)=>{
     if(aY>790)return;
-    const c2=calcAccount(a,allRecords[a.id]||[]);const r2=c2.totalReturn;
+    const c2=calcAccount(a,store.allRecords[a.id]||[]);const r2=c2.totalReturn;
     const isCash=a.account_type==='cash';
-    // 行背景
     R(36,aY-2,W-72,48,10);ctx.fillStyle='rgba(255,255,255,0.04)';ctx.fill();
-    // 名称 + 类型标签（测量宽度后用固定间距避免重叠）
     ctx.textAlign='left';
     ctx.fillStyle='#ffffff';ctx.font='bold 13px sans-serif';
     const nameW=ctx.measureText(a.name).width;
     ctx.fillText(a.name,52,aY+20);
     ctx.fillStyle=isCash?'rgba(16,185,129,0.5)':'rgba(96,165,250,0.5)';ctx.font='9px sans-serif';
     ctx.fillText(isCash?'现金':'投资',52+Math.min(nameW+10,140),aY+20);
-    // 收益数值
     ctx.textAlign='right';
     ctx.fillStyle=clr(r2);ctx.font='bold 14px sans-serif';ctx.fillText((r2>=0?'+':'')+fmtN(r2),W-48,aY+18);
     ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='10px sans-serif';
-    const mvStr=privacyMode?'******':fmtN(c2.currentValue);
+    const mvStr=store.privacyMode?'******':fmtN(c2.currentValue);
     ctx.fillText('市值 '+mvStr,W-48,aY+36);
     aY+=56;
   });
-  // ===== 底部 =====
   const qrY=aY+20;
   ctx.strokeStyle='rgba(255,255,255,0.08)';ctx.beginPath();ctx.moveTo(40,qrY-4);ctx.lineTo(W-40,qrY-4);ctx.stroke();
-  // 加载二维码
   const img=new Image();img.crossOrigin='anonymous';
   img.onload=function(){
     ctx.drawImage(img,W/2-36,qrY+16,72,72);
@@ -1048,8 +642,8 @@ function shareSnapshot(){
     ctx.fillText('扫码使用收益账本',W/2,qrY+100);
     c.toBlob(blob=>{
       const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='收益账本_'+ds+'.png';a.click();
-      URL.revokeObjectURL(a.href);toast('快照已保存，快去分享吧 🎉','success');
-      shareAchievement();
+      URL.revokeObjectURL(a.href);window.toast('快照已保存，快去分享吧 🎉','success');
+      window.shareAchievement();
     },'image/png');
   };
   img.onerror=function(){
@@ -1057,8 +651,8 @@ function shareSnapshot(){
     ctx.fillText('qyit.eu.org',W/2,qrY+60);
     c.toBlob(blob=>{
       const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='收益账本_'+ds+'.png';a.click();
-      URL.revokeObjectURL(a.href);toast('快照已保存，快去分享吧 🎉','success');
-      shareAchievement();
+      URL.revokeObjectURL(a.href);window.toast('快照已保存，快去分享吧 🎉','success');
+      window.shareAchievement();
     },'image/png');
   };
   img.src='https://api.qrserver.com/v1/create-qr-code/?size=100&data=https://qyit.eu.org';
