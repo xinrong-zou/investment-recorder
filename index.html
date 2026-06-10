@@ -535,14 +535,14 @@ function editRecord(id,accountId,actionType,amount,date,note,invId){
   window.__store.showEditModal=true;
 }
 
-// ====== 家族基金模式 ======
+// ====== 家庭基金模式 ======
 function toggleFundMode(){
   const store=window.__store;
   store.fundMode=!store.fundMode;
   try{localStorage.setItem('hermes_fund_mode',store.fundMode?'1':'0');}catch(e){}
   const panel=$('fundPanel');
   if(store.fundMode){
-    window.triggerAchievement('fund_open','开基立业','基业初成，家族基金从今天起航','🏛️');
+    window.triggerAchievement('fund_open','开基立业','基业初成，家庭基金从今天起航','🏛️');
     const cnt=store.investors.length;
     if(cnt>=5)window.triggerAchievement('inviter_5','八方来财','五方汇聚，财源广进','🌟');
     else if(cnt>=3)window.triggerAchievement('inviter_3','群策群力','三人同心，其利断金','👥');

@@ -1,4 +1,4 @@
-// 收益账本 Service Worker v2 — 家族基金模式
+// 收益账本 Service Worker v2 — 家庭基金模式
 const CACHE_NAME = '收益账本-v2';
 const STATIC_ASSETS = [
   'index.html',

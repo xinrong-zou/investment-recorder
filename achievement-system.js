@@ -27,7 +27,7 @@
     {key:'export_1',    name:'有备无患', msg:'导出备份，数据多一份安心',                                          icon:'💾', check:()=>false},
     {key:'share_1',     name:'立此存照', msg:'截图留念，为努力的自己存一份见证',                                   icon:'📸', check:()=>false},
     {key:'hide_1',      name:'藏之名山', msg:'藏之名山，传之其人——把秘密留给时间',                                 icon:'🗃️', check:()=>false},
-    {key:'fund_open',   name:'开基立业', msg:'基业初成，家族基金从今天起航',                                        icon:'🏛️', check:()=>false},
+    {key:'fund_open',   name:'开基立业', msg:'基业初成，家庭基金从今天起航',                                        icon:'🏛️', check:()=>false},
     {key:'inviter_1',   name:'二人同心', msg:'一个篱笆三个桩，一个好汉三个帮',                                        icon:'🤝', check:()=>false},
     {key:'inviter_3',   name:'群策群力', msg:'三人同心，其利断金',                                                    icon:'👥', check:()=>false},
     {key:'inviter_5',   name:'八方来财', msg:'五方汇聚，财源广进',                                                    icon:'🌟', check:()=>false},
