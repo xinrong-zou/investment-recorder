@@ -24,6 +24,6 @@
     <button class="btn btn-primary" onclick="location.reload()">🔄 重试</button>
   </div>
   <script src="nav-bar.js"></script>
-  <script>mountNavBar('#nav-app');</script>
+  <script>if(typeof mountNavBar==='function')mountNavBar('#nav-app');</script>
 </body>
 </html>
