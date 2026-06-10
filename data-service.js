@@ -356,7 +356,8 @@
     allSorted.sort((a, b) => {
       const d = new Date(a.record_date) - new Date(b.record_date);
       if (d !== 0) return d;
-      const order = { transfer_in: 0, transfer_out: 1, revalue: 2 };
+      // 基金计算：先确定当日收盘市值，再按收盘净值做申购赎回
+      const order = { revalue: 0, transfer_in: 1, transfer_out: 2 };
       return (order[a.action_type] || 0) - (order[b.action_type] || 0);
     });
 
