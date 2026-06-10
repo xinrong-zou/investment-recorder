@@ -570,6 +570,7 @@ async function loadData(){
   // 并行加载所有账户记录（比串行快N倍）
   await Promise.all(accounts.map(async a=>{
     const{data:recs}=await cachedQuery('recs_'+a.id,()=>client.from('investment_records').select('id,account_id,record_date,action_type,amount,note,paired_id').eq('account_id',a.id).order('record_date',{ascending:true}).order('id',{ascending:true}));
+    (recs||[]).forEach(r=>{r.amount=r.amount/100;});
     allRecords[a.id]=recs||[];
   }));
   // CRUD 操作直接本地更新 allRecords，无需重新请求
@@ -1175,7 +1176,8 @@ function onRecordTypeChange(){
   }
 }
 async function saveRecord(){
-  const amount=parseFloat($('recordAmount').value);const type=$('recordType').value;
+  const amtYuan=parseFloat($('recordAmount').value);
+  const amount=Math.round(amtYuan*100);const type=$('recordType').value;
   if(type==='revalue'){if(isNaN(amount)||amount<0){toast('请输入有效市值','error');return;}
   }else{if(!amount||amount<=0){toast('请输入有效金额','error');return;}}
   const date=$('recordDate').value||new Date().toISOString().substring(0,10),note=$('recordNote').value.trim()||'';
@@ -1198,7 +1200,7 @@ async function saveRecord(){
     if(srcId){
       // 检查来源账户在指定日期的余额（仅警告，不阻止）
       const srcCalc=calcAccount(accounts.find(a=>a.id===srcId),(allRecords[srcId]||[]).filter(r=>r.record_date<=date));
-      if(srcCalc.currentValue<amount)toast('警告：来源账户在 '+date+' 余额不足（'+fmt(srcCalc.currentValue)+'），已保存但建议检查','warning');
+      if(srcCalc.currentValue<amtYuan)toast('警告：来源账户在 '+date+' 余额不足（'+fmt(srcCalc.currentValue)+'），已保存但建议检查','warning');
       recs.push({account_id:srcId,action_type:'transfer_out',amount,record_date:date,note:(note||'转至 '+(accounts.find(a=>a.id===recordAccountId)?.name||'其他账户'))});
       recs.push({account_id:recordAccountId,action_type:'transfer_in',amount,record_date:date,note:note||'来自 '+(accounts.find(a=>a.id===srcId)?.name||'其他账户')});
     }else{
@@ -1207,7 +1209,7 @@ async function saveRecord(){
   }else if(type==='transfer_out'){
     // 检查账户在指定日期的余额（仅警告，不阻止）
     const outCalc=calcAccount(accounts.find(a=>a.id===recordAccountId),(allRecords[recordAccountId]||[]).filter(r=>r.record_date<=date));
-    if(outCalc.currentValue<amount)toast('警告：账户在 '+date+' 余额不足（'+fmt(outCalc.currentValue)+'），已保存但建议检查','warning');
+    if(outCalc.currentValue<amtYuan)toast('警告：账户在 '+date+' 余额不足（'+fmt(outCalc.currentValue)+'），已保存但建议检查','warning');
     recs.push({account_id:recordAccountId,action_type:'transfer_out',amount,record_date:date,note:note||'转出'});
     const destId=$('destAccount').value;
     if(destId){recs.push({account_id:destId,action_type:'transfer_in',amount,record_date:date,note:note||'来自 '+(accounts.find(a=>a.id===recordAccountId)?.name||'其他账户')});}
@@ -1480,6 +1482,7 @@ async function editRecord(id,accountId,actionType,amount,date,note){
   // 保存按钮
   $('editSaveBtn').onclick=async function(){
     const amt=parseFloat($('editAmount').value);
+    let amtCents=Math.round(amt*100);
     if(actionType==='revalue'){if(isNaN(amt)||amt<0){toast('请输入有效市值','error');return;}
     }else{if(!amt||amt<=0){toast('请输入有效金额','error');return;}}
     const newDate=$('editDate').value||date;
@@ -1519,12 +1522,12 @@ async function editRecord(id,accountId,actionType,amount,date,note){
       }
     }
 
-    const upd={amount:amt,record_date:newDate,note:$('editNote').value.trim()||''};
+    const upd={amount:amtCents,record_date:newDate,note:$('editNote').value.trim()||''};
     const{error}=await client.from('investment_records').update(upd).eq('id',editingRecordId);
     if(error){toast(error.message,'error');return;}
     // 同步更新配对记录
     if(editingPairedId){
-      const{error:pairErr}=await client.from('investment_records').update({amount:amt,record_date:newDate}).eq('id',editingPairedId);
+      const{error:pairErr}=await client.from('investment_records').update({amount:amtCents,record_date:newDate}).eq('id',editingPairedId);
       if(pairErr)toast('配对记录未能同步更新','error');
     }
     // 本地更新
