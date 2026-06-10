@@ -718,15 +718,15 @@ async function loadData(){
   }));
   // 先加载缓存的指数数据（立即渲染，不等待网络）
   const cache=loadIndexCache();
-  csi300Map=cache.hs300||{};
-  csi500Map=cache.zz500||{};
+  window.__store.csi300Map = cache.hs300 || {};
+  window.__store.csi500Map = cache.zz500 || {};
   // 不阻塞渲染，后台刷新指数数据
   const indexPromise = Promise.all([fetchIndexData('hs300'), fetchIndexData('zz500')]);
   render();
   // 指数数据到齐后，刷新图表加上对比线（缓存数据已有则图表更准确）
   const [hs300, zz500] = await indexPromise;
-  if(Object.keys(hs300).length) csi300Map = hs300;
-  if(Object.keys(zz500).length) csi500Map = zz500;
+  if(Object.keys(hs300).length) window.__store.csi300Map = hs300;
+  if(Object.keys(zz500).length) window.__store.csi500Map = zz500;
   // 初始化同步状态
   window._syncState.lastSyncTime = Date.now();
   updateSyncUI();

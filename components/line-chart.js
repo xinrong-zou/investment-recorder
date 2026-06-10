@@ -58,13 +58,23 @@
       csi500Map() { this.$nextTick(() => this.renderChart()); },
     },
     mounted() {
+      // 直接监听 store 变化（比 computed watcher 更可靠）
+      this._unwatch300 = this.$watch(() => window.__store.csi300Map, () => { this.scheduleRender(); }, { deep: true });
+      this._unwatch500 = this.$watch(() => window.__store.csi500Map, () => { this.scheduleRender(); }, { deep: true });
+      this._unwatchAccounts = this.$watch(() => window.__store.accounts, () => { this.scheduleRender(); }, { deep: true });
+      this._unwatchRecords = this.$watch(() => window.__store.allRecords, () => { this.scheduleRender(); }, { deep: true });
       this.$nextTick(() => this.renderChart());
     },
     beforeUnmount() {
       if (this._chart) { this._chart.dispose(); this._chart = null; }
       if (this._pieChart) { this._pieChart.dispose(); this._pieChart = null; }
+      if (this._unwatch300) this._unwatch300();
+      if (this._unwatch500) this._unwatch500();
+      if (this._unwatchAccounts) this._unwatchAccounts();
+      if (this._unwatchRecords) this._unwatchRecords();
     },
     methods: {
+      scheduleRender() { this.$nextTick(() => this.renderChart()); },
       switchMode(m) {
         this.mode = m;
         this.$nextTick(() => this.renderChart());
@@ -150,15 +160,17 @@
             ]
           };
         } else if (this.mode === 'nav') {
-          // 沪深300归一化
+          // 沪深300归一化（直接从 __store 读取，绕过 computed 追踪）
+          const csi300 = window.__store.csi300Map || {};
+          const csi500 = window.__store.csi500Map || {};
           let lastV = null;
-          const hR = dates.map(d => { const v = this.csi300Map[d]; if (v != null) lastV = v; return v; });
+          const hR = dates.map(d => { const v = csi300[d]; if (v != null) lastV = v; return v; });
           const fg = hR.find(v => v != null);
           const hF = hR.map(v => v != null ? v : (fg || null));
           const base = fg || 1;
           const hN = hF.map(v => v != null ? v / base : null);
           let lastV5 = null;
-          const zR = dates.map(d => { const v = this.csi500Map[d]; if (v != null) lastV5 = v; return v; });
+          const zR = dates.map(d => { const v = csi500[d]; if (v != null) lastV5 = v; return v; });
           const fg5 = zR.find(v => v != null);
           const zF = zR.map(v => v != null ? v : (fg5 || null));
           const base5 = fg5 || 1;
