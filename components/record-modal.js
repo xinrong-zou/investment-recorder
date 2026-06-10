@@ -56,7 +56,8 @@
             💡 更新市值代表当天<strong>最终</strong>市值。如有同一天的转入/转出，请<strong>先录入转入转出</strong>，最后再录入更新市值。
           </div>
           <div v-if="hasRevalueToday" style="margin-top:6px;padding:8px 12px;background:#fef3c7;border-radius:8px;font-size:0.76rem;color:#d97706;line-height:1.5;">
-            ⚠️ 当天已有一条更新市值记录，继续录入将覆盖前面的值。如需修改建议编辑已有记录。
+            <template v-if="recordType==='revalue'">⚠️ 当天已有一条更新市值记录，继续录入将覆盖前面的值。如需修改建议编辑已有记录。</template>
+            <template v-else>💡 当天已有一条更新市值记录。新增的转入/转出会更新成本，当天的最终市值仍以最后一条更新市值记录为准。</template>
           </div>
           
           <div class="form-actions">
@@ -109,12 +110,17 @@
     },
     watch: {
       targetType(val) { this.recordType = val || 'transfer_in'; },
-      visible(val) { if (val) { this.recordType = this.targetType || 'transfer_in'; this.amount = null; this.recordDate = new Date().toISOString().substring(0,10); this.note = ''; this.investorId = ''; 
+      visible(val) { if (val) { this.$nextTick(() => {
+        this.recordType = this.targetType || 'transfer_in';
+        this.amount = null;
+        this.recordDate = new Date().toISOString().substring(0,10);
+        this.note = '';
+        this.investorId = '';
         // 默认选中现金账户
         const cash = this.allAccounts.find(a => a.account_type === 'cash' && a.id !== this.targetId);
         this.srcId = cash ? cash.id : '';
         this.destId = cash ? cash.id : '';
-      } },
+      }); } },
     },
     methods: {
       onOverlayClick(e) { if (e.target === e.currentTarget) this.close(); },
