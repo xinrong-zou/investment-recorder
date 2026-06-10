@@ -38,10 +38,12 @@
             <div class="drawer-range-btns" v-if="hasChart">
               <button v-for="r in ranges" :key="r.key" class="chart-range-btn" :class="{active: drawerRange === r.key}" @click="setRange(r.key)">{{ r.label }}</button>
             </div>
-            <!-- 迷你折线图容器 -->
-            <div ref="chartEl" :style="{height: '140px', marginBottom: '12px', display: hasChart ? 'block' : 'none'}">
-              <div v-if="!hasChart" style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.8rem;">至少2条记录才能显示趋势</div>
+            <!-- 迷你折线图 -->
+            <div v-if="hasChart" style="margin-bottom:12px;">
+              <line-chart ref="chart" scope="single" :records="records" :account-type="acct.account_type" height="140"
+                :range="drawerRange" :filter-start="filterStart" :filter-end="filterEnd"></line-chart>
             </div>
+            <div v-else style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.8rem;">至少2条记录才能显示趋势</div>
             <!-- 筛选 -->
             <div class="drawer-filter">
               <select v-model="filterType" @change="applyFilter">
@@ -136,7 +138,7 @@
       // 图表数据
       hasChart() { return this.records.length >= 2; },
       chartModes() { return [{key:'assets',label:'资产'},{key:'nav',label:'净值'},{key:'return',label:'收益'}]; },
-      ranges() { return [{key:'all',label:'全部'},{key:'thisYear',label:'今年'},{key:'1y',label:'近1年'},{key:'3y',label:'近3年'}]; },
+      ranges() { return [{key:'all',label:'全部'},{key:'thisYear',label:'今年'},{key:'1y',label:'近1年'},{key:'3y',label:'近3年'},{key:'custom',label:'自定义'}]; },
       // 筛选
       filteredRecords() {
         let f = [...this.records].sort((a, b) => {
@@ -159,14 +161,8 @@
             const t = new Date();
             this.filterEnd = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
           }
-          this.$nextTick(() => this.renderChart());
-        } else {
-          // 销毁图表
-          this.disposeChart();
         }
       },
-      drawerRange() { this.$nextTick(() => this.renderChart()); },
-      chartMode() { this.$nextTick(() => this.renderChart()); },
     },
     methods: {
       onOverlayClick(e) { if (e.target === e.currentTarget) this.close(); },
@@ -198,7 +194,6 @@
         return r.action_type === 'transfer_out' ? '-' : '';
       },
       close() {
-        this.disposeChart();
         window.__store.drawerOpen = false;
         if (window.render) window.render();
       },
@@ -209,100 +204,22 @@
         if (window.editRecord) window.editRecord(r.id, r.account_id, r.action_type, r.amount, r.record_date, r.note || '');
       },
       applyFilter() {
-        this.$nextTick(() => this.renderChart());
+        // line-chart watches filterStart/filterEnd automatically
       },
       switchMode(mode) {
         this.chartMode = mode;
+        // 通知 line-chart 切换模式
+        this.$nextTick(() => {
+          if (this.$refs.chart) this.$refs.chart.switchMode(mode);
+        });
       },
       setRange(range) {
         this.drawerRange = range;
         if (range !== 'custom') this.customDateRange = false;
       },
-      renderChart() {
-        const el = this.$refs.chartEl;
-        if (!el || this.records.length < 2) return;
-        // 销毁旧实例
-        if (this._chart) { this._chart.dispose(); }
-        // 构建时间序列
-        const rawRecords = window.calcUtils.sortRecords(this.records);
-        let value = 0, cost = 0;
-        const dates = [], vals = [], costs = [], navs = [], rets = [];
-        const dailyTransfers = {};
-        for (const r of rawRecords) {
-          if (r.action_type === 'transfer_in') { value += Number(r.amount); cost += Number(r.amount); dailyTransfers[r.record_date] = dailyTransfers[r.record_date] || {netIn: 0, netOut: 0}; dailyTransfers[r.record_date].netIn += Number(r.amount); }
-          else if (r.action_type === 'transfer_out') { value -= Number(r.amount); cost -= Number(r.amount); dailyTransfers[r.record_date] = dailyTransfers[r.record_date] || {netIn: 0, netOut: 0}; dailyTransfers[r.record_date].netOut += Number(r.amount); }
-          else if (r.action_type === 'revalue') value = Number(r.amount);
-          const navPlot = this.isInvestment ? (cost > 0 ? value / cost : value) : value;
-          dates.push(r.record_date); vals.push(value); costs.push(cost); navs.push(navPlot); rets.push(value - cost);
-        }
-        // 日期范围截取
-        let startIdx = 0, endIdx = dates.length;
-        if (this.drawerRange === 'thisYear') { const y = new Date().getFullYear(); startIdx = dates.findIndex(d => d >= y + '-01-01'); if (startIdx < 0) startIdx = 0; }
-        else if (this.drawerRange === '1y') { const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear() - 1); const s = cutoff.toISOString().slice(0, 10); startIdx = dates.findIndex(d => d >= s); if (startIdx < 0) startIdx = 0; }
-        else if (this.drawerRange === '3y') { const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear() - 3); const s = cutoff.toISOString().slice(0, 10); startIdx = dates.findIndex(d => d >= s); if (startIdx < 0) startIdx = 0; }
-        if (this.filterStart) { const idx = dates.findIndex(d => d >= this.filterStart); if (idx >= 0) startIdx = Math.max(startIdx, idx); }
-        if (this.filterEnd) { const idx = dates.findIndex(d => d > this.filterEnd); if (idx >= 0) endIdx = Math.min(endIdx, idx); }
-        const slice = (arr) => arr.slice(startIdx, endIdx);
-        const sDates = slice(dates), sVals = slice(vals), sCosts = slice(costs), sNavs = slice(navs), sRets = slice(rets);
-        if (sDates.length < 2) { el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.8rem;">至少2条记录才能显示趋势</div>'; return; }
-        // 标记红蓝数据点
-        const valData = sVals.map((v, i) => {
-          const tf = dailyTransfers[sDates[i]];
-          if (!tf) return v;
-          const net = tf.netIn - tf.netOut;
-          if (Math.abs(net) < 0.005) return v;
-          return { value: v, symbol: 'circle', symbolSize: 4, itemStyle: { color: net > 0 ? '#dc2626' : '#2563eb', borderColor: net > 0 ? '#dc2626' : '#2563eb' } };
-        });
-        // ECharts option
-        const chart = echarts.init(el);
-        this._chart = chart;
-        const mode = this.chartMode;
-        let option;
-        if (mode === 'assets') {
-          option = {
-            tooltip: { z: 800, trigger: 'axis', formatter: function (p) { const idx = p[0].dataIndex; const lines = [sDates[idx], ...p.map(d => d.seriesName + ': ' + (isNaN(d.value) ? '—' : '¥' + Number(d.value).toFixed(2)))]; const tf = dailyTransfers[sDates[idx]]; if (tf) { const net = tf.netIn - tf.netOut; if (Math.abs(net) >= 0.005) lines.push('当日净' + (net > 0 ? '转入: +¥' : '转出: -¥') + Math.abs(net).toLocaleString()); } return lines.join('<br/>'); } },
-            legend: { data: ['余额', '净投入'], icon: 'rect', itemWidth: 12, itemHeight: 2, top: 0, right: 0, textStyle: { fontSize: 8, color: '#94a3b8' } },
-            grid: { left: 42, right: 10, top: 18, bottom: 28 },
-            xAxis: { type: 'category', data: sDates, axisLabel: { fontSize: 9, rotate: 30, color: '#94a3b8', margin: 4 }, axisLine: { show: false }, axisTick: { show: false } },
-            yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' } }, axisLabel: { fontSize: 9, color: '#94a3b8', formatter: v => v >= 10000 ? (v / 10000).toFixed(1) + '万' : v } },
-            series: [
-              { name: '余额', type: 'line', data: valData, smooth: true, showSymbol: true, symbol: 'none', color: '#3b82f6', lineStyle: { width: 1.5, color: '#3b82f6' }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(59,130,246,0.3)' }, { offset: 1, color: 'rgba(59,130,246,0)' }] } } },
-              { name: '净投入', type: 'line', data: sCosts, smooth: true, symbol: 'none', color: '#f59e0b', lineStyle: { width: 1, color: '#f59e0b' } }
-            ]
-          };
-        } else if (mode === 'nav') {
-          option = {
-            tooltip: { z: 800, trigger: 'axis', formatter: function (p) { return [p[0].axisValue, ...p.map(d => d.seriesName + ': ' + (isNaN(d.value) ? '—' : d.value.toFixed(4)))].join('<br/>'); } },
-            legend: { data: ['净值'], icon: 'rect', itemWidth: 12, itemHeight: 2, top: 0, right: 0, textStyle: { fontSize: 8, color: '#94a3b8' } },
-            grid: { left: 42, right: 10, top: 18, bottom: 28 },
-            xAxis: { type: 'category', data: sDates, axisLabel: { fontSize: 9, rotate: 30, color: '#94a3b8', margin: 4 }, axisLine: { show: false }, axisTick: { show: false } },
-            yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' } }, axisLabel: { fontSize: 9, color: '#94a3b8', formatter: v => v.toFixed(4) } },
-            series: [{ name: '净值', type: 'line', data: sNavs, smooth: true, symbol: 'none', color: '#1e293b', lineStyle: { width: 1.5, color: '#1e293b' }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(30,41,59,0.15)' }, { offset: 1, color: 'rgba(30,41,59,0)' }] } } }]
-          };
-        } else {
-          option = {
-            tooltip: { z: 800, trigger: 'axis', formatter: function (p) { const d = p[0]; return d.axisValue + '<br/>累计收益: ' + (isNaN(d.value) ? '—' : '¥' + Number(d.value).toFixed(2)); } },
-            legend: { data: ['累计收益'], icon: 'rect', itemWidth: 12, itemHeight: 2, top: 0, right: 0, textStyle: { fontSize: 8, color: '#94a3b8' } },
-            grid: { left: 42, right: 10, top: 18, bottom: 28 },
-            xAxis: { type: 'category', data: sDates, axisLabel: { fontSize: 9, rotate: 30, color: '#94a3b8', margin: 4 }, axisLine: { show: false }, axisTick: { show: false } },
-            yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' } }, axisLabel: { fontSize: 9, color: '#94a3b8', formatter: v => v >= 10000 ? (v / 10000).toFixed(1) + '万' : v } },
-            series: [{ name: '累计收益', type: 'line', data: sRets, smooth: true, symbol: 'none', color: '#dc2626', lineStyle: { width: 1.5, color: '#dc2626' }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(220,38,38,0.3)' }, { offset: 1, color: 'rgba(220,38,38,0)' }] } } }]
-          };
-        }
-        chart.setOption(option, true);
-      },
-      disposeChart() {
-        if (this._chart) { this._chart.dispose(); this._chart = null; }
-      },
     },
   };
 
   window.__accountDrawerComponent = AccountDrawer;
-
-  // Also install a direct chart renderer that's easy to call
-  if (typeof window !== 'undefined' && !window.renderDrawerChartDirect) {
-    // The renderDrawerChartDirect will be defined after this script loads
-  }
-
   console.log('[component] account-drawer loaded');
 })();
