@@ -236,6 +236,7 @@
 <body>
 <div id="nav-app"><nav-bar title="收益账本" logo-url="/"></nav-bar></div>
 
+<div id="app">
 <div class="dash-layout" id="appContent">
   <div class="dash-main">
     <div class="auth-prompt" id="loginPrompt" style="display:none;">
@@ -277,9 +278,7 @@
           <div class="account-card card" style="padding:20px;border:1px solid var(--border);"><div class="skeleton" style="height:18px;width:60%;margin-bottom:10px;"></div><div class="skeleton" style="height:22px;width:40%;margin-bottom:4px;"></div><div class="skeleton" style="height:12px;width:30%;margin-bottom:6px;"></div><div style="display:flex;gap:4px;"><div class="skeleton" style="height:28px;flex:1;border-radius:6px;"></div><div class="skeleton" style="height:28px;flex:1;border-radius:6px;"></div><div class="skeleton" style="height:28px;width:32px;border-radius:6px;"></div></div></div>
         </div>
       </div>
-      <div class="summary-card" id="summaryCard">
-        <div id="summaryRow"></div>
-      </div>
+      <summary-card></summary-card>
 
       <div class="chart-container">
         <div class="chart-tabs">
@@ -321,8 +320,8 @@
         </div>
       </div>
 
-      <div class="account-grid" id="accountGrid"></div>
-      <div id="encourageText" style="text-align:center;padding:16px 0 8px;font-size:0.82rem;color:var(--text-muted);line-height:1.6;"></div>
+      <account-grid></account-grid>
+      <encourage-text></encourage-text>
     </div>
   </div>
 </div>
@@ -337,26 +336,7 @@
   </div>
 </div>
 
-<!-- 弹窗：录入操作 -->
-<div class="modal-overlay" id="recordModal">
-  <div class="modal-box">
-    <h2 id="recordModalTitle">录入操作</h2>
-    <p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:12px;" id="recordModalAccount"></p>
-    <div class="input-group"><label>操作类型</label><select class="input" id="recordType" onchange="onRecordTypeChange()"><option value="transfer_in">转入</option><option value="transfer_out">转出</option><option value="revalue">更新市值</option></select></div>
-    <div class="input-group" id="srcGroup" style="display:none;"><label>来源账户</label><select class="input" id="srcAccount"><option value="">外部资金（从外部转入）</option></select></div>
-    <div class="input-group" id="destGroup" style="display:none;"><label>转出至</label><select class="input" id="destAccount"><option value="">消费支出（不转入任何账户）</option></select></div>
-    <div class="input-group"><label>金额</label><input type="number" class="input" id="recordAmount" placeholder="0.00" step="0.01" min="0"></div>
-    <div class="input-group"><label>日期</label><input type="date" class="input" id="recordDate"></div>
-    <div class="input-group"><label>备注</label><input type="text" class="input" id="recordNote" placeholder="选填" maxlength="50"></div>
-    <div id="revalueHint" style="display:none;margin-top:8px;padding:8px 12px;background:#f0fdf4;border-radius:8px;font-size:0.76rem;color:#059669;line-height:1.5;">
-      💡 更新市值代表当天<strong>最终</strong>市值。如有同一天的转入/转出，请<strong>先录入转入转出</strong>，最后再录入更新市值。
-    </div>
-    <div id="revalueDupHint" style="display:none;margin-top:6px;padding:8px 12px;background:#fef3c7;border-radius:8px;font-size:0.76rem;color:#d97706;line-height:1.5;">
-      ⚠️ 当天已有一条更新市值记录，继续录入将覆盖前面的值。如需修改建议编辑已有记录。
-    </div>
-    <div class="form-actions"><button class="btn btn-ghost" onclick="closeModal('recordModal')">取消</button><button class="btn btn-primary" onclick="saveRecord()">保存</button></div>
-  </div>
-</div>
+<record-modal></record-modal>
 
 <!-- 抽屉：账户详情 -->
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
@@ -418,8 +398,8 @@
 </div>
 
 <div id="toastContainer" style="position:fixed;bottom:20px;right:20px;z-index:2000;"></div>
-<!-- 同步状态云图标 -->
-<div id="syncStatusIcon" onclick="forceSync()" class="sync-icon synced" title="点击刷新" style="position:fixed;bottom:54px;right:20px;z-index:1999;cursor:pointer;font-size:0.82rem;background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:4px 12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);display:flex;align-items:center;gap:4px;transition:all 0.2s;user-select:none;">☁️ <span class="sync-ts">—</span></div>
+<sync-status></sync-status>
+</div>
 
 <!-- 成就庆祝弹窗 -->
 <div class="modal-overlay" id="achievementModal">
@@ -449,16 +429,58 @@
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="nav-bar.js"></script>
+<script src="app-state.js"></script>
+<script src="calc-utils.js"></script>
+<script src="components/sync-status.js"></script>
+<script src="components/summary-card.js"></script>
+<script src="components/encourage-text.js"></script>
+<script src="components/account-grid.js"></script>
+<script src="components/record-modal.js"></script>
+<script src="components/dash-app.js"></script>
 <script>
 mountNavBar('#nav-app');
-const SUPABASE_URL='https://spb-cl9n18iof0i9qxjh.supabase.opentrust.net', SUPABASE_ANON_KEY='eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiIsInJlZiI6InNwYi1jbDluMThpb2YwaTlxeGpoIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA2NjgzNzQsImV4cCI6MjA5NjI0NDM3NH0.t8MDF4zdvV9kpUz-gZpVM-OgFlAow8FlENASpqkUkwk';
+const SUPABASE_URL='https://spb-cl9n18iof0i9qxjh.supabase.opentrust.net', SUPABASE_ANON_KEY='eyJ0eX...Ukwk';
 const client=window.__supabaseClient||supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 if(!window.__supabaseClient)window.__supabaseClient=client;
 
-let currentUser=null,accounts=[],allRecords={},settings=null,showHidden=false;
-let chartInstance=null,drawerAccountId=null,chartMode='assets',drawerChartMode='assets',csi300Map={},csi500Map={},chartRange='all',privacyMode=false;
+// ====== 全局变量 → 从 __store 读取（逐步迁移到 __store） ======
+const S = ()=>window.__store;
+let currentUser=null; Object.defineProperty(window,'currentUser',{get(){return S().currentUser;},set(v){S().currentUser=v;}});
+let accounts=[]; Object.defineProperty(window,'accounts',{get(){return S().accounts;},set(v){S().accounts=v;}});
+let allRecords={}; Object.defineProperty(window,'allRecords',{get(){return S().allRecords;},set(v){S().allRecords=v;}});
+let settings=null; Object.defineProperty(window,'settings',{get(){return S().settings;},set(v){S().settings=v;}});
+let achieved={}; Object.defineProperty(window,'achieved',{get(){return S().achieved;},set(v){S().achieved=v;}});
+let lastReturnSign='negative'; Object.defineProperty(window,'lastReturnSign',{get(){return S().lastReturnSign;},set(v){S().lastReturnSign=v;}});
+let positiveReturnCount=0; Object.defineProperty(window,'positiveReturnCount',{get(){return S().positiveReturnCount;},set(v){S().positiveReturnCount=v;}});
+let privacyMode=false; Object.defineProperty(window,'privacyMode',{get(){return S().privacyMode;},set(v){S().privacyMode=v;}});
+let showHidden=false; Object.defineProperty(window,'showHidden',{get(){return S().showHidden;},set(v){S().showHidden=v;}});
+let chartInstance=null; Object.defineProperty(window,'chartInstance',{get(){return S().chartInstance;},set(v){S().chartInstance=v;}});
+let drawerAccountId=null; Object.defineProperty(window,'drawerAccountId',{get(){return S().drawerAccountId;},set(v){S().drawerAccountId=v;}});
+let chartMode='assets'; Object.defineProperty(window,'chartMode',{get(){return S().chartMode;},set(v){S().chartMode=v;}});
+let drawerChartMode='assets'; Object.defineProperty(window,'drawerChartMode',{get(){return S().drawerChartMode;},set(v){S().drawerChartMode=v;}});
+let csi300Map={}; Object.defineProperty(window,'csi300Map',{get(){return S().csi300Map;},set(v){S().csi300Map=v;}});
+let csi500Map={}; Object.defineProperty(window,'csi500Map',{get(){return S().csi500Map;},set(v){S().csi500Map=v;}});
+let chartRange='all'; Object.defineProperty(window,'chartRange',{get(){return S().chartRange;},set(v){S().chartRange=v;}});
+// 编辑状态
+let editingRecordId=null; Object.defineProperty(window,'editingRecordId',{get(){return S().editingRecordId;},set(v){S().editingRecordId=v;}});
+let editingPairedId=null; Object.defineProperty(window,'editingPairedId',{get(){return S().editingPairedId;},set(v){S().editingPairedId=v;}});
+let recordAccountId=null; Object.defineProperty(window,'recordAccountId',{get(){return S().recordAccountId;},set(v){S().recordAccountId=v;}});
+// 同步状态
+let syncQueueTimer=null; Object.defineProperty(window,'syncQueueTimer',{get(){return S().syncQueueTimer;},set(v){S().syncQueueTimer=v;}});
+window._syncState = null; Object.defineProperty(window,'_syncState',{get(){return S().syncState;},set(v){S().syncState=v;}});
+
+// ====== 工具函数 → calcUtils（逐步迁移） ======
+window.fmt = window.calcUtils.fmt;
+window.fmtPct = window.calcUtils.fmtPct;
+window.fmtS = function(v){return privacyMode?'******':calcUtils.fmt(v);};
+window.sortRecords = window.calcUtils.sortRecords;
+window.calcAccount = window.calcUtils.calcAccount;
+window.calcXIRR = window.calcUtils.calcXIRR;
+window.buildSeries = function(){return calcUtils.buildSeries(accounts,allRecords);};
+window.calcMaxDrawdown = function(){return calcUtils.calcMaxDrawdown(accounts,allRecords);};
+window.checkNegativeBalance = function(id){return calcUtils.checkNegativeBalance(id,accounts,allRecords);};
+
 // 成就系统
-let achieved={},lastReturnSign='negative',positiveReturnCount=0;
 const ACHIEVEMENTS=[
   // 按弹窗优先级排列（最优先的排前面）
   {key:'record_1',    name:'千里之行', msg:'记账的第一笔，通往自由的第一步',                                  icon:'🏆', check:(v,t,r,a)=>r>=1},
@@ -489,8 +511,6 @@ function clearCache(){for(const k in queryCache)delete queryCache[k];}
 
 // ====== 乐观写入同步队列系统 ======
 const SYNC_QUEUE_KEY = 'hermes_sync_queue_v1';
-let syncQueueTimer = null;
-window._syncState = { status: 'synced', lastSyncTime: null, pendingCount: 0, lastError: null };
 
 function getSyncQueue() {
   try { return JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]'); } catch(e) { return []; }
@@ -530,22 +550,9 @@ function removeSyncOp(syncId) {
 function updateSyncUI() {
   const q = getSyncQueue();
   const pending = q.filter(o => o.status !== 'done').length;
+  const failed = q.some(o => o.status === 'failed');
   window._syncState.pendingCount = pending;
-  const icon = $('syncStatusIcon');
-  if (!icon) return;
-  const ts = window._syncState.lastSyncTime;
-  const timeStr = ts ? formatSyncTime(ts) : '—';
-  if (pending === 0) {
-    icon.innerHTML = '☁️ <span class="sync-ts">' + timeStr + '</span>';
-    icon.className = 'sync-icon synced';
-    icon.title = '已同步 · ' + (ts ? new Date(ts).toLocaleString('zh-CN') : '尚未同步');
-  } else {
-    const fail = q.some(o => o.status === 'failed');
-    icon.innerHTML = fail ? '☁️ <span class="sync-badge warn">' + pending + '</span> <span class="sync-ts">' + timeStr + '</span>'
-                         : '☁️ <span class="sync-badge">' + pending + '</span> <span class="sync-ts">' + timeStr + '</span>';
-    icon.className = 'sync-icon ' + (fail ? 'warning' : 'pending');
-    icon.title = fail ? pending + '条同步失败，点击重试' : pending + '条待同步';
-  }
+  window._syncState.lastError = failed ? 'failed' : null;
 }
 
 async function consumeSyncQueue() {
@@ -705,21 +712,10 @@ window.forceSync = function() {
   if (!syncQueueTimer) consumeSyncQueue();
 };
 
-function formatSyncTime(ts) {
-  const diff = (Date.now() - ts) / 1000;
-  if (diff < 10) return '刚刚';
-  if (diff < 60) return Math.floor(diff) + '秒前';
-  if (diff < 3600) return Math.floor(diff/60) + '分钟前';
-  if (diff < 86400) return Math.floor(diff/3600) + '小时前';
-  return new Date(ts).toLocaleDateString('zh-CN', {month:'short',day:'numeric'});
-}
-
 // 联网状态监听
 window.addEventListener('online', () => { updateSyncUI(); consumeSyncQueue(); });
 window.addEventListener('offline', () => {
   window._syncState.status = 'offline';
-  const icon = $('syncStatusIcon');
-  if (icon) { icon.innerHTML = '📡 <span style="color:#ef4444;">离线</span>'; icon.className = 'sync-icon offline'; icon.title = '网络离线'; }
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) consumeSyncQueue(); });
 
@@ -735,85 +731,12 @@ client.auth.onAuthStateChange((event) => {
   }
 });
 
-function fmtS(v){return privacyMode?'******':fmt(v);}
-
 const $=id=>document.getElementById(id);
-function fmt(n){return n==null?'—':'¥'+Number(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
-function fmtPct(n){return n==null?'—':(n>=0?'+':'')+Number(n).toFixed(2)+'%';}
 function openModal(id){$(id).classList.add('open');}
 function closeModal(id){$(id).classList.remove('open');}
 document.querySelectorAll('.modal-overlay').forEach(el=>{el.addEventListener('mousedown',e=>{if(e.target===el)el.classList.remove('open');});});
 
-function sortRecords(records){
-  return [...records].sort((a,b)=>{
-    const d=new Date(a.record_date)-new Date(b.record_date);
-    if(d!==0)return d;
-    // 同一天：转入(0)→转出(1)→市值更新(2)
-    const order={transfer_in:0,transfer_out:1,revalue:2};
-    const ao=(order[a.action_type]||0)-(order[b.action_type]||0);
-    if(ao!==0)return ao;
-    // 同一天同类型：用id确保稳定顺序，后面的覆盖前面的（多条市值更新取最后一条）
-    if(a.id<b.id)return -1;
-    if(a.id>b.id)return 1;
-    return 0;
-  });
-}
-function calcAccount(acct,records){
-  const sorted=sortRecords(records);
-  let cost=0,lastRevalue=null;
-  sorted.forEach(r=>{
-    if(r.action_type==='transfer_in'){
-      cost+=Number(r.amount);
-      if(lastRevalue!=null)lastRevalue+=Number(r.amount);
-    }else if(r.action_type==='transfer_out'){
-      cost-=Number(r.amount);
-      if(lastRevalue!=null)lastRevalue-=Number(r.amount);
-    }else if(r.action_type==='revalue')lastRevalue=Number(r.amount);
-  });
-  const isCash=acct.account_type==='cash',val=isCash?cost:(lastRevalue!=null?lastRevalue:cost),ret=val-cost,retPct=cost>0?(ret/cost)*100:0,nav=cost>0?val/cost:1;
-  return {costBasis:cost,currentValue:val,totalReturn:ret,returnPct:retPct,nav};
-}
-
-// ====== XIRR 年化收益率计算 ======
-function calcXIRR(records, accountType, currentValue){
-  // 从记录中提取现金流（仅转入转出影响现金流）
-  const flows=records.filter(r=>r.action_type!=='revalue').map(r=>({amount:r.action_type==='transfer_in'?-Number(r.amount):Number(r.amount),date:new Date(r.record_date)}));
-  if(flows.length<2)return null;
-  // 按日期排序
-  flows.sort((a,b)=>a.date-b.date);
-  // 从所有记录中取最晚日期（含更新市值），用于放置当前市值
-  if(currentValue!=null&&currentValue!==0){
-    let lastDate=flows[flows.length-1].date;
-    records.forEach(r=>{const d=new Date(r.record_date);if(!isNaN(d)&&d>lastDate)lastDate=d;});
-    flows.push({amount:currentValue, date:lastDate});
-  }
-  const startDate=flows[0].date;
-  // 将现金流归一化到年偏移
-  const days=flows.map(f=>(f.date-startDate)/86400000);
-  const amounts=flows.map(f=>f.amount);
-  // 用牛顿法求解 XIRR（多初始猜测，提高收敛率）
-  const guesses=[0.1,-0.1,0.3,-0.3,0.5,-0.5,0.01,-0.01,0.001,-0.001,0.99];
-  for(let g of guesses){
-    let rate=g;
-    for(let iter=0;iter<100;iter++){
-      let f=0,fp=0;
-      for(let i=0;i<amounts.length;i++){
-        const exp=days[i]/365;
-        const denom=Math.pow(1+rate,exp);
-        f+=amounts[i]/denom;
-        fp-=exp*amounts[i]/(denom*(1+rate));
-      }
-      if(Math.abs(f)<1e-7)return rate;
-      if(fp===0)break;
-      const newRate=rate-f/fp;
-      if(newRate<-0.9999||newRate>10)break;
-      rate=newRate;
-    }
-  }
-  return null;
-}
-
-// ====== 指数数据持久化（localStorage缓存，退出登录不清除） ======
+// ====== 指数数据持久化
 const INDEX_CACHE_KEY = 'hermes_index_cache_v1';
 function loadIndexCache(){
   try{const d=localStorage.getItem(INDEX_CACHE_KEY);return d?JSON.parse(d):{};}catch(e){return {};}
@@ -894,141 +817,38 @@ async function loadData(){
   window._syncState.lastSyncTime = Date.now();
   updateSyncUI();
   consumeSyncQueue();
-}
-
-// 检查现金账户历史中是否有余额为负的情况
-function checkNegativeBalance(accountId){
-  const acct=accounts.find(a=>a.id===accountId);
-  if(!acct||acct.account_type!=='cash')return null;
-  const records=(allRecords[accountId]||[]).slice().sort((a,b)=>{
-    const d=new Date(a.record_date)-new Date(b.record_date);
-    return d!==0?d:(({transfer_in:0,transfer_out:1,revalue:2}[a.action_type]||0)-({transfer_in:0,transfer_out:1,revalue:2}[b.action_type]||0));
-  });
-  let bal=0;
-  for(const r of records){
-    if(r.action_type==='transfer_in')bal+=Number(r.amount);
-    else if(r.action_type==='transfer_out')bal-=Number(r.amount);
-    if(bal<0)return {date:r.record_date,balance:bal};
-  }
-  return null;
+  console.log('[loadData] complete, accounts:', accounts.length, 'records:', Object.keys(allRecords).length);
 }
 
 function render(){
   // 鼓励语
-  const quotes=[
-    '💰 投资是一场马拉松，不是百米冲刺。坚持定投，时间会给你答案。',
-    '📈 市场有起有落，长期持有优质资产是最好的策略。',
-    '🌱 今天存下的每一分钱，都是未来自由的种子。',
-    '🧠 最好的投资是投资自己——学习、健康、眼界。',
-    '⏰ 复利是世界第八大奇迹。早点开始，耐心等待。',
-    '🎯 不要试图择时，待在市场里的时间比 timing 更重要。',
-    '📊 投资纪律比投资技巧更重要——定投、分散、长期。',
-    '💡 牛市赚钱，熊市赚股。下跌时买的每一份都是未来的利润。',
-    '🌊 市场短期是投票机，长期是称重机。——本杰明·格雷厄姆',
-    '🏔️ 别人贪婪时恐惧，别人恐惧时贪婪。——沃伦·巴菲特',
-  ];
-  $('encourageText').textContent=quotes[Math.floor(Math.random()*quotes.length)];
   $('dashSkeleton').style.display='none';
   // 汇总用全部账户（含隐藏）
   let totalVal=0,totalCost=0;
   accounts.forEach(a=>{const c=calcAccount(a,allRecords[a.id]||[]);totalVal+=c.currentValue;totalCost+=c.costBasis;});
 
-  const filtered=accounts.filter(a=>showHidden||!a.hidden);
-  let html='';
-  filtered.forEach(a=>{
-    const calc=calcAccount(a,allRecords[a.id]||[]);
-    const isCash=a.account_type==='cash',retColor=calc.totalReturn>=0?'#dc2626':'#2563eb';
-    const updateBtn=isCash?'':'<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openRecord(\''+a.id+'\',\'revalue\')">更新</button>';
-    const hiddenLabel=a.hidden?' <span style="font-size:0.7rem;color:var(--text-muted);">(已隐藏)</span>':'';
-    const hideAction=a.hidden?'unhideAccount(\''+a.id+'\')':'hideAccount(\''+a.id+'\')';
-    const hideLabel=a.hidden?'👁 取消隐藏':'🙈 隐藏';
-    const neg=checkNegativeBalance(a.id);
-    const warnBadge=neg?' <span title="'+neg.date+' 余额 '+fmt(neg.balance)+'，查看折线图定位问题" style="display:inline-flex;align-items:center;gap:3px;font-size:0.72rem;color:#d97706;background:#fef3c7;padding:1px 8px;border-radius:10px;font-weight:500;cursor:help;">⚠ 余额异常</span>':'';
-    // 计算该账户XIRR
-    const acctRecs=sortRecords(allRecords[a.id]||[]);
-    const acctXirr=calcXIRR(acctRecs,a.account_type,calc.currentValue);
-    const xirrStr=acctXirr!=null&&!isNaN(acctXirr)?(acctXirr*100).toFixed(2)+'%':'—';
-    const xirrColor=acctXirr!=null?(acctXirr>=0?'#dc2626':'#2563eb'):'var(--text-secondary)';
-    // 计算该账户净值与最大回撤
-    const cardNav=calc.nav;
-    let cardDd='—',cardDdPct=0;
-    if(acctRecs.length>=2){
-      let v=0,c=0,peak=1;
-      for(const r of acctRecs){
-        if(r.action_type==='transfer_in'){v+=Number(r.amount);c+=Number(r.amount);}
-        else if(r.action_type==='transfer_out'){v-=Number(r.amount);c-=Number(r.amount);}
-        else if(r.action_type==='revalue')v=Number(r.amount);
-        const nv=a.account_type==='investment'?(c>0?v/c:v):v;
-        if(nv>peak)peak=nv;
-        const dd=(nv-peak)/peak;
-        if(dd<cardDdPct)cardDdPct=dd;
-      }
-    }
-    if(cardDdPct<0)cardDd=(cardDdPct*100).toFixed(2)+'%';
-    html+=`<div class="account-card card" onclick="showRecords('${a.id}')">
-      <div class="acct-header"><span class="acct-name">${a.name}${hiddenLabel}${warnBadge}</span><span class="acct-type ${isCash?'type-cash':'type-investment'}">${isCash?'现金':'投资'}</span></div>
-      <div class="acct-stats">
-        <div class="total-val">${fmtS(calc.currentValue)}</div>
-        <div class="total-lbl">当前资产</div>
-        <div class="row-main">
-          <div class="stat"><div class="v" style="color:${retColor}">${fmtS(calc.totalReturn)}</div><div class="l">累计收益</div></div>
-          <div class="stat"><div class="v" style="color:${xirrColor}">${xirrStr}</div><div class="l">年化 XIRR</div></div>
-        </div>
-        <div class="row-extra">
-          <div class="stat"><div class="v">${cardNav.toFixed(4)}</div><div class="l">净值</div></div>
-          <div class="stat"><div class="v loss">${cardDd}</div><div class="l">最大回撤</div></div>
-        </div>
-      </div>
-      <div class="acct-actions">
-        <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();openRecord('${a.id}','transfer_in')">转入</button>
-        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openRecord('${a.id}','transfer_out')">转出</button>
-        ${updateBtn}
-        <div class="dot-menu"><button class="dot-btn" onclick="event.stopPropagation();toggleDotMenu(this)">⋮</button><div class="dot-dropdown"><div onclick="event.stopPropagation();showRecords('${a.id}')">📋 查看记录</div><div onclick="event.stopPropagation();${hideAction}">${hideLabel}</div><div class="danger" onclick="event.stopPropagation();deleteAccount('${a.id}')">🗑 删除</div></div></div>
-      </div></div>`;
-  });
-  // 检测新用户：仅1个现金账户且0条记录
-  const totalAllRecs=Object.values(allRecords).reduce((sum,arr)=>sum+(arr||[]).length,0);
-  const isNewUser=accounts.length===1&&accounts[0].account_type==='cash'&&totalAllRecs===0;
-  if(isNewUser)html+=`<div style="grid-column:1/-1;text-align:center;padding:32px 20px 20px;background:linear-gradient(135deg,#f0f7ff 0%,#fdf2f8 100%);border-radius:12px;border:1px solid #e0e7ff;">
-    <div style="font-size:2.2rem;margin-bottom:6px;">🕊</div>
-    <h2 style="font-size:1.15rem;margin-bottom:4px;color:var(--text);">欢迎来到收益账本</h2>
-    <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:16px;line-height:1.5;">你已拥有一个现金账户，只需两步即可开启投资追踪之旅</p>
-    <div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px;flex-wrap:wrap;">
-      <div style="background:var(--bg);border-radius:10px;padding:14px 18px;text-align:left;flex:1;max-width:220px;min-width:160px;"><div style="font-size:0.75rem;color:var(--primary);font-weight:700;margin-bottom:3px;">第一步</div><div style="font-size:0.85rem;font-weight:600;margin-bottom:2px;">💰 记录第一笔资金</div><div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5;">录入转入或转出，开始积累数据</div></div>
-      <div style="background:var(--bg);border-radius:10px;padding:14px 18px;text-align:left;flex:1;max-width:220px;min-width:160px;"><div style="font-size:0.75rem;color:var(--primary);font-weight:700;margin-bottom:3px;">第二步</div><div style="font-size:0.85rem;font-weight:600;margin-bottom:2px;">📈 查看资产走势</div><div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5;">图表自动生成，收益、净值一目了然</div></div>
-    </div>
-    <button class="btn btn-primary" style="font-size:0.88rem;padding:8px 20px;" onclick="openRecord('${accounts[0].id}','transfer_in')">💰 录入第一笔记录</button>
-  </div>`;
-  if(filtered.length===0&&!isNewUser)html=`<div class="empty-guide" style="grid-column:1/-1;">
-    <div class="icon-big">📊</div>
-    <h2>暂无账户</h2>
-    <p>创建一个新账户开始追踪吧</p>
-    <button class="btn btn-primary" onclick="openAddAccount()">+ 创建账户</button>
-    <a href="about.html" class="btn btn-ghost" style="margin-left:8px;">了解更多</a>
-  </div>`;
-  $('accountGrid').innerHTML=html;
   const totalRet=totalVal-totalCost,totalRetPct=totalCost>0?(totalRet/totalCost)*100:0;
   const totalNavVal=totalCost>0?(totalVal/totalCost):1;
   const {maxDd,ddStart,ddEnd}=calcMaxDrawdown();
+  // 写入 __store 供 Vue 组件读取
+  window.__store.accounts = accounts;
+  window.__store.allRecords = allRecords;
+  window.__store.showHidden = showHidden;
+  window.__store.privacyMode = privacyMode;
+  window.__store.totalVal = totalVal;
+  window.__store.totalCost = totalCost;
+  window.__store.totalRet = totalRet;
+  window.__store.totalRetPct = totalRetPct;
+  window.__store.totalNavVal = totalNavVal;
+  window.__store.maxDd = maxDd;
+  window.__store.ddStart = ddStart;
+  window.__store.ddEnd = ddEnd;
   // 汇总 XIRR
   const allFlows=[];
   accounts.forEach(a=>{(allRecords[a.id]||[]).forEach(r=>{allFlows.push(r);});});
   const totalXirr=calcXIRR(allFlows,'investment', totalVal);
+  window.__store.totalXirr = totalXirr;
   const retColor=totalRet>=0?'profit':'loss';
-  const ddHtml=maxDd<0?`<div class="stat"><div class="v loss">${(maxDd*100).toFixed(2)}%</div><div class="l">最大回撤</div><div class="sub">${ddStart} ~ ${ddEnd}</div></div>`:'';
-  const xirrHtml=totalXirr!=null&&!isNaN(totalXirr)?`<div class="stat"><div class="v ${totalXirr>=0?'profit':'loss'}">${(totalXirr*100).toFixed(2)}%</div><div class="l">年化 <span class="xirr">XIRR</span></div></div>`:'';
-  const EYE_OPEN='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
-  const EYE_SLASH='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
-  $('summaryRow').innerHTML=`
-    <div class="total-row"><div class="v">${fmtS(totalVal)} <button class="eye-btn" onclick="togglePrivacy()" title="切换隐私模式">${privacyMode?EYE_SLASH:EYE_OPEN}</button></div><div class="l">总资产</div></div>
-    <div class="sub-row">
-      <div class="stat"><div class="v ${retColor}">${fmtS(totalRet)}</div><div class="l">累计收益</div></div>
-      <div class="stat"><div class="v ${retColor}">${fmtPct(totalRetPct)}</div><div class="l">总收益率</div></div>
-      <div class="stat"><div class="v">${totalNavVal.toFixed(4)}</div><div class="l">净值</div></div>
-      ${xirrHtml}
-      ${ddHtml}
-    </div>
-  `;
   const hasHidden=accounts.some(a=>a.hidden);$('showHiddenToggle').style.display=hasHidden?'':'none';
   renderChart();
   renderPieChart();
@@ -1104,86 +924,7 @@ async function saveAchievements(){
   try{await client.from('user_settings').upsert({user_id:currentUser.id,achieved,last_return_sign:lastReturnSign,positive_return_count:positiveReturnCount},{onConflict:'user_id'});}catch(e){}
 }
 
-document.addEventListener('click',()=>{document.querySelectorAll('.dot-dropdown.open').forEach(d=>d.classList.remove('open'));});
-function toggleDotMenu(btn){btn.nextElementSibling.classList.toggle('open');}
-
 // ====== ECharts 图表 ======
-// 构建时间序列数据（增量算法 O(n)）
-function buildSeries(){
-  const dset=new Set();
-  accounts.forEach(a=>{(allRecords[a.id]||[]).forEach(r=>dset.add(r.record_date));});
-  const dates=[...dset].sort();
-  if(dates.length<2)return null;
-  // 预计算每日净转入/净转出
-  const dailyTransfers={};
-  for(const aid of Object.keys(allRecords)){
-    for(const r of (allRecords[aid]||[])){
-      if(r.action_type==='transfer_in'||r.action_type==='transfer_out'){
-        if(!dailyTransfers[r.record_date])dailyTransfers[r.record_date]={netIn:0,netOut:0};
-        if(r.action_type==='transfer_in')dailyTransfers[r.record_date].netIn+=Number(r.amount);
-        else dailyTransfers[r.record_date].netOut+=Number(r.amount);
-      }
-    }
-  }
-  // 过滤 netIn===netOut（内部转账不显示标记）
-  for(const d of Object.keys(dailyTransfers)){
-    if(Math.abs(dailyTransfers[d].netIn-dailyTransfers[d].netOut)<0.005)delete dailyTransfers[d];
-  }
-  // 增量计算：每个账户维护当前状态指针
-  const acctState={}; // account_id -> {ptr, cost, lastRevalue, records}
-  let totalVal=0,totalCost=0;
-  const totalValArr=[],totalCostArr=[],navArr=[],cumRetArr=[];
-  // 初始化每个账户的状态（预排序确保同一天内 revalue 最后处理）
-  for(const a of accounts){
-    const recs=sortRecords(allRecords[a.id]||[]);
-    acctState[a.id]={ptr:0,cost:0,lastRevalue:null,records:recs};
-  }
-  // 逐日推进
-  for(const d of dates){
-    for(const a of accounts){
-      const st=acctState[a.id];
-      // 推进到当天（处理当天所有记录）
-      while(st.ptr<st.records.length&&st.records[st.ptr].record_date<=d){
-        const r=st.records[st.ptr];
-        if(r.action_type==='transfer_in'){
-          st.cost+=Number(r.amount);
-          if(st.lastRevalue!=null)st.lastRevalue+=Number(r.amount);
-        }else if(r.action_type==='transfer_out'){
-          st.cost-=Number(r.amount);
-          if(st.lastRevalue!=null)st.lastRevalue-=Number(r.amount);
-        }else if(r.action_type==='revalue'){
-          st.lastRevalue=Number(r.amount);
-        }
-        st.ptr++;
-      }
-    }
-    // 汇总所有账户
-    let v=0,c=0;
-    for(const a of accounts){
-      const st=acctState[a.id];
-      const isCash=a.account_type==='cash';
-      const val=isCash?st.cost:(st.lastRevalue!=null?st.lastRevalue:st.cost);
-      v+=val;c+=st.cost;
-    }
-    totalValArr.push(v);totalCostArr.push(c);
-    navArr.push(c>0?v/c:1);cumRetArr.push(v-c);
-  }
-  return {dates:dates,totalVal:totalValArr,totalCost:totalCostArr,nav:navArr,cumRet:cumRetArr,dailyTransfers};
-}
-
-// 计算最大回撤
-function calcMaxDrawdown(){
-  const data=buildSeries();
-  if(!data||data.nav.length<2)return {maxDd:0,ddStart:'',ddEnd:''};
-  let peak=data.nav[0],peakIdx=0,maxDd=0,ddStart=0,ddEnd=0;
-  for(let i=1;i<data.nav.length;i++){
-    if(data.nav[i]>peak){peak=data.nav[i];peakIdx=i;}
-    const dd=(data.nav[i]-peak)/peak;
-    if(dd<maxDd){maxDd=dd;ddStart=peakIdx;ddEnd=i;}
-  }
-  return {maxDd,ddStart:data.dates[ddStart],ddEnd:data.dates[ddEnd]};
-}
-
 // 切换主页图表模式
 function computeRangeStart(range){
   if(range==='custom'){
@@ -1457,155 +1198,11 @@ async function saveAccount(){
   closeModal('accountModal');toast('账户已创建（同步中）','success');render();
 }
 
-let recordAccountId=null;
 function openRecord(accountId,type){
-  recordAccountId=accountId;const acct=accounts.find(a=>a.id===accountId);
-  $('recordModalTitle').textContent=(acct?acct.name:'')+' — 录入操作';
-  $('recordType').value=type||'transfer_in';$('recordAmount').value='';$('recordDate').value=new Date().toISOString().substring(0,10);$('recordNote').value='';
-  onRecordTypeChange();openModal('recordModal');
+  window.__store.recordTargetId=accountId;
+  window.__store.recordTargetType=type||'transfer_in';
+  window.__store.showRecordModal=true;
 }
-function onRecordTypeChange(){
-  const type=$('recordType').value,srcGroup=$('srcGroup'),destGroup=$('destGroup');
-  srcGroup.style.display=type==='transfer_in'?'':'none';
-  destGroup.style.display=type==='transfer_out'?'':'none';
-  const hint=$('revalueHint');if(hint)hint.style.display=type==='revalue'?'block':'none';
-  // 检查当天是否已有更新市值记录
-  const dupHint=$('revalueDupHint');
-  if(dupHint){
-    if(type==='revalue'&&recordAccountId){
-      const date=$('recordDate').value;
-      const hasRevalue=(allRecords[recordAccountId]||[]).some(r=>r.record_date===date&&r.action_type==='revalue');
-      dupHint.style.display=hasRevalue?'block':'none';
-    }else{dupHint.style.display='none';}
-  }
-  if(type==='transfer_in'){
-    const sel=$('srcAccount');sel.innerHTML='<option value="">外部资金（从外部转入）</option>';
-    let defaultSelected=false;
-    accounts.forEach(a=>{
-      if(a.id!==recordAccountId&&!a.hidden){
-        const opt=document.createElement('option');opt.value=a.id;opt.textContent=a.name+(a.account_type==='cash'?' (现金)':' (投资)');sel.appendChild(opt);
-        if((settings?.default_cash_account_id===a.id)||(!defaultSelected&&a.account_type==='cash')){opt.selected=true;defaultSelected=true;}
-      }
-    });
-  }else if(type==='transfer_out'){
-    const sel=$('destAccount');sel.innerHTML='<option value="">消费支出（不转入任何账户）</option>';
-    let defaultSelected=false;
-    accounts.forEach(a=>{
-      if(a.id!==recordAccountId&&!a.hidden){
-        const opt=document.createElement('option');opt.value=a.id;opt.textContent=a.name+(a.account_type==='cash'?' (现金)':' (投资)');sel.appendChild(opt);
-        if((settings?.default_cash_account_id===a.id)||(!defaultSelected&&a.account_type==='cash')){opt.selected=true;defaultSelected=true;}
-      }
-    });
-  }
-}
-async function saveRecord(){
-  const amtYuan=parseFloat($('recordAmount').value);
-  const amount=Math.round(amtYuan*100);const type=$('recordType').value;
-  if(type==='revalue'){if(isNaN(amount)||amount<0){toast('请输入有效市值','error');return;}
-  }else{if(!amount||amount<=0){toast('请输入有效金额','error');return;}}
-  const date=$('recordDate').value||new Date().toISOString().substring(0,10),note=$('recordNote').value.trim()||'';
-
-  if(!recordAccountId){toast('系统错误：缺少账户信息','error');return;}
-
-  // 检查账户是否被冻结（仍需要实时检查，因为依赖服务器端账户数据）
-  const plan=await getUserPlan();
-  if(plan!=='pro'){
-    if(isFrozenAccount(recordAccountId)){toast('该账户已超出免费额度，操作被冻结','error');return;}
-    const srcId=$('srcAccount').value;
-    const destId=$('destAccount').value;
-    if(srcId&&isFrozenAccount(srcId)){toast('来源账户已超出免费额度','error');return;}
-    if(destId&&isFrozenAccount(destId)){toast('目标账户已超出免费额度','error');return;}
-  }
-
-  // —— 乐观写入：先本地更新 + 入队，再同步服务器 ——
-  if(type==='transfer_in'){
-    const srcId=$('srcAccount').value;
-    if(srcId){
-      const srcCalc=calcAccount(accounts.find(a=>a.id===srcId),(allRecords[srcId]||[]).filter(r=>r.record_date<=date));
-      if(srcCalc.currentValue<amtYuan)toast('警告：来源账户在 '+date+' 余额不足（'+fmt(srcCalc.currentValue)+'），已保存但建议检查','warning');
-      // 本地创建两条记录（temp ID）
-      const r1Id=genTempId(),r2Id=genTempId();
-      const r1={id:r1Id,account_id:srcId,action_type:'transfer_out',amount:amtYuan,record_date:date,note:note||'转至 '+(accounts.find(a=>a.id===recordAccountId)?.name||'其他账户'),paired_id:null};
-      const r2={id:r2Id,account_id:recordAccountId,action_type:'transfer_in',amount:amtYuan,record_date:date,note:note||'来自 '+(accounts.find(a=>a.id===srcId)?.name||'其他账户'),paired_id:null};
-      // 本地追加
-      if(!allRecords[srcId])allRecords[srcId]=[];
-      if(!allRecords[recordAccountId])allRecords[recordAccountId]=[];
-      allRecords[srcId].push(r1);
-      allRecords[recordAccountId].push(r2);
-      // 入队
-      enqueueOp('create_record',{
-        record:{account_id:srcId,action_type:'transfer_out',amount,record_date:date,note:r1.note},
-        pairedRecord:{account_id:recordAccountId,action_type:'transfer_in',amount,record_date:date,note:r2.note},
-        localAcct:srcId,
-        pairedLocalAcct:recordAccountId,
-      });
-    }else{
-      const rId=genTempId();
-      const r={id:rId,account_id:recordAccountId,action_type:'transfer_in',amount:amtYuan,record_date:date,note:note||'外部转入',paired_id:null};
-      if(!allRecords[recordAccountId])allRecords[recordAccountId]=[];
-      allRecords[recordAccountId].push(r);
-      enqueueOp('create_record',{
-        record:{account_id:recordAccountId,action_type:'transfer_in',amount,record_date:date,note:r.note},
-        localAcct:recordAccountId,
-      });
-    }
-  }else if(type==='transfer_out'){
-    const outCalc=calcAccount(accounts.find(a=>a.id===recordAccountId),(allRecords[recordAccountId]||[]).filter(r=>r.record_date<=date));
-    if(outCalc.currentValue<amtYuan)toast('警告：账户在 '+date+' 余额不足（'+fmt(outCalc.currentValue)+'），已保存但建议检查','warning');
-    const destId=$('destAccount').value;
-    if(destId){
-      const r1Id=genTempId(),r2Id=genTempId();
-      const r1={id:r1Id,account_id:recordAccountId,action_type:'transfer_out',amount:amtYuan,record_date:date,note:note||'转出',paired_id:null};
-      const r2={id:r2Id,account_id:destId,action_type:'transfer_in',amount:amtYuan,record_date:date,note:note||'来自 '+(accounts.find(a=>a.id===recordAccountId)?.name||'其他账户'),paired_id:null};
-      if(!allRecords[recordAccountId])allRecords[recordAccountId]=[];
-      if(!allRecords[destId])allRecords[destId]=[];
-      allRecords[recordAccountId].push(r1);
-      allRecords[destId].push(r2);
-      enqueueOp('create_record',{
-        record:{account_id:recordAccountId,action_type:'transfer_out',amount,record_date:date,note:r1.note},
-        pairedRecord:{account_id:destId,action_type:'transfer_in',amount,record_date:date,note:r2.note},
-        localAcct:recordAccountId,
-        pairedLocalAcct:destId,
-      });
-    }else{
-      const rId=genTempId();
-      const r={id:rId,account_id:recordAccountId,action_type:'transfer_out',amount:amtYuan,record_date:date,note:note||'转出',paired_id:null};
-      if(!allRecords[recordAccountId])allRecords[recordAccountId]=[];
-      allRecords[recordAccountId].push(r);
-      enqueueOp('create_record',{
-        record:{account_id:recordAccountId,action_type:'transfer_out',amount,record_date:date,note:r.note},
-        localAcct:recordAccountId,
-      });
-    }
-  }else{
-    // revalue
-    const rId=genTempId();
-    const r={id:rId,account_id:recordAccountId,action_type:'revalue',amount:amtYuan,record_date:date,note,paired_id:null};
-    if(!allRecords[recordAccountId])allRecords[recordAccountId]=[];
-    allRecords[recordAccountId].push(r);
-    enqueueOp('create_record',{
-      record:{account_id:recordAccountId,action_type:'revalue',amount,record_date:date,note},
-      localAcct:recordAccountId,
-    });
-  }
-  // 刷新缓存
-  if(queryCache['recs_'+recordAccountId]!==undefined)delete queryCache['recs_'+recordAccountId];
-  closeModal('recordModal');
-  toast('记录已保存（同步中）','success');
-  render();
-}
-async function deleteAccount(id){
-  if(!confirm('确定删除此账户？所有流水也会一并删除'))return;
-  // 本地删除（乐观）
-  accounts=accounts.filter(a=>a.id!==id);
-  delete allRecords[id];
-  if(queryCache['recs_'+id]!==undefined)delete queryCache['recs_'+id];
-  // 入队，后台同步到服务器
-  enqueueOp('delete_account',{accountId:id});
-  toast('已删除（同步中）','success');render();
-}
-
-// ====== 抽屉（账户详情） ======
 async function showRecords(accountId){
   drawerAccountId=accountId;const acct=accounts.find(a=>a.id===accountId);if(!acct)return;
   $('drawerTitle').textContent=acct.name;
@@ -1815,7 +1412,6 @@ function switchDrawerChartMode(mode){
   }
 }
 // ====== 记录编辑 ======
-let editingRecordId=null,editingPairedId=null;
 async function editRecord(id,accountId,actionType,amount,date,note){
   editingRecordId=id;
   const acct=accounts.find(a=>a.id===accountId);
