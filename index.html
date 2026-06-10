@@ -585,6 +585,7 @@ function renderInvestorList(){
   const totalVal=store.totalVal||0;
   const totalCost=store.totalCost||0;
   const pm=store.privacyMode;
+  const priv=(v)=>pm?'******':v;
   if(!store.investors.length&&!totalVal){
     el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.85rem;">暂无成员，点击上方按钮添加</div>';
     return;
@@ -626,7 +627,7 @@ function renderInvestorList(){
       <div style="flex:1;">
         <div style="font-weight:600;font-size:0.9rem;">${inv.name}</div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">
-          份额 ${m?m.shares.toFixed(2):'0.00'} · 占比 ${sharePct}%
+          份额 ${priv(m?m.shares.toFixed(2):'0.00')} · 占比 ${sharePct}%
         </div>
       </div>
       <div style="text-align:right;">
