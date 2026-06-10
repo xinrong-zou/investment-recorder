@@ -201,7 +201,7 @@
         if (window.openRecord) window.openRecord(this.acctId, type);
       },
       edit(r) {
-        if (window.editRecord) window.editRecord(r.id, r.account_id, r.action_type, r.amount, r.record_date, r.note || '');
+        if (window.editRecord) window.editRecord(r.id, r.account_id, r.action_type, r.amount, r.record_date, r.note || '', r.investor_id || '');
       },
       applyFilter() {
         // line-chart watches filterStart/filterEnd automatically

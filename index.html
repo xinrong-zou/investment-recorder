@@ -442,6 +442,7 @@ function render(){
   const hasHidden=store.accounts.some(a=>a.hidden);$('showHiddenToggle').style.display=hasHidden?'':'none';
   // 计算投资人权益
   store.fundMembers = window.calcFundMembers();
+  if (store.fundMode) renderInvestorList();
   window.checkAchievements(totalVal,totalRet);
 }
 
@@ -518,8 +519,8 @@ function drawerAction(type){
   if(!id){window.toast('请先选择账户','error');return;}
   openRecord(id,type);
 }
-function editRecord(id,accountId,actionType,amount,date,note){
-  window.__store.editRecordId=id+"|"+accountId+"|"+actionType+"|"+amount+"|"+date+"|"+(note||"");
+function editRecord(id,accountId,actionType,amount,date,note,invId){
+  window.__store.editRecordId=id+"|"+accountId+"|"+actionType+"|"+amount+"|"+date+"|"+(note||"")+"|"+(invId||"");
   window.__store.showEditModal=true;
 }
 

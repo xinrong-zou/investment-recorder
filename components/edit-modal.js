@@ -12,6 +12,12 @@
           <div class="input-group"><label>金额</label><input type="number" class="input" v-model.number="editAmount" step="0.01" min="0"></div>
           <div class="input-group"><label>日期</label><input type="date" class="input" v-model="editDate"></div>
           <div class="input-group"><label>备注</label><input type="text" class="input" v-model="editNote" placeholder="选填" maxlength="50"></div>
+          <div class="input-group" v-if="showInvestorEdit"><label>投资人</label>
+            <select class="input" v-model="editInvestorId">
+              <option value="">管理人名下</option>
+              <option v-for="inv in investors" :key="inv.id" :value="inv.id">{{ inv.name }}</option>
+            </select>
+          </div>
           <div class="form-actions">
             <button class="btn btn-ghost" @click="close">取消</button>
             <button class="btn btn-danger" @click="remove">🗑 删除</button>
@@ -30,6 +36,7 @@
         editingAccountId: null,
         editingActionType: null,
         editingOriginalDate: null,
+        editInvestorId: '',
       };
     },
     computed: {
@@ -45,6 +52,11 @@
       actionLabel() {
         return { transfer_in: '转入', transfer_out: '转出', revalue: '更新市值' }[this.editingActionType] || '';
       },
+      investors() { return this.store.investors || []; },
+      showInvestorEdit() {
+        return (this.editingActionType === 'transfer_in' || this.editingActionType === 'transfer_out')
+          && this.investors.length > 0;
+      },
     },
     watch: {
       editId(val) {
@@ -57,6 +69,7 @@
         const amount = parseFloat(parts[3]);
         const date = parts[4];
         const note = parts[5] || '';
+        const invId = parts[6] || '';
         
         this.editingRecordId = id;
         this.editingAccountId = accountId;
@@ -65,6 +78,7 @@
         this.editAmount = amount;
         this.editDate = date;
         this.editNote = note === '' ? '' : note;
+        this.editInvestorId = invId || '';
         
         // Find paired_id
         this.editingPairedId = null;
@@ -135,6 +149,7 @@
         }
 
         const upd = { amount: amt, record_date: newDate, note: (this.editNote || '').trim() };
+        if (this.editingActionType !== 'revalue') upd.investor_id = this.editInvestorId || null;
         
         // Get version
         let version = null;
@@ -162,7 +177,7 @@
         // Enqueue sync
         window.enqueueOp('update_record', {
           recordId: this.editingRecordId,
-          updates: { amount: amtCents, record_date: newDate, note: upd.note },
+          updates: { amount: amtCents, record_date: newDate, note: upd.note, investor_id: upd.investor_id || null },
           version: version,
           pairedId: this.editingPairedId,
           pairedUpdates: this.editingPairedId ? { amount: amtCents, record_date: newDate } : null,
