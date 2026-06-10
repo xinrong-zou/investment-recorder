@@ -8,7 +8,7 @@
     template: `
       <div class="sync-icon" :class="iconClass" :title="iconTitle"
            @click="onClick"
-           style="position:fixed;bottom:54px;right:20px;z-index:1999;cursor:pointer;font-size:0.82rem;background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:4px 12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);display:flex;align-items:center;gap:4px;transition:all 0.2s;user-select:none;">
+           style="position:fixed;bottom:20px;left:20px;z-index:1999;cursor:pointer;font-size:0.82rem;background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:4px 12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);display:flex;align-items:center;gap:4px;transition:all 0.2s;user-select:none;">
         <template v-if="offline">📡 <span style="color:#ef4444;">离线</span></template>
         <template v-else>
           ☁️
