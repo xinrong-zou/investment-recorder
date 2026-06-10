@@ -111,7 +111,7 @@
         return n == null ? '—' : (n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%';
       },
       togglePrivacy() {
-        window.__store.privacyMode = !window.__store.privacyMode;
+        if (typeof window.togglePrivacy === 'function') window.togglePrivacy();
       },
       onSyncClick() {
         if (typeof window.forceSync === 'function') window.forceSync();
