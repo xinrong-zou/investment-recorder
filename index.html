@@ -372,6 +372,7 @@ document.querySelectorAll('.modal-overlay').forEach(el=>{el.addEventListener('mo
 
 // ====== 主页渲染 ======
 async function loadData(){
+  window.clearCache();
   const{data:{session}}=await client.auth.getSession();
   if(!session){$('loginPrompt').style.display='block';$('dashContent').style.display='none';return;}
   const store = window.__store;
