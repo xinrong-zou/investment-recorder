@@ -207,10 +207,9 @@
     navigator.serviceWorker.addEventListener('controllerchange',function(){window.location.reload();});
   };
 
-  // ====== 初始化 Supabase ======
-  window.__store = window.createStore();
+  // ====== 初始化 Store ======
   var store = window.__store;
-  /* supabase 初始化已在 nav-bar.js 中完成 */
+  /* store 由 app-state.js 初始化 */
 
   // ====== 清理失效记录（server-only 标记） ======
   async function cleanupOrphanedRecords(accountId, serverRecords) {
