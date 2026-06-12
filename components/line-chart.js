@@ -124,7 +124,7 @@
               if (!dailyTransfers[r.record_date]) dailyTransfers[r.record_date] = { netIn: 0, netOut: 0 };
               dailyTransfers[r.record_date].netOut += amt;
             } else if (r.action_type === 'revalue') value = amt;
-            const navPlot = this.accountType === 'investment' ? (shares > 0 ? value / shares : 1.0) : value;
+            const navPlot = this.accountType === 'investment' ? (shares > 0 ? value / shares : 1.0) : 1.0;
             dates.push(r.record_date); totalVal.push(value); totalCost.push(cost); nav.push(navPlot); cumRet.push(value - cost);
           }
         }
