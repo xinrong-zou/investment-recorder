@@ -173,17 +173,16 @@
   };
 
   // ====== Service Worker 注册 + 版本感知更新 ======
+  // 版本变化标记提前读取（在 load 事件前）
+  var swForceUpdate = (function(){
+    try { var f = localStorage.getItem('hermes_sw_force_update'); localStorage.removeItem('hermes_sw_force_update'); return f === '1'; } catch(e) { return false; }
+  })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
       navigator.serviceWorker.register('service-worker.js').then(function(reg) {
-        // 版本变化时强制立即检查最新 SW（不等浏览器轮询）
-        var forceUpdate = false;
-        try { forceUpdate = localStorage.getItem('hermes_sw_force_update') === '1'; localStorage.removeItem('hermes_sw_force_update'); } catch(e) {}
-        if (forceUpdate) {
-          reg.update();
-        }
-        // 常规加载也检查
+        // 版本变化或每次加载都检查更新（浏览器对 SW 脚本有独立的更新检查机制）
         reg.update();
+        if (swForceUpdate) { console.log('[sw] version changed, force update check completed'); }
 
         reg.addEventListener('updatefound', function() {
           var newWorker = reg.installing;
