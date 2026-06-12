@@ -40,7 +40,7 @@
             </div>
             <!-- 迷你折线图 -->
             <div v-if="hasChart" style="margin-bottom:12px;">
-              <line-chart ref="chart" scope="single" :records="records" :account-type="acct.account_type" height="140"
+              <line-chart ref="chart" scope="single" :records="records" :account-type="acct.account_type" :precomputed="fullCalc" height="140"
                 :range="drawerRange" :filter-start="filterStart" :filter-end="filterEnd"></line-chart>
             </div>
             <div v-else style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.8rem;">至少2条记录才能显示趋势</div>
@@ -95,7 +95,6 @@
       acctName() { return this.acct ? this.acct.name : '账户详情'; },
       isInvestment() { return this.acct ? this.acct.account_type === 'investment' : false; },
       failedRecordIds() {
-        // 从 sync queue 中收集失败的记录 ID
         try {
           const q = JSON.parse(localStorage.getItem('hermes_sync_queue_v1') || '[]');
           const ids = {};
@@ -108,9 +107,14 @@
           return ids;
         } catch (e) { return {}; }
       },
+      // 一次遍历，供 calc / ddResult / line-chart 共享
+      fullCalc() {
+        if (!this.acct) return null;
+        return window.calcUtils.calcAccountFull(this.acct, this.records);
+      },
       calc() {
-        if (!this.acct) return { currentValue: 0, totalReturn: 0, nav: 1 };
-        return window.calcAccount(this.acct, this.records);
+        const fc = this.fullCalc;
+        return fc || { costBasis: 0, currentValue: 0, totalReturn: 0, returnPct: 0, nav: 1 };
       },
       currentValue() { return this.calc.currentValue; },
       totalReturn() { return this.calc.totalReturn; },
@@ -128,8 +132,7 @@
       },
       // 最大回撤
       ddResult() {
-        if (!this.acct) return { maxDd: 0 };
-        return window.calcUtils.calcDrawerMaxDrawdown(this.acct, this.records);
+        return this.fullCalc || { maxDd: 0, ddStart: '', ddEnd: '' };
       },
       ddText() {
         const dd = this.ddResult.maxDd;

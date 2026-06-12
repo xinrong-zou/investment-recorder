@@ -34,33 +34,86 @@
   }
 
   // -------------------------------------------------------------------
-  // 单账户计算：成本、当前值、收益、收益率、净值
+  // 单账户全量计算：一次遍历 → 最终净值 + 最大回撤 + 时序数组
   // -------------------------------------------------------------------
-  function calcAccount(acct, records) {
+  function calcAccountFull(acct, records) {
     const sorted = sortRecords(records);
+    const isCash = acct.account_type === 'cash';
     let cost = 0, lastRevalue = null, shares = 0;
-    sorted.forEach(r => {
+    let peak = 1, peakIdx = 0, ddVal = 0, ddStart = 0, ddEnd = 0;
+    const dates = [], totalValArr = [], totalCostArr = [], navArr = [], cumRetArr = [];
+    const dailyTransfers = {};
+
+    sorted.forEach((r, i) => {
       const amt = Number(r.amount);
       if (r.action_type === 'transfer_in') {
-        const curNav = lastRevalue != null ? (lastRevalue / (shares || 1)) : 1.0;
-        shares += amt / curNav;
+        if (!isCash) {
+          const curNav = lastRevalue != null ? (lastRevalue / (shares || 1)) : 1.0;
+          shares += amt / curNav;
+        }
         cost += amt;
         if (lastRevalue != null) lastRevalue += amt;
+        if (!dailyTransfers[r.record_date]) dailyTransfers[r.record_date] = { netIn: 0, netOut: 0 };
+        dailyTransfers[r.record_date].netIn += amt;
       } else if (r.action_type === 'transfer_out') {
-        const curNav = lastRevalue != null ? (lastRevalue / (shares || 1)) : 1.0;
-        shares -= amt / curNav;
+        if (!isCash) {
+          const curNav = lastRevalue != null ? (lastRevalue / (shares || 1)) : 1.0;
+          shares -= amt / curNav;
+        }
         cost -= amt;
         if (lastRevalue != null) lastRevalue -= amt;
+        if (!dailyTransfers[r.record_date]) dailyTransfers[r.record_date] = { netIn: 0, netOut: 0 };
+        dailyTransfers[r.record_date].netOut += amt;
       } else if (r.action_type === 'revalue') {
         lastRevalue = amt;
       }
+      // 快照（每步的市值、净值、累计收益）
+      const val = isCash ? cost : (lastRevalue != null ? lastRevalue : cost);
+      const nav = isCash ? 1.0 : (shares > 0 ? val / shares : 1.0);
+      dates.push(r.record_date);
+      totalValArr.push(val);
+      totalCostArr.push(cost);
+      navArr.push(nav);
+      cumRetArr.push(val - cost);
+      // 最大回撤跟踪
+      if (nav > peak) { peak = nav; peakIdx = i; }
+      const dd = (nav - peak) / peak;
+      if (dd < ddVal) { ddVal = dd; ddStart = peakIdx; ddEnd = i; }
     });
-    const isCash = acct.account_type === 'cash';
-    const val = isCash ? cost : (lastRevalue != null ? lastRevalue : cost);
-    const ret = val - cost;
+
+    // 清理净额为零的净转账
+    for (const d of Object.keys(dailyTransfers)) {
+      if (Math.abs(dailyTransfers[d].netIn - dailyTransfers[d].netOut) < 0.005) delete dailyTransfers[d];
+    }
+
+    const finalVal = sorted.length ? totalValArr[sorted.length - 1] : 0;
+    const finalNav = sorted.length ? navArr[sorted.length - 1] : 1.0;
+    const ret = finalVal - cost;
     const retPct = cost > 0 ? (ret / cost) * 100 : 0;
-    const nav = isCash ? 1.0 : (shares > 0 ? val / shares : 1.0);
-    return { costBasis: cost, currentValue: val, totalReturn: ret, returnPct: retPct, nav };
+
+    return {
+      costBasis: cost, currentValue: finalVal, totalReturn: ret, returnPct: retPct, nav: finalNav,
+      maxDd: ddVal,
+      ddStart: ddVal < 0 && sorted.length ? sorted[ddStart].record_date : '',
+      ddEnd: ddVal < 0 && sorted.length ? sorted[ddEnd].record_date : '',
+      dates, totalVal: totalValArr, totalCost: totalCostArr, navArr, cumRet: cumRetArr, dailyTransfers,
+    };
+  }
+
+  // -------------------------------------------------------------------
+  // 单账户计算：汇总（最终净值）
+  // -------------------------------------------------------------------
+  function calcAccount(acct, records) {
+    const full = calcAccountFull(acct, records);
+    return { costBasis: full.costBasis, currentValue: full.currentValue, totalReturn: full.totalReturn, returnPct: full.returnPct, nav: full.nav };
+  }
+
+  // -------------------------------------------------------------------
+  // 单账户最大回撤（用于抽屉详情）
+  // -------------------------------------------------------------------
+  function calcDrawerMaxDrawdown(acct, records) {
+    const full = calcAccountFull(acct, records);
+    return { maxDd: full.maxDd, ddStart: full.ddStart, ddEnd: full.ddEnd };
   }
 
   // -------------------------------------------------------------------
@@ -103,7 +156,7 @@
   }
 
   // -------------------------------------------------------------------
-  // 构建图表时序数据（增量 O(n) 算法）
+  // 构建图表时序数据（增量 O(n) 算法，组合级份额法）
   // -------------------------------------------------------------------
   function buildSeries(accounts, allRecords) {
     const dset = new Set();
@@ -145,12 +198,10 @@
           if (r.action_type === 'transfer_in') {
             st.cost += amt;
             if (st.lastRevalue != null) st.lastRevalue += amt;
-            // 无 paired_id = 外部入金 → 按当前组合净值折算份额
             if (!r.paired_id) totalShares += amt / (portfolioNav || 1.0);
           } else if (r.action_type === 'transfer_out') {
             st.cost -= amt;
             if (st.lastRevalue != null) st.lastRevalue -= amt;
-            // 无 paired_id = 外部出金 → 按当前组合净值赎回份额
             if (!r.paired_id) totalShares -= amt / (portfolioNav || 1.0);
           } else if (r.action_type === 'revalue') {
             st.lastRevalue = amt;
@@ -176,7 +227,7 @@
   }
 
   // -------------------------------------------------------------------
-  // 最大回撤
+  // 最大回撤（基于组合图表数据）
   // -------------------------------------------------------------------
   function calcMaxDrawdown(accounts, allRecords) {
     const data = buildSeries(accounts, allRecords);
@@ -188,38 +239,6 @@
       if (dd < maxDd) { maxDd = dd; ddStart = peakIdx; ddEnd = i; }
     }
     return { maxDd, ddStart: data.dates[ddStart], ddEnd: data.dates[ddEnd] };
-  }
-
-  // -------------------------------------------------------------------
-  // 单账户最大回撤（用于抽屉详情）
-  // -------------------------------------------------------------------
-  function calcDrawerMaxDrawdown(acct, records) {
-    const sorted = sortRecords(records);
-    if (sorted.length < 2) return { maxDd: 0, ddStart: '', ddEnd: '' };
-    let val = 0, cost = 0, shares = 0, peak = 1, peakIdx = 0, ddVal = 0, ddStart = 0, ddEnd = 0;
-    for (let i = 0; i < sorted.length; i++) {
-      const r = sorted[i];
-      const amt = Number(r.amount);
-      if (r.action_type === 'transfer_in') {
-        if (acct.account_type === 'investment') {
-          const curNav = shares > 0 ? val / shares : 1.0;
-          shares += amt / curNav;
-        }
-        val += amt; cost += amt;
-      } else if (r.action_type === 'transfer_out') {
-        if (acct.account_type === 'investment') {
-          const curNav = shares > 0 ? val / shares : 1.0;
-          shares -= amt / curNav;
-        }
-        val -= amt; cost -= amt;
-      } else if (r.action_type === 'revalue') { val = amt; }
-      const nav = acct.account_type === 'investment' ? (shares > 0 ? val / shares : val) : val;
-      if (nav > peak) { peak = nav; peakIdx = i; }
-      const dd = (nav - peak) / peak;
-      if (dd < ddVal) { ddVal = dd; ddStart = peakIdx; ddEnd = i; }
-    }
-    if (ddVal < 0) return { maxDd: ddVal, ddStart: sorted[ddStart].record_date, ddEnd: sorted[ddEnd].record_date };
-    return { maxDd: 0, ddStart: '', ddEnd: '' };
   }
 
   // -------------------------------------------------------------------
@@ -245,6 +264,7 @@
     fmt, fmtPct, fmtS,
     sortRecords,
     calcAccount,
+    calcAccountFull,
     calcXIRR,
     buildSeries,
     calcMaxDrawdown,

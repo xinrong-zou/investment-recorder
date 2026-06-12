@@ -11,6 +11,7 @@
       scope: { type: String, default: 'all' },        // 'all' | 'single'
       records: { type: Array, default: () => [] },
       accountType: { type: String, default: 'investment' },
+      precomputed: { type: Object, default: null },    // calcAccountFull 结果，避免重复计算
       height: { type: Number, default: 260 },
       showPie: { type: Boolean, default: false },
       range: { type: String, default: 'all' },
@@ -99,34 +100,16 @@
           this.empty = false;
           ({ dates, totalVal, totalCost, nav, cumRet, dailyTransfers } = data);
         } else {
-          // 单账户模式
-          const sorted = window.calcUtils.sortRecords(this.records);
-          if (sorted.length < 2) { this.empty = true; this.disposeChart(); return; }
+          // 单账户模式 — 优先使用预计算数据，避免重复遍历
+          const full = this.precomputed || window.calcUtils.calcAccountFull({ account_type: this.accountType, name: 'tmp' }, this.records);
+          if (!full.dates || full.dates.length < 2) { this.empty = true; this.disposeChart(); return; }
           this.empty = false;
-          let value = 0, cost = 0, shares = 0;
-          dates = []; totalVal = []; totalCost = []; nav = []; cumRet = []; dailyTransfers = {};
-          for (const r of sorted) {
-            const amt = Number(r.amount);
-            if (r.action_type === 'transfer_in') {
-              if (this.accountType === 'investment') {
-                const curNav = shares > 0 ? value / shares : 1.0;
-                shares += amt / curNav;
-              }
-              value += amt; cost += amt;
-              if (!dailyTransfers[r.record_date]) dailyTransfers[r.record_date] = { netIn: 0, netOut: 0 };
-              dailyTransfers[r.record_date].netIn += amt;
-            } else if (r.action_type === 'transfer_out') {
-              if (this.accountType === 'investment') {
-                const curNav = shares > 0 ? value / shares : 1.0;
-                shares -= amt / curNav;
-              }
-              value -= amt; cost -= amt;
-              if (!dailyTransfers[r.record_date]) dailyTransfers[r.record_date] = { netIn: 0, netOut: 0 };
-              dailyTransfers[r.record_date].netOut += amt;
-            } else if (r.action_type === 'revalue') value = amt;
-            const navPlot = this.accountType === 'investment' ? (shares > 0 ? value / shares : 1.0) : 1.0;
-            dates.push(r.record_date); totalVal.push(value); totalCost.push(cost); nav.push(navPlot); cumRet.push(value - cost);
-          }
+          dates = full.dates;
+          totalVal = full.totalVal;
+          totalCost = full.totalCost;
+          nav = full.navArr;
+          cumRet = full.cumRet;
+          dailyTransfers = full.dailyTransfers;
         }
 
         // 日期范围截取
