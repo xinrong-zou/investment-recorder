@@ -2,590 +2,840 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-  <meta name="description" content="个人投资理财追踪工具 - 多账户管理、收益率计算、资产走势可视化">
-  <meta name="theme-color" content="#1e40af">
-  <meta property="og:title" content="收益账本">
-  <meta property="og:description" content="个人投资理财追踪工具">
-  <meta property="og:url" content="https://qyit.eu.org">
-  <meta property="og:type" content="website">
-  <link rel="manifest" href="manifest.json">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>收益账本 - 投资看板</title>
+  <meta name="description" content="收益账本是一款免费的个人投资理财追踪工具。多账户管理、XIRR年化收益率计算、资产走势可视化、净值曲线分析，助你轻松掌握每一笔投资。">
+  <meta property="og:title" content="收益账本 - 个人投资理财追踪工具">
+  <meta property="og:description" content="多账户管理 · XIRR收益率 · 资产走势图 · 净值分析 —— 免费开源的个人投资账本">
+  <meta property="og:image" content="https://qyit.eu.org/icons/icon-512.png">
+  <meta property="og:url" content="https://qyit.eu.org/">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="canonical" href="https://qyit.eu.org/">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"收益账本","url":"https://qyit.eu.org","description":"个人投资理财追踪工具，支持多账户管理、XIRR收益率计算、资产走势可视化","applicationCategory":"FinanceApplication","operatingSystem":"Web","browserRequirements":"Requires JavaScript"}</script>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <title>收益账本</title>
+  <link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512.png">
   <link rel="stylesheet" href="style.css">
-  <!-- ECharts -->
-  <script src="https://unpkg.com/echarts@5.5.1/dist/echarts.min.js"></script>
-  <!-- SheetJS for export -->
-  <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <!-- Vue 3 -->
-  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-</head>
-<body>
-  <div id="app">
-    <!-- 导航栏 (由 nav-bar.js 渲染) -->
-    <nav id="navbar" class="navbar"></nav>
-
-    <!-- 主容器 -->
-    <main id="mainContent" style="max-width:960px;margin:0 auto;padding:10px 12px 80px;">
-
-      <!-- 汇总卡片 (Vue) -->
-      <div id="summaryCardContainer"></div>
-
-      <!-- 基金面板 -->
-      <div id="fundPanel" style="display:none;margin-top:10px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 4px;">
-          <span style="font-weight:600;font-size:0.9rem;color:var(--text);">基金管理</span>
-          <div style="display:flex;gap:6px;">
-            <button class="btn btn-sm" onclick="addInvestor()" style="font-size:0.78rem;">+ 添加成员</button>
-          </div>
-        </div>
-        <div id="investorList" style="display:flex;flex-direction:column;gap:6px;"></div>
-      </div>
-
-      <!-- 账户筛选 + 操作栏 -->
-      <div id="controls" style="display:flex;align-items:center;gap:6px;margin-top:14px;flex-wrap:wrap;">
-        <button class="btn btn-sm" onclick="openAddAccount()" style="font-size:0.78rem;">+ 新建账户</button>
-        <select id="accountFilter" class="input" style="width:auto;font-size:0.78rem;" onchange="render()">
-          <option value="all">全部账户</option>
-          <option value="cash">仅现金</option>
-          <option value="investment">仅投资</option>
-        </select>
-        <label style="display:inline-flex;align-items:center;gap:4px;font-size:0.78rem;cursor:pointer;margin-left:auto;">
-          <input type="checkbox" id="showHiddenCheck" onchange="toggleHidden()" style="margin:0;"> 显示隐藏
-        </label>
-        <button class="btn btn-sm" onclick="exportData()" style="font-size:0.78rem;" title="导出 Excel">📥</button>
-        <button class="btn btn-sm" onclick="openSyncDialog()" style="font-size:0.78rem;" title="同步状态">☁️</button>
-      </div>
-
-      <!-- 账户列表容器 -->
-      <div id="accountList" style="margin-top:8px;"></div>
-    </main>
-
-    <!-- Toast 容器 -->
-    <div id="toastContainer" style="position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:1003;display:flex;flex-direction:column;gap:6px;pointer-events:none;"></div>
-
-    <!-- 弹窗遮罩 -->
-    <div id="modalOverlay" class="modal-overlay" onclick="closeAllModals()">
-      <div id="accountModal" class="modal" onclick="event.stopPropagation()">
-        <div class="modal-header">
-          <span id="accountModalTitle">新建账户</span>
-          <button class="modal-close" onclick="closeAllModals()">✕</button>
-        </div>
-        <div class="modal-body">
-          <input id="accountName" class="input" placeholder="账户名称" style="margin-bottom:10px;">
-          <select id="accountType" class="input" style="margin-bottom:10px;">
-            <option value="investment">投资账户</option>
-            <option value="cash">现金账户</option>
-          </select>
-          <button id="saveAccountBtn" class="btn btn-primary" onclick="saveAccount()">创建</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ====== ====== -->
-  <!-- 同步状态弹窗 -->
-  <div id="syncModalOverlay" class="modal-overlay" onclick="closeSyncDialog()">
-    <div class="modal" onclick="event.stopPropagation()" style="max-width:400px;">
-      <div class="modal-header">
-        <span>同步状态</span>
-        <button class="modal-close" onclick="closeSyncDialog()">✕</button>
-      </div>
-      <div class="modal-body" id="syncStatusBody" style="font-size:0.85rem;"></div>
-    </div>
-  </div>
-
-  <!-- ====== ====== -->
-  <!-- 弹窗（记录编辑/账户编辑） -->
-  <div id="editModalOverlay" class="modal-overlay" onclick="closeEditModal()">
-    <div id="editModal" class="modal" onclick="event.stopPropagation()" style="max-width:420px;">
-      <div class="modal-header">
-        <span id="editModalTitle">编辑</span>
-        <button class="modal-close" onclick="closeEditModal()">✕</button>
-      </div>
-      <div id="editModalBody" class="modal-body" style="min-height:100px;"></div>
-    </div>
-  </div>
-
-  <!-- ====== ====== -->
-  <!-- 外部 JS -->
-  <script src="app-state.js"></script>
-  <script src="calc-utils.js"></script>
-  <script src="nav-bar.js"></script>
-  <script src="data-service.js"></script>
-  <script src="achievement-system.js"></script>
-
-  <!-- ====== ====== -->
-  <!-- 主脚本 -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1e40af">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="收益账本">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <script>
-  'use strict';
-
-  // ====== PWA 版本跟踪 ======
-  // 必须与 service-worker.js 中的 CACHE_NAME 保持一致
-  const APP_VERSION = '收益账本-v4';
-  (function() {
-    try {
-      var prev = localStorage.getItem('hermes_sw_version');
-      if (prev && prev !== APP_VERSION) {
-        // 版本变了 → 标记需要立即检查 SW 更新
-        localStorage.setItem('hermes_sw_force_update', '1');
-      }
-      localStorage.setItem('hermes_sw_version', APP_VERSION);
-    } catch(e) {}
-  })();
-
-  // ====== helpers ======
-  const $ = id => document.getElementById(id);
-  const fmtYuan = n => '¥' + Number(n).toLocaleString('zh-CN', {minimumFractionDigits:2, maximumFractionDigits:2});
-  const fmtYuanInput = n => Number(n).toFixed(2);
-  function openModal(id){$(id).parentElement.style.display='flex';}
-  function closeAllModals(){
-    document.querySelectorAll('.modal-overlay').forEach(m=>m.style.display='none');
-    closeEditModal();
-  }
-  // 关闭函数
-  function openModal(id){$(id).parentElement.style.display='flex';}
-  function closeModal(el){el.parentElement.style.display='none';}
-  // 点击遮罩关闭 — 用 mousedown 而非 click.self
-  document.addEventListener('mousedown',function(e){
-    if(e.target.classList.contains('modal-overlay')){
-      e.target.style.display='none';
-      closeEditModal();
-    }
-  });
-
-  // ====== PWA Install ======
-  let deferredPrompt;
-  window.addEventListener('beforeinstallprompt',e=>{
-    e.preventDefault();
-    deferredPrompt=e;
-    const b=document.querySelector('.install-banner');
-    if(b)b.style.display='flex';
-  });
-  window.installPWA=async function(){
-    if(!deferredPrompt)return;
-    deferredPrompt.prompt();
-    const r=await deferredPrompt.userChoice;
-    deferredPrompt=null;
-    const b=document.querySelector('.install-banner');
-    if(b)b.remove();
-  };
-
-  // ====== Service Worker 注册 + 版本感知更新 ======
-  // 版本变化标记提前读取（在 load 事件前）
-  var swForceUpdate = (function(){
-    try { var f = localStorage.getItem('hermes_sw_force_update'); localStorage.removeItem('hermes_sw_force_update'); return f === '1'; } catch(e) { return false; }
-  })();
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function() {
-      navigator.serviceWorker.register('service-worker.js').then(function(reg) {
-        // 版本变化或每次加载都检查更新（浏览器对 SW 脚本有独立的更新检查机制）
-        reg.update();
-        if (swForceUpdate) { console.log('[sw] version changed, force update check completed'); }
-
-        reg.addEventListener('updatefound', function() {
-          var newWorker = reg.installing;
-          newWorker.addEventListener('statechange', function() {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              var tc=document.getElementById('toastContainer');
-              if(tc)tc.innerHTML='<div style="background:#1e40af;color:#fff;padding:10px 16px;border-radius:8px;font-size:0.85rem;display:flex;align-items:center;gap:10px;box-shadow:0 4px 12px rgba(0,0,0,0.15);">🆕 新版本可用 <button onclick="applySWUpdate()" style="background:#fff;color:#1e40af;border:none;padding:4px 12px;border-radius:6px;font-size:0.8rem;cursor:pointer;font-weight:600;">立即更新</button></div>';
-            }
-          });
-        });
-        // 定期检查
-        setInterval(function(){reg.update();}, 30*60*1000);
-        document.addEventListener('visibilitychange',function(){if(!document.hidden)reg.update();});
-      }).catch(function(){});
-    });
-  }
-  window.applySWUpdate = function() {
-    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({type:'SKIP_WAITING'});
-    }
-    // 等待新 SW 激活后页面自动刷新
-    navigator.serviceWorker.addEventListener('controllerchange',function(){window.location.reload();});
-  };
-
-  // ====== 初始化 Store ======
-  var store = window.__store;
-  /* store 由 app-state.js 初始化 */
-
-  // ====== 清理失效记录（server-only 标记） ======
-  async function cleanupOrphanedRecords(accountId, serverRecords) {
-    if (!accountId || !serverRecords) return;
-    var localRecs = store.allRecords[accountId];
-    if (!localRecs) return;
-    var serverIds = new Set(serverRecords.map(function(r){return r.id;}));
-    var removed = [];
-    for (var i = localRecs.length-1; i >= 0; i--) {
-      if (!serverIds.has(localRecs[i].id)) {
-        removed.push(localRecs[i].id);
-        localRecs.splice(i,1);
-      }
-    }
-    if (removed.length > 0) { /* 无操作，仅清除本地 */ }
-  }
-
-  // ====== 数据加载 ======
-  window.appReady = (async function initApp() {
-    try {
-      // 等待 store 初始化
-      while (!store.currentUser) { await new Promise(r=>setTimeout(r,50)); }
-      var client = window.__supabase;
-      if (!client) { console.warn('[init] supabase not ready'); return; }
-
-      // 判断是登录状态还是试用
-      var isLoggedIn = store.currentUser && store.currentUser.id;
-
-      // —— 登录用户 ——
-      if (isLoggedIn) {
-        var userId = store.currentUser.id;
-
-        // 加载投资人列表（基金模式用）
-        var{data:invs}=await window.cachedQuery('invs_'+userId,function(){return client.from('fund_investors').select('*').eq('user_id',userId).order('sort_order').order('created_at');});
-        store.investors=invs||[];
-
-        // 加载账户
-        var{data:accts}=await window.cachedQuery('accts_'+userId,function(){return client.from('accounts').select('*').eq('user_id',userId).order('created_at',{ascending:true});});
-        store.accounts=accts||[];
-
-        // 加载每个账户的记录
-        for (var a of store.accounts) {
-          var{data:recs}=await window.cachedQuery('recs_'+a.id,function(){return client.from('investment_records').select('id,account_id,record_date,action_type,amount,note,investor_id,paired_id,updated_at').eq('account_id',a.id).order('record_date',{ascending:true}).order('id',{ascending:true});});
-          store.allRecords[a.id]=recs||[];
+    const APP_VERSION = '4';
+    // 检测版本更新（不依赖 SW）
+    (function(){
+      try{
+        const v = localStorage.getItem('hermes_app_version');
+        if(v && v !== APP_VERSION){
+          localStorage.setItem('hermes_app_version', APP_VERSION);
+          const tc = document.getElementById('toastContainer');
+          if(tc)tc.innerHTML='<div style="background:#1e40af;color:#fff;padding:10px 16px;border-radius:8px;font-size:0.85rem;display:flex;align-items:center;gap:10px;box-shadow:0 4px 12px rgba(0,0,0,0.15);">🆕 新版本可用 <button onclick="location.reload()" style="background:#fff;color:#1e40af;border:none;padding:4px 12px;border-radius:6px;font-size:0.8rem;cursor:pointer;font-weight:600;">立即更新</button></div>';
+        } else {
+          localStorage.setItem('hermes_app_version', APP_VERSION);
         }
-
-        store.ready=true;
-      }
-
-      // 恢复基金模式偏好
-      try{var fm=localStorage.getItem('hermes_fund_mode');if(fm==='1'){store.fundMode=true;}}catch(e){}
-
-      // —— 渲染 ——
-      render();
-      mountComponents();
-      if (store.fundMode) {
-        var panel=$('fundPanel');
-        if(panel)panel.style.display='block';
-        renderInvestorList();
-      }
-
-      // 监听同步状态变化
-      if(typeof window.onSyncStateChange==='function'){
-        window.onSyncStateChange(function(){render();});
-      }
-
-      // —— 后加载：版本检测 & 后台同步初始化 ——
-      setTimeout(function(){
-        // 启动定时同步
-        if(typeof window.initSyncScheduler==='function') window.initSyncScheduler();
-        // 检测 Fund 模式成就不提示
-        if(store.fundMode){window._inFundMode=true;}
-      },1000);
-
-    } catch(e) {
-      console.error('[init]', e);
+      }catch(e){}
+    })();
+    let deferredPrompt=null;
+    // PWA 安装提示
+    window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;showInstallBanner();});
+    window.addEventListener('appinstalled',()=>{deferredPrompt=null;const tc=document.getElementById('toastContainer');if(tc){const b=tc.querySelector('.install-banner');if(b)b.remove();}});
+    function showInstallBanner(){
+      const tc=document.getElementById('toastContainer');
+      if(!tc||tc.querySelector('.install-banner'))return;
+      const div=document.createElement('div');
+      div.className='install-banner';
+      div.style.cssText='background:#1e40af;color:#fff;padding:10px 16px;border-radius:8px;font-size:0.85rem;display:flex;align-items:center;gap:10px;box-shadow:0 4px 12px rgba(0,0,0,0.15);margin-bottom:8px;';
+      div.innerHTML='📲 安装收益账本到主屏幕 <button onclick="installPWA()" style="background:#fff;color:#1e40af;border:none;padding:4px 12px;border-radius:6px;font-size:0.8rem;cursor:pointer;font-weight:600;">安装</button><button onclick="this.parentElement.remove()" style="background:transparent;color:rgba(255,255,255,0.7);border:none;font-size:1.1rem;cursor:pointer;padding:0 2px;">✕</button>';
+      tc.appendChild(div);
     }
-  })();
-
-  // ====== 渲染函数 ======
-  function getVisibleAccounts(){
-    var s=store;
-    var filter=$('accountFilter')?.value||'all';
-    var showHidden=!!s.showHidden;
-    return s.accounts.filter(function(a){
-      if(!showHidden&&a.hidden)return false;
-      if(filter==='cash'&&a.account_type!=='cash')return false;
-      if(filter==='investment'&&a.account_type!=='investment')return false;
-      return true;
-    });
-  }
-
-  function render(){
-    var s=store;
-    if(!s.ready){$('accountList').innerHTML='<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:0.9rem;">加载中...</div>';return;}
-    if(!s.accounts.length){$('accountList').innerHTML='<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:0.9rem;">暂无账户，点击上方按钮创建</div>';return;}
-
-    var visible=getVisibleAccounts();
-    if(!visible.length){
-      $('accountList').innerHTML='<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:0.9rem;">没有可见的账户</div>';
-      return;
-    }
-
-    // 计算总体统计
-    var totalVal=0,totalCost=0,totalNavVal=1;
-    var series=window.calcUtils.buildSeries(s.accounts,s.allRecords);
-    if(series&&series.nav.length){
-      totalVal=series.totalVal;
-      totalCost=series.totalCost;
-      totalNavVal=series.nav[series.nav.length-1];
-    }
-    var totalRet=totalVal-totalCost;
-    var totalRetPct=totalCost>0?(totalRet/totalCost)*100:0;
-    const{maxDd,ddStart,ddEnd}=window.calcMaxDrawdown();
-    store.totalVal=totalVal; store.totalCost=totalCost; store.totalRet=totalRet;
-    store.totalRetPct=totalRetPct; store.totalNavVal=totalNavVal;
-    store.maxDd=maxDd; store.ddStart=ddStart; store.ddEnd=ddEnd;
-    var allFlows=[];
-    s.accounts.forEach(function(a){(s.allRecords[a.id]||[]).forEach(function(r){allFlows.push(r);});});
-    store.totalXirr=calcXIRR(allFlows,'investment', totalVal);
-    var hasHidden=s.accounts.some(function(a){return a.hidden;});$('showHiddenToggle').style.display=hasHidden?'':'none';
-    // 计算投资人权益
-    store.fundMembers = window.calcFundMembers();
-    if (store.fundMode) {
-      var panel=$('fundPanel');
-      if(panel)panel.style.display='block';
-      renderInvestorList();
-    }
-    window.checkAchievements(totalVal,totalRet);
-  }
-
-  // ====== 账户操作 ======
-  function togglePrivacy(){window.__store.privacyMode=!window.__store.privacyMode;try{localStorage.setItem('hermes_privacy_mode',window.__store.privacyMode?'1':'0');}catch(e){}render();}
-  function toggleHidden(){window.__store.showHidden=$('showHiddenCheck').checked;render();}
-  async function hideAccount(id){
-    var s=window.__store;
-    var a=s.accounts.find(function(x){return x.id===id;});
-    if(a)a.hidden=true;
-    window.enqueueOp('update_account',{accountId:id,updates:{hidden:true}});
-    window.toast('已隐藏','success');window.hideAchievement();render();
-  }
-  async function unhideAccount(id){
-    var s=window.__store;
-    var a=s.accounts.find(function(x){return x.id===id;});
-    if(a)a.hidden=false;
-    window.enqueueOp('update_account',{accountId:id,updates:{hidden:false}});
-    window.toast('已取消隐藏','success');render();
-  }
-  function openAddAccount(){$('accountModalTitle').textContent='新建账户';$('saveAccountBtn').textContent='创建';$('accountName').value='';$('accountType').value='investment';openModal('accountModal');}
-  async function getUserPlan(){
-    var store=window.__store;
-    try{
-      var{data}=await window.cachedQuery('plan_'+store.currentUser.id,function(){return client.from('subscriptions').select('plan,expires_at').eq('user_id',store.currentUser.id).maybeSingle();});
-      if(!data||data.plan!=='pro')return'free';
-      if(!data.expires_at)return'pro';
-      return new Date(data.expires_at)>new Date()?'pro':'free';
-    }catch(e){return 'free';}
-  }
-  function isFrozenAccount(accountId){
-    var store=window.__store;
-    var sorted=[].concat(store.accounts).sort(function(a,b){return new Date(a.created_at)-new Date(b.created_at);});
-    var cashCount=0,investCount=0;
-    for(var i=0;i<sorted.length;i++){
-      var a=sorted[i];
-      if(a.account_type==='cash')cashCount++;
-      else investCount++;
-      if(a.id===accountId){
-        if(a.account_type==='cash')return cashCount>1;
-        return investCount>5;
-      }
-    }
-    return false;
-  }
-
-  // ====== 基金模式管理 ======
-  function toggleFundMode(){
-    store.fundMode=!store.fundMode;
-    try{localStorage.setItem('hermes_fund_mode',store.fundMode?'1':'0');}catch(e){}
-    if(store.fundMode){
-      renderInvestorList();
-    }
-    render();
-  }
-  function showFundIntro(){
-    window.toast('基金模式：邀请家人加入，每笔出入金按当日净值折算份额，权益公平分配','info');
-  }
-  async function addInvestor(){
-    var name=prompt('输入成员名称：');
-    if(!name||!name.trim())return;
-    name=name.trim();
-    var client=window.__supabase;
-    if(!client)return;
-    var{data,error}=await client.from('fund_investors').insert({user_id:store.currentUser.id,name:name}).select().single();
-    if(error){alert('添加失败：'+error.message);return;}
-    store.investors.push(data);
-    var cnt=store.investors.length;
-    store.fundMembers=window.calcFundMembers();
-    renderInvestorList();
-    // 成就检测
-    window.triggerAchievement('开基立业');
-    if(cnt>=2)window.triggerAchievement('二人同心');
-    if(cnt>=3)window.triggerAchievement('群策群力');
-    if(cnt>=8)window.triggerAchievement('八方来财');
-  }
-  async function deleteInvestor(id,name){
-    if(!confirm('确定删除成员「'+name+'」？\n\n该成员的历史记录不受影响，但会失去份额权益。'))return;
-    var client=window.__supabase;
-    if(!client)return;
-    var{error}=await client.from('fund_investors').delete().eq('id',id);
-    if(error){alert('删除失败：'+error.message);return;}
-    store.investors=store.investors.filter(function(i){return i.id!==id;});
-    store.fundMembers=window.calcFundMembers();
-    renderInvestorList();
-    render();
-  }
-
-  // 渲染投资人列表
-  function renderInvestorList(){
-    var store=window.__store;
-    var el=$('investorList');
-    if(!el)return;
-    var members=store.fundMembers||[];
-    var totalVal=store.totalVal||0;
-    var totalCost=store.totalCost||0;
-    var pm=store.privacyMode;
-    var priv=function(v){return pm?'******':v;};
-    if(!store.investors.length&&!totalVal){
-      el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.85rem;">暂无成员，点击上方按钮添加</div>';
-      return;
-    }
-    var html='';
-    // 管理人（剩余权益）
-    var invVal=members.reduce(function(s,m){return s+m.currentValue;},0);
-    var invInvested=members.reduce(function(s,m){return s+m.totalInvested;},0);
-    var invShares=members.reduce(function(s,m){return s+m.shares;},0);
-    var mgrVal=totalVal-invVal;
-    var mgrInvested=totalCost-invInvested;
-    var mgrRet=mgrVal-mgrInvested;
-    var mgrPct=mgrInvested>0?(mgrRet/mgrInvested)*100:0;
-    var mgrPctStr=mgrPct>=0?'+'+mgrPct.toFixed(2)+'%':mgrPct.toFixed(2)+'%';
-    // 份额计算：总份额 = 总资产 / 最新净值，管理人的 = 总份额 - 投资人份额
-    var curNav=store.totalNavVal||1;
-    var totalShares=totalVal/curNav;
-    var mgrShares=Math.max(0,totalShares-invShares);
-    var mgrSharePct=totalShares>0?((mgrShares/totalShares)*100).toFixed(1):'0.0';
-    html+='<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:8px;border-left:3px solid #3b82f6;">'+
-      '<div style="flex:1;">'+
-        '<div style="font-weight:600;font-size:0.9rem;">管理人（我）</div>'+
-        '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">份额 '+priv(mgrShares.toFixed(2))+' · 占比 '+mgrSharePct+'%</div>'+
-      '</div>'+
-      '<div style="text-align:right;">'+
-        '<div style="font-weight:700;font-size:0.95rem;">'+window.fmtS(mgrVal)+'</div>'+
-        '<div style="font-size:0.7rem;color:'+(mgrRet>=0?'#dc2626':'#2563eb')+';margin-top:1px;">浮盈 '+window.fmtS(mgrRet)+'</div>'+
-        '<div style="font-size:0.7rem;color:var(--text-muted);margin-top:1px;">投入 '+window.fmtS(mgrInvested)+' · '+mgrPctStr+'</div>'+
-      '</div>'+
-    '</div>';
-    for(var i=0;i<store.investors.length;i++){
-      var inv=store.investors[i];
-      var m=null;
-      for(var j=0;j<members.length;j++){if(members[j].id===inv.id){m=members[j];break;}}
-      var val=m?m.currentValue:0;
-      var invested=m?m.totalInvested:0;
-      var ret=m?m['return']:0;
-      var pct=m?m.returnPct:0;
-      var pctStr=pct>=0?'+'+pct.toFixed(2)+'%':pct.toFixed(2)+'%';
-      var sharePct=totalShares>0?((m.shares/totalShares)*100).toFixed(1):'0.0';
-      html+='<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:8px;">'+
-        '<div style="flex:1;">'+
-          '<div style="font-weight:600;font-size:0.9rem;">'+inv.name+'</div>'+
-          '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">份额 '+priv(m?m.shares.toFixed(2):'0.00')+' · 占比 '+sharePct+'%</div>'+
-        '</div>'+
-        '<div style="text-align:right;">'+
-          '<div style="font-weight:700;font-size:0.95rem;">'+window.fmtS(val)+'</div>'+
-          '<div style="font-size:0.7rem;color:'+(ret>=0?'#dc2626':'#2563eb')+';margin-top:1px;">浮盈 '+window.fmtS(ret)+'</div>'+
-          '<div style="font-size:0.7rem;color:var(--text-muted);margin-top:1px;">投入 '+window.fmtS(invested)+' · '+pctStr+'</div>'+
-        '</div>'+
-        '<button class="btn btn-sm btn-ghost" onclick="deleteInvestor(\''+inv.id+'\',\''+inv.name+'\')" style="padding:2px 6px;font-size:0.8rem;color:var(--text-muted);" title="删除">✕</button>'+
-      '</div>';
-    }
-    el.innerHTML=html;
-  }
-
-  // ====== 导出 Excel ======
-  function exportData(){
-    var store=window.__store;
-    if(!store.accounts.length){window.toast('没有数据可导出','error');return;}
-    try{
-      var rows=[];
-      var header=['账户名称','账户类型','日期','操作类型','金额','备注'];
-      for(var ai=0;ai<store.accounts.length;ai++){
-        var a=store.accounts[ai];
-        var recs=store.allRecords[a.id]||[];
-        if(recs.length===0){
-          rows.push({账户名称:a.name,账户类型:a.account_type==='cash'?'现金':'投资',日期:'',操作类型:'',金额:'',备注:''});
-        }else{
-          recs.sort(function(x,y){return new Date(y.record_date)-new Date(x.record_date);}).forEach(function(r){
-            var tl=r.action_type==='transfer_in'?'转入':r.action_type==='transfer_out'?'转出':'更新市值';
-            rows.push({
-              账户名称:a.name,
-              账户类型:a.account_type==='cash'?'现金':'投资',
-              日期:r.record_date,
-              操作类型:tl,
-              金额:Number(r.amount).toFixed(2),
-              备注:r.note||''
+    window.installPWA=function(){
+      if(!deferredPrompt)return;
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(()=>{deferredPrompt=null;const b=document.querySelector('.install-banner');if(b)b.remove();});
+    };
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js').then(reg => {
+          // 立即检查更新（PWA 冷启动时触发）
+          reg.update();
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                const tc=document.getElementById('toastContainer');
+                if(tc)tc.innerHTML='<div style="background:#1e40af;color:#fff;padding:10px 16px;border-radius:8px;font-size:0.85rem;display:flex;align-items:center;gap:10px;box-shadow:0 4px 12px rgba(0,0,0,0.15);">🆕 新版本可用 <button onclick="applySWUpdate()" style="background:#fff;color:#1e40af;border:none;padding:4px 12px;border-radius:6px;font-size:0.8rem;cursor:pointer;font-weight:600;">立即更新</button></div>';
+              }
             });
           });
-        }
+          // 每30分钟检查一次更新
+          setInterval(()=>{reg.update();},30*60*1000);
+          // 页面可见时也检查
+          document.addEventListener('visibilitychange',()=>{if(!document.hidden)reg.update();});
+        }).catch(() => {});
+      });
+    }
+    window.applySWUpdate = function() {
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({type: 'SKIP_WAITING'});
+        window.location.reload();
       }
-      var ws=XLSX.utils.json_to_sheet(rows,{header:header});
-      ws['!cols']=[{wch:12},{wch:8},{wch:12},{wch:8},{wch:12},{wch:20}];
-      var wb=XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb,ws,'收益记录');
-      // 生成多个工作表
-      // 2) 记录详情 sheet
-      var detailRows=[];
-      header.push('来源');
-      for(var di=0;di<store.accounts.length;di++){
-        var da=store.accounts[di];
-        var drecs=store.allRecords[da.id]||[];
-        for(var dri=0;dri<drecs.length;dri++){
-          var dr=drecs[dri];
-          var ttl=dr.action_type==='transfer_in'?'转入':dr.action_type==='transfer_out'?'转出':'更新市值';
-          detailRows.push({
-            账户名称:da.name,
-            账户类型:da.account_type==='cash'?'现金':'投资',
-            日期:dr.record_date,
-            操作类型:ttl,
-            金额:Number(dr.amount).toFixed(2),
-            备注:dr.note||'',
-            来源:'manual'
-          });
-        }
-      }
-      if(detailRows.length){
-        var detailHeader=['账户名称','账户类型','日期','操作类型','金额','备注','来源'];
-        var ws2=XLSX.utils.json_to_sheet(detailRows,{header:detailHeader});
-        XLSX.utils.book_append_sheet(wb,ws2,'明细');
-      }
-      XLSX.writeFile(wb,'收益账本_'+new Date().toISOString().slice(0,10)+'.xlsx');
-      window.toast('导出成功','success');
-    }catch(e){
-      console.error(e);
-      window.toast('导出失败','error');
+    };
+  </script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    .dash-layout { display: flex; min-height: calc(100vh - 60px); }
+    .dash-main { flex: 1; padding: 20px; max-width: 1000px; margin: 0 auto; overflow-y: auto; }
+    .summary-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px 20px; margin-bottom: 24px; }
+    .summary-card .total-row { margin-bottom: 6px; }
+    .summary-card .total-row .v { font-size: 1.6rem; font-weight: 800; color: var(--text); line-height: 1.2; }
+    .summary-card .total-row .l { font-size: 0.75rem; color: var(--text-muted); }
+    .summary-card .sub-row { display: flex; flex-wrap: wrap; gap: 6px 20px; }
+    .summary-card .sub-row .stat { flex: 1; min-width: 60px; text-align: left; }
+    .summary-card .sub-row .stat .v { font-size: 1rem; font-weight: 700; color: var(--text); white-space: nowrap; }
+    .summary-card .sub-row .stat .v.profit { color: #dc2626; }
+    .summary-card .sub-row .stat .v.loss { color: #2563eb; }
+    .summary-card .sub-row .stat .l { font-size: 0.68rem; color: var(--text-muted); margin-top: 1px; }
+    .summary-card .sub-row .stat .sub { font-size: 0.65rem; color: var(--text-muted); }
+    .account-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .account-card { padding: 20px; position: relative; cursor: pointer; transition: border-color 0.15s; }
+    .account-card:hover { border-color: var(--primary-light); }
+    .acct-stats .row-main { display: flex; gap: 4px; }
+    .acct-stats .row-extra { display: flex; gap: 4px; margin-top: 2px; }
+    .acct-stats .row-extra .stat .v { font-size: 0.78rem; }
+    .acct-stats .row-extra .stat .l { font-size: 0.6rem; }
+    .account-card .acct-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .account-card .acct-name { font-size: 1.05rem; font-weight: 700; }
+    .account-card .acct-type { font-size: 0.72rem; padding: 1px 8px; border-radius: 10px; font-weight: 500; }
+    .type-cash { background: #f0fdf4; color: #059669; }
+    .type-investment { background: #eff6ff; color: #1e40af; }
+    .acct-stats { margin-bottom: 10px; pointer-events: none; }
+    .acct-stats .total-val { font-size: 1.2rem; font-weight: 800; color: var(--text); }
+    .acct-stats .total-lbl { font-size: 0.7rem; color: var(--text-muted); margin-bottom: 4px; }
+    .acct-stats .row { display: flex; gap: 4px; }
+    .acct-stats .stat { flex: 1; min-width: 40px; text-align: center; }
+    .acct-stats .stat .v { font-size: 0.9rem; font-weight: 700; white-space: nowrap; }
+    .acct-stats .stat .l { font-size: 0.65rem; color: var(--text-muted); white-space: nowrap; }
+    .acct-actions { display: flex; gap: 4px; position: relative; pointer-events: none; }
+    .acct-actions .btn { font-size: 0.78rem; padding: 4px 10px; flex: 1; pointer-events: auto; }
+    .dot-menu { position: relative; pointer-events: auto; }
+    .dot-btn { width: 32px; height: 32px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: var(--text-muted); line-height: 1; padding: 0; flex: none !important; }
+    .dot-btn:hover { background: var(--bg-hover); }
+    .dot-dropdown { display: none; position: absolute; right: 0; top: 100%; min-width: 120px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 100; margin-top: 2px; }
+    .dot-dropdown.open { display: block; }
+    .dot-dropdown div { padding: 8px 14px; font-size: 0.85rem; cursor: pointer; color: var(--text-secondary); }
+    .dot-dropdown div:hover { background: var(--bg-hover); color: var(--text); }
+    .dot-dropdown .danger { color: #dc2626; }
+    .dot-dropdown .danger:hover { background: #fef2f2; }
+    .chart-container { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 24px; }
+    .chart-container .chart-area { width: 100%; height: 260px; }
+    .chart-tabs { display: flex; gap: 0; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .chart-tab { padding: 2px 8px 3px 8px; font-size: 0.76rem; border: none; background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.15s; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .chart-tab:hover { color: var(--text); }
+    .chart-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+    .chart-range-btns { display: flex; gap: 4px; margin-bottom: 6px; flex-wrap: wrap; }
+    .chart-range-btn { padding: 1px 8px; font-size: 0.72rem; border: 1px solid var(--border); border-radius: 10px; background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.15s; }
+    .chart-range-btn:hover { border-color: var(--primary); color: var(--text); }
+    .chart-range-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .drawer-range-btns { display: flex; gap: 3px; margin-bottom: 4px; flex-wrap: wrap; }
+    .chart-empty { text-align: center; padding: 80px 20px; color: var(--text-muted); font-size: 0.9rem; }
+    .dd-label { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+    .drawer-chart-tabs { display: flex; gap: 0; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .drawer-chart-tab { padding: 2px 8px 3px 8px; font-size: 0.72rem; border: none; background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.15s; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .drawer-chart-tab:hover { color: var(--text); }
+    .drawer-chart-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal-box { background: var(--bg-card); border-radius: var(--radius); padding: 28px; max-width: 420px; width: 90%; max-height: 80vh; overflow-y: auto; }
+    .modal-box h2 { font-size: 1.1rem; margin-bottom: 16px; }
+    .modal-box .input-group { margin-bottom: 12px; }
+    .modal-box .input-group label { display: block; font-size: 0.85rem; margin-bottom: 4px; color: var(--text-secondary); }
+    .form-actions { display: flex; gap: 8px; margin-top: 16px; }
+    .form-actions .btn { flex: 1; }
+    .btn-danger { background: #dc2626; color: white; border: none; flex: 1; }
+    .btn-danger:hover { background: #b91c1c; }
+    .drawer-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 900; }
+    .drawer-overlay.open { display: block; }
+    .drawer { position: fixed; top: 0; right: -100%; width: 100%; max-width: 520px; height: 100vh; background: var(--bg-card); z-index: 901; transition: right 0.25s; display: flex; flex-direction: column; }
+    .drawer.open { right: 0; }
+    .drawer-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--border); }
+    .drawer-header h2 { font-size: 1.05rem; }
+    .drawer-close { width: 32px; height: 32px; border: none; background: none; cursor: pointer; font-size: 1.3rem; color: var(--text-muted); display: flex; align-items: center; justify-content: center; }
+    .drawer-actions { display: flex; gap: 6px; padding: 12px 24px; border-bottom: 1px solid var(--border); }
+    .drawer-actions .btn { font-size: 0.82rem; padding: 6px 14px; flex: 1; text-align: center; }
+    .drawer-body { flex: 1; overflow-y: auto; padding: 16px 24px; }
+    .drawer-summary { margin-bottom: 12px; }
+    .drawer-summary .total-row { margin-bottom: 4px; }
+    .drawer-summary .total-row .v { font-size: 1.2rem; font-weight: 800; color: var(--text); line-height: 1.2; white-space: nowrap; }
+    .drawer-summary .total-row .l { font-size: 0.68rem; color: var(--text-muted); }
+    .drawer-summary .row { display: flex; gap: 4px; flex-wrap: wrap; }
+    .drawer-summary .stat { flex: 1; min-width: 50px; text-align: center; padding: 4px 2px 0; }
+    .drawer-summary .stat .v { font-size: 0.85rem; font-weight: 700; white-space: nowrap; }
+    .drawer-summary .stat .l { font-size: 0.62rem; color: var(--text-muted); white-space: nowrap; }
+    .record-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+    .record-table th { text-align: left; padding: 8px 10px; background: var(--bg-hover); color: var(--text-muted); font-weight: 600; font-size: 0.76rem; border-bottom: 2px solid var(--border); }
+    .record-table td { padding: 6px 10px; border-bottom: 1px solid var(--border-light); }
+    .tag-in { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 500; background: #fef2f2; color: #dc2626; }
+    .tag-out { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 500; background: #eff6ff; color: #2563eb; }
+    .tag-revalue { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 500; background: #f8fafc; color: #64748b; }
+    .show-hidden { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-muted); cursor: pointer; margin-left: 12px; }
+    .show-hidden:hover { color: var(--text); }
+    .eye-btn { background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:1rem;padding:2px 6px;color:var(--text-muted);line-height:1;margin-left:8px;vertical-align:middle;display:inline-flex;align-items:center;justify-content:center; }
+    .eye-btn:hover { border-color:var(--primary);color:var(--text); }
+    .auth-prompt { text-align: center; padding: 80px 20px; }
+    .auth-prompt h1 { font-size: 1.8rem; margin-bottom: 8px; }
+    .auth-prompt p { color: var(--text-muted); margin-bottom: 20px; }
+    @media (max-width: 768px) {
+      .summary-card { padding: 10px 12px; }
+      .summary-card .total-row .v { font-size: 1.3rem; }
+      .summary-card .sub-row { gap: 4px 8px; display: grid; grid-template-columns: repeat(2, 1fr); }
+      .summary-card .sub-row .stat { min-width: 0; }
+      .summary-card .sub-row .stat .v { font-size: 0.85rem; }
+      .summary-card .sub-row .stat .l { font-size: 0.6rem; }
+      .account-grid { grid-template-columns: 1fr; }
+      .drawer { width: 100vw; }
+      .dash-main { padding: 12px; }
+      .dash-main h2 { font-size: 1rem; }
+      .chart-container { padding: 10px; }
+      .chart-container .chart-area { height: 200px; }
+      .record-table { font-size: 0.78rem; }
+      .record-table th, .record-table td { padding: 5px 6px; }
+      .drawer-filter { flex-wrap: nowrap; }
+      .drawer-filter select, .drawer-filter input { min-width: 0; flex-shrink: 1; }
+      .drawer-filter input[type=date] { width: 80px; }
+      .drawer-summary .total-row .v { font-size: 1rem; }
+      .drawer-summary .stat .v { font-size: 0.78rem; }
+      .acct-stats .total-val { font-size: 1rem; }
+      .acct-stats .stat .v { font-size: 0.82rem; }
+      .acct-stats .row-extra { display: none; }
+      .pie-chart-area { height: 180px; }
+      .empty-guide { padding: 24px 16px; }
+      .empty-guide .steps { grid-template-columns: 1fr; gap: 10px; }
+    }
+    /* Pie chart */
+     .pie-chart-area { height: 200px; }
+     /* Skeleton screen */
+     @keyframes shimmer{0%{background-position:-200px 0}100%{background-position:calc(200px + 100%) 0}}
+     .skeleton{background:linear-gradient(90deg,var(--bg-card) 25%,var(--border) 50%,var(--bg-card) 75%);background-size:200px 100%;animation:shimmer 1.5s infinite;border-radius:var(--radius-sm);}
+    /* Drawer filter */
+    .drawer-filter { display: flex; gap: 6px; padding: 8px 0; flex-wrap: nowrap; }
+    .drawer-filter select, .drawer-filter input { font-size: 0.78rem; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); min-width: 0; }
+    .drawer-filter input[type=date] { width: 110px; }
+    .drawer-filter .btn-sm { font-size: 0.75rem; padding: 4px 10px; flex-shrink: 0; }
+    /* Empty state guide */
+    .empty-guide { text-align: center; padding: 40px 20px; }
+    .empty-guide .icon-big { font-size: 2.5rem; margin-bottom: 10px; }
+    .empty-guide h2 { font-size: 1.15rem; margin-bottom: 6px; }
+    .empty-guide p { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 16px; }
+    .empty-guide .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; text-align: left; }
+    .empty-guide .step { background: var(--bg); border-radius: var(--radius-sm); padding: 14px; }
+    .empty-guide .step-num { font-size: 0.75rem; color: var(--primary); font-weight: 700; margin-bottom: 4px; }
+    .empty-guide .step-title { font-size: 0.85rem; font-weight: 600; margin-bottom: 2px; }
+    .empty-guide .step-desc { font-size: 0.78rem; color: var(--text-muted); }
+    /* XIRR summary display */
+    .xirr { font-size: 0.7rem; color: var(--text-muted); margin-top: 1px; }
+    /* 最大回撤区间 */
+    .sub { font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; }
+    /* Sync icon */
+    .sync-icon { transition: all 0.2s; }
+    .sync-icon:hover { border-color: var(--primary) !important; }
+    .sync-icon.synced { opacity: 0.7; }
+    .sync-icon.synced:hover { opacity: 1; }
+    .sync-icon.pending { border-color: #f59e0b !important; background: #fffbeb !important; }
+    .sync-icon.warning { border-color: #ef4444 !important; background: #fef2f2 !important; }
+    .sync-icon.offline { border-color: #6b7280 !important; background: #f3f4f6 !important; }
+    .sync-badge { display:inline-flex;align-items:center;justify-content:center;background:#f59e0b;color:#fff;font-size:0.7rem;font-weight:700;border-radius:50%;width:18px;height:18px;line-height:18px; }
+    .sync-badge.warn { background:#ef4444; }
+    .sync-ts { color: var(--text-muted); font-size: 0.72rem; white-space: nowrap; }
+  </style>
+</head>
+<body>
+<div id="nav-app"><nav-bar title="收益账本" logo-url="/"></nav-bar></div>
+
+<div id="app">
+<div class="dash-layout" id="appContent">
+  <div class="dash-main">
+    <div class="auth-prompt" id="loginPrompt" style="display:none;">
+      <h1>📊 收益账本</h1>
+      <p>管理多账户、追踪收益率、可视化资产走势</p>
+      <a href="login.html" class="btn btn-primary">登录</a>
+      <a href="register.html" class="btn btn-ghost" style="margin-left:8px;">免费注册</a>
+      <p style="margin-top:16px;"><a href="about.html" style="color:var(--text-muted);font-size:0.85rem;">了解更多功能 →</a></p>
+    </div>
+
+    <div id="dashContent" style="display:none;">
+      <div id="dashSkeleton">
+        <div class="summary-card" style="padding:16px 20px;">
+          <div class="skeleton" style="height:38px;width:60%;margin-bottom:4px;"></div>
+          <div style="display:flex;gap:20px;">
+            <div style="flex:1;"><div class="skeleton" style="height:18px;width:50%;margin-bottom:2px;"></div><div class="skeleton" style="height:11px;width:40%;"></div></div>
+            <div style="flex:1;"><div class="skeleton" style="height:18px;width:50%;margin-bottom:2px;"></div><div class="skeleton" style="height:11px;width:40%;"></div></div>
+            <div style="flex:1;"><div class="skeleton" style="height:18px;width:40%;margin-bottom:2px;"></div><div class="skeleton" style="height:11px;width:40%;"></div></div>
+            <div style="flex:1;"><div class="skeleton" style="height:18px;width:50%;margin-bottom:2px;"></div><div class="skeleton" style="height:11px;width:40%;"></div></div>
+            <div style="flex:1;"><div class="skeleton" style="height:18px;width:50%;margin-bottom:2px;"></div><div class="skeleton" style="height:11px;width:50%;"></div></div>
+          </div>
+        </div>
+        <div class="chart-container">
+          <div style="display:flex;gap:12px;margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:3px;">
+            <div class="skeleton" style="height:16px;width:40px;"></div>
+            <div class="skeleton" style="height:16px;width:28px;"></div>
+            <div class="skeleton" style="height:16px;width:56px;"></div>
+            <div class="skeleton" style="height:16px;width:28px;"></div>
+          </div>
+          <div class="skeleton" style="height:260px;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div class="skeleton" style="height:20px;width:80px;"></div>
+          <div class="skeleton" style="height:28px;width:100px;border-radius:6px;"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;">
+          <div class="account-card card" style="padding:20px;border:1px solid var(--border);"><div class="skeleton" style="height:18px;width:60%;margin-bottom:10px;"></div><div class="skeleton" style="height:22px;width:40%;margin-bottom:4px;"></div><div class="skeleton" style="height:12px;width:30%;margin-bottom:6px;"></div><div style="display:flex;gap:4px;"><div class="skeleton" style="height:28px;flex:1;border-radius:6px;"></div><div class="skeleton" style="height:28px;flex:1;border-radius:6px;"></div><div class="skeleton" style="height:28px;width:32px;border-radius:6px;"></div></div></div>
+          <div class="account-card card" style="padding:20px;border:1px solid var(--border);"><div class="skeleton" style="height:18px;width:60%;margin-bottom:10px;"></div><div class="skeleton" style="height:22px;width:40%;margin-bottom:4px;"></div><div class="skeleton" style="height:12px;width:30%;margin-bottom:6px;"></div><div style="display:flex;gap:4px;"><div class="skeleton" style="height:28px;flex:1;border-radius:6px;"></div><div class="skeleton" style="height:28px;flex:1;border-radius:6px;"></div><div class="skeleton" style="height:28px;width:32px;border-radius:6px;"></div></div></div>
+          <div class="account-card card" style="padding:20px;border:1px solid var(--border);"><div class="skeleton" style="height:18px;width:60%;margin-bottom:10px;"></div><div class="skeleton" style="height:22px;width:40%;margin-bottom:4px;"></div><div class="skeleton" style="height:12px;width:30%;margin-bottom:6px;"></div><div style="display:flex;gap:4px;"><div class="skeleton" style="height:28px;flex:1;border-radius:6px;"></div><div class="skeleton" style="height:28px;flex:1;border-radius:6px;"></div><div class="skeleton" style="height:28px;width:32px;border-radius:6px;"></div></div></div>
+        </div>
+      </div>
+      <summary-card></summary-card>
+      <!-- 基金成员管理 -->
+      <div id="fundPanel" style="display:none;margin-bottom:24px;">
+        <div class="card" style="padding:16px 20px;border:1px solid var(--border);border-radius:var(--radius-sm);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="font-size:1rem;">👥 基金成员</h3>
+            <button class="btn btn-sm btn-primary" onclick="openAddInvestor()">+ 添加成员</button>
+          </div>
+          <div id="investorList" style="display:flex;flex-direction:column;gap:6px;">
+            <!-- 由 JS 动态渲染 -->
+          </div>
+        </div>
+      </div>
+
+      <total-chart></total-chart>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+        <h2 style="font-size:1.1rem;">我的账户</h2>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <label class="show-hidden" id="showHiddenToggle" style="display:none;">
+            <input type="checkbox" id="showHiddenCheck" onchange="toggleHidden()"> 显示已隐藏
+          </label>
+          <button class="btn btn-primary btn-sm" onclick="openAddAccount()">+ 新建账户</button>
+          <button class="btn btn-ghost btn-sm" style="margin-left:4px;" onclick="exportData()">📥 导出</button>
+          <button class="btn btn-ghost btn-sm" style="margin-left:4px;" onclick="shareSnapshot()">📸 分享</button>
+        </div>
+      </div>
+
+      <account-grid></account-grid>
+      <encourage-text></encourage-text>
+      <app-footer></app-footer>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：新建账户 -->
+<div class="modal-overlay" id="accountModal">
+  <div class="modal-box">
+    <h2 id="accountModalTitle">新建账户</h2>
+    <div class="input-group"><label>账户名称</label><input type="text" class="input" id="accountName" placeholder="如：股票账户" maxlength="20"></div>
+    <div class="input-group"><label>账户类型</label><select class="input" id="accountType"><option value="investment">投资账户</option><option value="cash">现金账户</option></select></div>
+    <div class="form-actions"><button class="btn btn-ghost" onclick="closeModal('accountModal')">取消</button><button class="btn btn-primary" id="saveAccountBtn" onclick="saveAccount()">创建</button></div>
+  </div>
+</div>
+
+<record-modal></record-modal>
+
+<account-drawer></account-drawer>
+<edit-modal></edit-modal>
+
+<div id="toastContainer" style="position:fixed;bottom:20px;right:20px;z-index:2000;"></div>
+<achievement-modal></achievement-modal>
+</div>
+<style>
+  .achievement-box{position:relative;max-width:380px;width:88%;border-radius:20px;overflow:hidden;text-align:center;padding:48px 28px 36px;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#1a1a2e 100%);box-shadow:0 0 60px rgba(59,130,246,0.3);animation:achievementIn 0.6s cubic-bezier(0.22,1,0.36,1);}
+  @keyframes achievementIn{0%{transform:scale(0.5) translateY(40px);opacity:0}100%{transform:scale(1) translateY(0);opacity:1}}
+  .achievement-bg{position:absolute;inset:0;background:radial-gradient(circle at 50% 30%,rgba(251,191,36,0.08) 0%,transparent 60%);pointer-events:none;}
+  .achievement-icon{font-size:3.6rem;margin-bottom:12px;animation:achieveBounce 0.8s 0.3s both;}
+  @keyframes achieveBounce{0%{transform:scale(0)}50%{transform:scale(1.25)}100%{transform:scale(1)}}
+  .achievement-name{font-size:1.5rem;font-weight:800;color:#fff;margin-bottom:8px;letter-spacing:2px;}
+  .achievement-msg{font-size:0.88rem;color:rgba(255,255,255,0.75);line-height:1.6;margin-bottom:4px;}
+  .achievement-close{position:absolute;top:12px;right:14px;width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;}
+  .achievement-close:hover{background:rgba(255,255,255,0.15);color:#fff;}
+  /* 星星粒子 */
+  .star-particle{position:absolute;width:4px;height:4px;background:#fff;border-radius:50%;animation:starFall 1.5s ease-out forwards;}
+  @keyframes starFall{0%{transform:translateY(0) scale(1);opacity:1}100%{transform:translateY(120px) scale(0);opacity:0}}
+</style>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="nav-bar.js"></script>
+<script src="app-state.js"></script>
+<script src="calc-utils.js"></script>
+<script src="components/summary-card.js"></script>
+<script src="components/encourage-text.js"></script>
+<script src="components/account-grid.js"></script>
+<script src="components/record-modal.js"></script>
+<script src="components/edit-modal.js"></script>
+<script src="components/achievement-modal.js"></script>
+<script src="components/account-drawer.js"></script>
+<script src="components/total-chart.js"></script>
+<script src="components/line-chart.js"></script>
+<script src="components/app-footer.js"></script>
+<script src="components/dash-app.js"></script>
+<script src="data-service.js"></script>
+<script src="achievement-system.js"></script>
+<script>
+if(typeof mountNavBar!=='function'){window.mountNavBar=function(){};}
+mountNavBar('#nav-app');
+const SUPABASE_URL='https://spb-cl9n18iof0i9qxjh.supabase.opentrust.net', SUPABASE_ANON_KEY='eyJ0eX...Ukwk';
+const client=window.__supabaseClient||supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+if(!window.__supabaseClient)window.__supabaseClient=client;
+
+// ====== 工具函数快捷引用 ======
+window.fmt = window.calcUtils.fmt;
+window.fmtPct = window.calcUtils.fmtPct;
+window.fmtS = function(v){ return window.__store.privacyMode ? '******' : calcUtils.fmt(v); };
+window.buildSeries = function(){ return calcUtils.buildSeries(window.__store.accounts, window.__store.allRecords); };
+window.calcMaxDrawdown = function(){ return calcUtils.calcMaxDrawdown(window.__store.accounts, window.__store.allRecords); };
+
+// ====== DOM 快捷操作 ======
+const $=id=>document.getElementById(id);
+function openModal(id){$(id).classList.add('open');}
+function closeModal(id){$(id).classList.remove('open');}
+document.querySelectorAll('.modal-overlay').forEach(el=>{el.addEventListener('mousedown',e=>{if(e.target===el)el.classList.remove('open');});});
+
+// ====== 主页渲染 ======
+async function loadData(){
+  window.clearCache();
+  const{data:{session}}=await client.auth.getSession();
+  if(!session){$('loginPrompt').style.display='block';$('dashContent').style.display='none';return;}
+  const store = window.__store;
+  store.currentUser=session.user;
+  $('loginPrompt').style.display='none';$('dashContent').style.display='block';$('dashSkeleton').style.display='block';
+  const{data:s}=await window.cachedQuery('settings_'+store.currentUser.id,()=>client.from('user_settings').select('*').eq('user_id',store.currentUser.id).maybeSingle());
+  store.settings=s;
+  store.achieved=s?.achieved||{};
+  store.lastReturnSign=s?.last_return_sign||'negative';
+  store.positiveReturnCount=s?.positive_return_count||0;
+  const{data:accts}=await window.cachedQuery('accts_'+store.currentUser.id,()=>client.from('investment_accounts').select('*').eq('user_id',store.currentUser.id).order('created_at'));
+  store.accounts=accts||[];
+  // 加载投资人
+  const{data:invs}=await window.cachedQuery('invs_'+store.currentUser.id,()=>client.from('fund_investors').select('*').eq('user_id',store.currentUser.id).order('sort_order').order('created_at'));
+  store.investors=invs||[];
+  // 恢复基金模式状态
+  try{const fm=localStorage.getItem('hermes_fund_mode');if(fm==='1'){store.fundMode=true;}}catch(e){}
+  try{const pm=localStorage.getItem('hermes_privacy_mode');if(pm==='1'){store.privacyMode=true;}}catch(e){}
+  const hasCash=store.accounts.some(a=>a.account_type==='cash');
+  if(!hasCash){
+    const{data:newAcct}=await client.from('investment_accounts').insert({user_id:store.currentUser.id,name:'现金账户',account_type:'cash'}).select().single();
+    if(newAcct){store.accounts.push(newAcct);await client.from('user_settings').upsert({user_id:store.currentUser.id,default_cash_account_id:newAcct.id},{onConflict:'user_id'});store.settings={...(store.settings||{}),default_cash_account_id:newAcct.id};}
+  }
+  store.allRecords={};
+  await Promise.all(store.accounts.map(async a=>{
+    const{data:recs}=await window.cachedQuery('recs_'+a.id,()=>client.from('investment_records').select('id,account_id,record_date,action_type,amount,note,investor_id,paired_id,updated_at').eq('account_id',a.id).order('record_date',{ascending:true}).order('id',{ascending:true}));
+    (recs||[]).forEach(r=>{r.amount=r.amount/100;});
+    store.allRecords[a.id]=recs||[];
+  }));
+  // 先加载缓存的指数数据（立即渲染，不等待网络）
+  const cache=window.loadIndexCache();
+  store.csi300Map=cache.hs300||{};
+  store.csi500Map=cache.zz500||{};
+  const indexPromise=Promise.all([window.fetchIndexData('hs300'),window.fetchIndexData('zz500')]);
+  render();
+  const [hs300,zz500]=await indexPromise;
+  if(Object.keys(hs300).length) store.csi300Map=hs300;
+  if(Object.keys(zz500).length) store.csi500Map=zz500;
+  store.syncState.lastSyncTime=Date.now();
+  window.consumeSyncQueue();
+  console.log('[loadData] complete');
+}
+
+function render(){
+  const store=window.__store;
+  $('dashSkeleton').style.display='none';
+  let totalVal=0,totalCost=0;
+  store.accounts.forEach(a=>{const c=calcAccount(a,store.allRecords[a.id]||[]);totalVal+=c.currentValue;totalCost+=c.costBasis;});
+  const totalRet=totalVal-totalCost,totalRetPct=totalCost>0?(totalRet/totalCost)*100:0;
+  // 组合份额法净值
+  let totalNavVal = 1;
+  const series = window.calcUtils.buildSeries(store.accounts, store.allRecords);
+  if (series && series.nav.length) totalNavVal = series.nav[series.nav.length - 1];
+  const {maxDd,ddStart,ddEnd}=window.calcMaxDrawdown();
+  store.totalVal=totalVal; store.totalCost=totalCost; store.totalRet=totalRet;
+  store.totalRetPct=totalRetPct; store.totalNavVal=totalNavVal;
+  store.maxDd=maxDd; store.ddStart=ddStart; store.ddEnd=ddEnd;
+  const allFlows=[];
+  store.accounts.forEach(a=>{(store.allRecords[a.id]||[]).forEach(r=>{allFlows.push(r);});});
+  store.totalXirr=calcXIRR(allFlows,'investment', totalVal);
+  const hasHidden=store.accounts.some(a=>a.hidden);$('showHiddenToggle').style.display=hasHidden?'':'none';
+  // 计算投资人权益
+  store.fundMembers = window.calcFundMembers();
+  if (store.fundMode) {
+    const panel=$('fundPanel');
+    if(panel)panel.style.display='block';
+    renderInvestorList();
+  }
+  window.checkAchievements(totalVal,totalRet);
+}
+
+// ====== 账户操作 ======
+function togglePrivacy(){window.__store.privacyMode=!window.__store.privacyMode;try{localStorage.setItem('hermes_privacy_mode',window.__store.privacyMode?'1':'0');}catch(e){}render();}
+function toggleHidden(){window.__store.showHidden=$('showHiddenCheck').checked;render();}
+async function hideAccount(id){
+  const s=window.__store;
+  const a=s.accounts.find(x=>x.id===id);
+  if(a)a.hidden=true;
+  window.enqueueOp('update_account',{accountId:id,updates:{hidden:true}});
+  window.toast('已隐藏','success');window.hideAchievement();render();
+}
+async function unhideAccount(id){
+  const s=window.__store;
+  const a=s.accounts.find(x=>x.id===id);
+  if(a)a.hidden=false;
+  window.enqueueOp('update_account',{accountId:id,updates:{hidden:false}});
+  window.toast('已取消隐藏','success');render();
+}
+function openAddAccount(){$('accountModalTitle').textContent='新建账户';$('saveAccountBtn').textContent='创建';$('accountName').value='';$('accountType').value='investment';openModal('accountModal');}
+async function getUserPlan(){
+  const store=window.__store;
+  try{
+    const{data}=await window.cachedQuery('plan_'+store.currentUser.id,()=>client.from('subscriptions').select('plan,expires_at').eq('user_id',store.currentUser.id).maybeSingle());
+    if(!data||data.plan!=='pro')return'free';
+    if(!data.expires_at)return'pro';
+    return new Date(data.expires_at)>new Date()?'pro':'free';
+  }catch(e){return 'free';}
+}
+function isFrozenAccount(accountId){
+  const store=window.__store;
+  const sorted=[...store.accounts].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+  let cashCount=0,investCount=0;
+  for(const a of sorted){
+    if(a.account_type==='cash')cashCount++;
+    else investCount++;
+    if(a.id===accountId){
+      if(a.account_type==='cash')return cashCount>1;
+      return investCount>5;
     }
   }
-
-  // ====== 同步状态弹窗 ======
-  function openSyncDialog() {
-    var body=$('syncStatusBody');
-    if(!body)return;
-    var ss=store.syncState;
-    var html='<div style="margin-bottom:8px;"><b>同步队列</b></div>';
-    html+='<div>待同步：'+ss.pendingCount+' 条</div>';
-    html+='<div>上次同步：'+(ss.lastSyncTime?new Date(ss.lastSyncTime).toLocaleString('zh-CN'):'未同步')+'</div>';
-    html+='<div>状态：'+ss.status+'</div>';
-    if(ss.lastError)html+='<div style="color:var(--loss);margin-top:6px;">最后错误：'+ss.lastError+'</div>';
-    html+='<div style="margin-top:10px;"><button class="btn btn-sm" onclick="forceSync()">立即同步</button></div>';
-    body.innerHTML=html;
-    openModal('syncModalOverlay');
+  return false;
+}
+async function saveAccount(){
+  const store=window.__store;
+  const name=$('accountName').value.trim();if(!name){window.toast('请输入账户名称','error');return;}
+  const type=$('accountType').value;
+  const plan=await getUserPlan();
+  if(plan!=='pro'){
+    const cashCount=store.accounts.filter(a=>a.account_type==='cash').length;
+    const investCount=store.accounts.filter(a=>a.account_type==='investment').length;
+    if(type==='cash'&&cashCount>=1){window.toast('免费用户只能拥有1个现金账户','error');return;}
+    if(type==='investment'&&investCount>=5){window.toast('免费用户最多5个投资账户，赞助后可解锁无限','error');return;}
   }
-  function closeSyncDialog(){$('syncModalOverlay').style.display='none';}
+  const tempId=window.genTempId();
+  const tempAcct={id:tempId,name,account_type:type,user_id:store.currentUser.id,hidden:false,created_at:new Date().toISOString()};
+  store.accounts.push(tempAcct);
+  store.allRecords[tempId]=[];
+  window.enqueueOp('create_account',{account:{user_id:store.currentUser.id,name,account_type:type}});
+  closeModal('accountModal');window.toast('账户已创建（同步中）','success');render();
+}
+function openRecord(accountId,type){
+  window.__store.recordTargetId=accountId;
+  window.__store.recordTargetType=type||'transfer_in';
+  window.__store.showRecordModal=true;
+}
+function showRecords(accountId){
+  window.__store.drawerAccountId=accountId;
+  window.__store.drawerOpen=true;
+}
+function drawerAction(type){
+  const id=window.__store.drawerAccountId;
+  if(!id){window.toast('请先选择账户','error');return;}
+  openRecord(id,type);
+}
+function editRecord(id,accountId,actionType,amount,date,note,invId){
+  window.__store.editRecordId=id+"|"+accountId+"|"+actionType+"|"+amount+"|"+date+"|"+(note||"")+"|"+(invId||"");
+  window.__store.showEditModal=true;
+}
 
-  // ====== 成就弹窗 ======
-  window.hideAchievement=function(){
-    var el=$('achievementToast');
-    if(el)el.remove();
+// ====== 家庭基金模式 ======
+function toggleFundMode(){
+  const store=window.__store;
+  store.fundMode=!store.fundMode;
+  try{localStorage.setItem('hermes_fund_mode',store.fundMode?'1':'0');}catch(e){}
+  const panel=$('fundPanel');
+  if(store.fundMode){
+    window.triggerAchievement('fund_open','开基立业','基业初成，家庭基金从今天起航','🏛️');
+    const cnt=store.investors.length;
+    if(cnt>=5)window.triggerAchievement('inviter_5','八方来财','五方汇聚，财源广进','🌟');
+    else if(cnt>=3)window.triggerAchievement('inviter_3','群策群力','三人同心，其利断金','👥');
+    else if(cnt>=1)window.triggerAchievement('inviter_1','二人同心','一个篱笆三个桩，一个好汉三个帮','🤝');
+    panel.style.display='block';
+    renderInvestorList();
+  }else{
+    panel.style.display='none';
+  }
+}
+
+window.showFundIntro = function(){
+  alert('📋 基金模式说明\n\n1. 外部转入/转出可关联投资人\n2. 关联投资人的资金按「全部账户汇总净值」折算份额\n   （按前一天收盘净值·首日为1.0）\n3. 净值上涨/下跌时，份额不变，每人持仓价值同比例变化\n4. 资金进哪个账户不影响份额计算\n\n可在录入操作时选择投资人。');
+};
+
+// 添加投资人
+async function openAddInvestor(){
+  const name=prompt('输入成员称呼（如：妈妈、爸爸）：');
+  if(!name||!name.trim())return;
+  const n=name.trim();
+  const store=window.__store;
+  try{
+    const {data,error}=await client.from('fund_investors').insert({user_id:store.currentUser.id,name:n}).select().single();
+    if(error){window.toast('添加失败: '+error.message,'error');return;}
+    store.investors.push(data);
+    const cnt=store.investors.length;
+    if(cnt===1)window.triggerAchievement('inviter_1','二人同心','一个篱笆三个桩，一个好汉三个帮','🤝');
+    else if(cnt===3)window.triggerAchievement('inviter_3','群策群力','三人同心，其利断金','👥');
+    else if(cnt===5)window.triggerAchievement('inviter_5','八方来财','五方汇聚，财源广进','🌟');
+    renderInvestorList();
+    window.toast('已添加成员: '+n,'success');
+  }catch(e){window.toast('添加失败','error');}
+}
+
+// 删除投资人
+async function deleteInvestor(id,name){
+  if(!confirm('确认删除成员「'+name+'」？已关联的流水记录不会删除，但将不再计算该成员权益。'))return;
+  try{
+    const {error}=await client.from('fund_investors').delete().eq('id',id);
+    if(error){window.toast('删除失败','error');return;}
+    const store=window.__store;
+    store.investors=store.investors.filter(i=>i.id!==id);
+    renderInvestorList();
+    window.toast('已删除成员','success');
+  }catch(e){window.toast('删除失败','error');}
+}
+
+// 渲染投资人列表
+function renderInvestorList(){
+  const store=window.__store;
+  const el=$('investorList');
+  if(!el)return;
+  const members=store.fundMembers||[];
+  const totalVal=store.totalVal||0;
+  const totalCost=store.totalCost||0;
+  const pm=store.privacyMode;
+  const priv=(v)=>pm?'******':v;
+  if(!store.investors.length&&!totalVal){
+    el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.85rem;">暂无成员，点击上方按钮添加</div>';
+    return;
+  }
+  let html='';
+  // 管理人（剩余权益）
+  const invVal=members.reduce((s,m)=>s+m.currentValue,0);
+  const invInvested=members.reduce((s,m)=>s+m.totalInvested,0);
+  const invShares=members.reduce((s,m)=>s+m.shares,0);
+  const mgrVal=totalVal-invVal;
+  const mgrInvested=totalCost-invInvested;
+  const mgrRet=mgrVal-mgrInvested;
+  const mgrPct=mgrInvested>0?(mgrRet/mgrInvested)*100:0;
+  const mgrPctStr=mgrPct>=0?'+'+mgrPct.toFixed(2)+'%':mgrPct.toFixed(2)+'%';
+  // 份额计算：总份额 = 总资产 / 最新净值，管理人的 = 总份额 - 投资人份额
+  const curNav=store.totalNavVal||1;
+  const totalShares=totalVal/curNav;
+  const mgrShares=Math.max(0,totalShares-invShares);
+  const mgrSharePct=totalShares>0?((mgrShares/totalShares)*100).toFixed(1):'0.0';
+  html+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:8px;border-left:3px solid #3b82f6;">
+    <div style="flex:1;">
+      <div style="font-weight:600;font-size:0.9rem;">管理人（我）</div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">份额 ${priv(mgrShares.toFixed(2))} · 占比 ${mgrSharePct}%</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-weight:700;font-size:0.95rem;">${window.fmtS(mgrVal)}</div>
+      <div style="font-size:0.7rem;color:${mgrRet>=0?'#dc2626':'#2563eb'};margin-top:1px;">
+        浮盈 ${window.fmtS(mgrRet)}
+      </div>
+      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:1px;">
+        投入 ${window.fmtS(mgrInvested)} · ${mgrPctStr}
+      </div>
+    </div>
+  </div>`;
+  for(const inv of store.investors){
+    const m=members.find(x=>x.id===inv.id);
+    const val=m?m.currentValue:0;
+    const invested=m?m.totalInvested:0;
+    const ret=m?m['return']:0;
+    const pct=m?m.returnPct:0;
+    const pctStr=pct>=0?'+'+pct.toFixed(2)+'%':pct.toFixed(2)+'%';
+    const sharePct=totalShares>0?((m.shares/totalShares)*100).toFixed(1):'0.0';
+    html+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:8px;">
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:0.9rem;">${inv.name}</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">
+          份额 ${priv(m?m.shares.toFixed(2):'0.00')} · 占比 ${sharePct}%
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-weight:700;font-size:0.95rem;">${window.fmtS(val)}</div>
+        <div style="font-size:0.7rem;color:${ret>=0?'#dc2626':'#2563eb'};margin-top:1px;">
+          浮盈 ${window.fmtS(ret)}
+        </div>
+        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:1px;">
+          投入 ${window.fmtS(invested)} · ${pctStr}
+        </div>
+      </div>
+      <button class="btn btn-sm btn-ghost" onclick="deleteInvestor('${inv.id}','${inv.name}')" style="padding:2px 6px;font-size:0.8rem;color:var(--text-muted);" title="删除">✕</button>
+    </div>`;
+  }
+  el.innerHTML=html;
+}
+
+// ====== 导出 Excel ======
+function exportData(){
+  const store=window.__store;
+  if(!store.accounts.length){window.toast('没有数据可导出','error');return;}
+  try{
+    const rows=[];
+    const header=['账户名称','账户类型','日期','操作类型','金额','备注'];
+    store.accounts.forEach(a=>{
+      const recs=store.allRecords[a.id]||[];
+      if(recs.length===0){
+        rows.push({账户名称:a.name,账户类型:a.account_type==='cash'?'现金':'投资',日期:'',操作类型:'',金额:'',备注:''});
+      }else{
+        recs.sort((x,y)=>new Date(y.record_date)-new Date(x.record_date)).forEach(r=>{
+          const tl=r.action_type==='transfer_in'?'转入':r.action_type==='transfer_out'?'转出':'更新市值';
+          rows.push({
+            账户名称:a.name,
+            账户类型:a.account_type==='cash'?'现金':'投资',
+            日期:r.record_date,
+            操作类型:tl,
+            金额:Number(r.amount).toFixed(2),
+            备注:r.note||''
+          });
+        });
+      }
+    });
+    const ws=XLSX.utils.json_to_sheet(rows,{header});
+    ws['!cols']=[{wch:12},{wch:8},{wch:12},{wch:8},{wch:12},{wch:20}];
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'收益记录');
+    const now=new Date();
+    const fn='收益记录_'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'.xlsx';
+    XLSX.writeFile(wb,fn);
+    window.toast('已导出 '+fn,'success');
+    // 有备无患成就
+    if(!store.achieved['export_1']){window.triggerAchievement('export_1','有备无患','导出备份，数据多一份安心','💾');}
+  }catch(e){window.toast('导出失败: '+e.message,'error');}
+}
+// ====== 分享快照图 ======
+function shareSnapshot(){
+  const store=window.__store;
+  const c=document.createElement('canvas');const W=540,H=960;c.width=W;c.height=H;
+  const ctx=c.getContext('2d');
+  const R=(x,y,w,h,r)=>{ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();};
+  let tv=0,tc=0;store.accounts.forEach(a=>{const c2=calcAccount(a,store.allRecords[a.id]||[]);tv+=c2.currentValue;tc+=c2.costBasis;});
+  const tr=tv-tc,trPct=tc>0?(tr/tc)*100:0,nav=tc>0?tv/tc:1;
+  const allF=[];store.accounts.forEach(a=>{(store.allRecords[a.id]||[]).forEach(r=>allF.push(r));});
+  const xirr=calcXIRR(allF,'investment',tv);
+  const today=new Date();const ds=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+  const fmtN=v=>store.privacyMode?'******':'¥'+Number(v).toLocaleString('zh-CN',{minimumFractionDigits:2});
+  const clr=n=>n>=0?'#dc2626':'#2563eb';
+  const visible=store.accounts.filter(a=>store.showHidden||!a.hidden);
+  const bg=ctx.createLinearGradient(0,0,W,H);bg.addColorStop(0,'#0b1120');bg.addColorStop(0.5,'#111827');bg.addColorStop(1,'#0b1120');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+  const glow=ctx.createRadialGradient(W/2,0,0,W/2,0,280);glow.addColorStop(0,'rgba(59,130,246,0.07)');glow.addColorStop(1,'rgba(59,130,246,0)');
+  ctx.fillStyle=glow;ctx.fillRect(0,0,W,280);
+  ctx.textAlign='center';
+  ctx.font='26px sans-serif';ctx.fillText('🕊',W/2,52);
+  ctx.fillStyle='rgba(255,255,255,0.85)';ctx.font='bold 18px sans-serif';ctx.fillText('收益账本',W/2,80);
+  ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='12px sans-serif';ctx.fillText('个人投资理财 · 数据截至 '+ds,W/2,100);
+  R(24,120,W-48,100,16);ctx.fillStyle='rgba(255,255,255,0.06)';ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.08)';ctx.lineWidth=1;ctx.stroke();
+  ctx.textAlign='left';
+  ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='12px sans-serif';ctx.fillText('总资产',44,148);
+  ctx.fillStyle='#ffffff';ctx.font='bold 34px sans-serif';
+  ctx.fillText(store.privacyMode?'******':fmtN(tv),44,188);
+  ctx.textAlign='right';
+  ctx.fillStyle=clr(tr);ctx.font='bold 22px sans-serif';
+  ctx.fillText((tr>=0?'+':'')+trPct.toFixed(2)+'%',W-44,148);
+  ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='12px sans-serif';ctx.fillText('总收益率',W-44,170);
+  const metrics=[
+    {label:'累计收益',val:store.privacyMode?'******':fmtN(tr),color:clr(tr)},
+    {label:'净值',val:nav.toFixed(4),color:'#60a5fa'},
+    {label:'年化 XIRR',val:xirr!=null?(xirr>=0?'+':'')+(xirr*100).toFixed(2)+'%':'—',color:xirr!=null?clr(xirr):'rgba(255,255,255,0.4)'},
+  ];
+  const mY=270;const mW=W/3;
+  ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=1;
+  for(let i=1;i<3;i++){ctx.beginPath();ctx.moveTo(mW*i,242);ctx.lineTo(mW*i,300);ctx.stroke();}
+  metrics.forEach((m,i)=>{
+    ctx.textAlign='center';
+    ctx.fillStyle=m.color;ctx.font='bold 20px sans-serif';ctx.fillText(m.val,mW*i+mW/2,mY);
+    ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='12px sans-serif';ctx.fillText(m.label,mW*i+mW/2,mY+22);
+  });
+  const series=window.buildSeries();
+  if(series&&series.nav.length>=2){
+    const sx=44,sy=330,sw=W-88,sh=88;
+    R(sx-4,sy-4,sw+8,sh+8,12);ctx.fillStyle='rgba(255,255,255,0.04)';ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='10px sans-serif';ctx.textAlign='left';ctx.fillText('净值走势',sx,sy+14);
+    const nMin=Math.min(...series.nav),nMax=Math.max(...series.nav),nRange=nMax-nMin||1;
+    const lineY=sy+32,lineH=sh-48;
+    ctx.beginPath();ctx.moveTo(sx,lineY+lineH);
+    series.nav.forEach((v,i)=>{
+      const x=sx+(i/(series.nav.length-1))*sw;
+      const y=lineY+lineH-((v-nMin)/nRange)*lineH;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    });
+    ctx.lineTo(sx+sw,lineY+lineH);ctx.closePath();ctx.fillStyle='rgba(96,165,250,0.08)';ctx.fill();
+    ctx.beginPath();ctx.strokeStyle='rgba(96,165,250,0.7)';ctx.lineWidth=1.5;
+    series.nav.forEach((v,i)=>{
+      const x=sx+(i/(series.nav.length-1))*sw;
+      const y=lineY+lineH-((v-nMin)/nRange)*lineH;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    });ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.25)';ctx.font='9px sans-serif';ctx.textAlign='left';
+    ctx.fillText(series.dates[0],sx,lineY+lineH+14);
+    ctx.textAlign='right';ctx.fillText(series.dates[series.dates.length-1],sx+sw,lineY+lineH+14);
+  }
+  let aY=450;
+  ctx.fillStyle='rgba(255,255,255,0.35)';ctx.font='11px sans-serif';ctx.textAlign='left';ctx.fillText('账户 ('+visible.length+')',44,aY-10);
+  visible.forEach((a,i)=>{
+    if(aY>790)return;
+    const c2=calcAccount(a,store.allRecords[a.id]||[]);const r2=c2.totalReturn;
+    const isCash=a.account_type==='cash';
+    R(36,aY-2,W-72,48,10);ctx.fillStyle='rgba(255,255,255,0.04)';ctx.fill();
+    ctx.textAlign='left';
+    ctx.fillStyle='#ffffff';ctx.font='bold 13px sans-serif';
+    const nameW=ctx.measureText(a.name).width;
+    ctx.fillText(a.name,52,aY+20);
+    ctx.fillStyle=isCash?'rgba(16,185,129,0.5)':'rgba(96,165,250,0.5)';ctx.font='9px sans-serif';
+    ctx.fillText(isCash?'现金':'投资',52+Math.min(nameW+10,140),aY+20);
+    ctx.textAlign='right';
+    ctx.fillStyle=clr(r2);ctx.font='bold 14px sans-serif';ctx.fillText((r2>=0?'+':'')+fmtN(r2),W-48,aY+18);
+    ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='10px sans-serif';
+    const mvStr=store.privacyMode?'******':fmtN(c2.currentValue);
+    ctx.fillText('市值 '+mvStr,W-48,aY+36);
+    aY+=56;
+  });
+  const qrY=aY+20;
+  ctx.strokeStyle='rgba(255,255,255,0.08)';ctx.beginPath();ctx.moveTo(40,qrY-4);ctx.lineTo(W-40,qrY-4);ctx.stroke();
+  const img=new Image();img.crossOrigin='anonymous';
+  img.onload=function(){
+    ctx.drawImage(img,W/2-36,qrY+16,72,72);
+    ctx.fillStyle='rgba(255,255,255,0.25)';ctx.font='10px sans-serif';ctx.textAlign='center';
+    ctx.fillText('扫码使用收益账本',W/2,qrY+100);
+    c.toBlob(blob=>{
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='收益账本_'+ds+'.png';a.click();
+      URL.revokeObjectURL(a.href);window.toast('快照已保存，快去分享吧 🎉','success');
+      window.shareAchievement();
+    },'image/png');
   };
-
-  // ========== 通用 ==========
-  window.fmtS = function(v){
-    var pm=window.__store.privacyMode;
-    var n=Number(v);
-    return pm ? '******' : (n==null?'—':'¥'+n.toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2}));
+  img.onerror=function(){
+    ctx.fillStyle='rgba(255,255,255,0.25)';ctx.font='10px sans-serif';ctx.textAlign='center';
+    ctx.fillText('qyit.eu.org',W/2,qrY+60);
+    c.toBlob(blob=>{
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='收益账本_'+ds+'.png';a.click();
+      URL.revokeObjectURL(a.href);window.toast('快照已保存，快去分享吧 🎉','success');
+      window.shareAchievement();
+    },'image/png');
   };
+  img.src='https://api.qrserver.com/v1/create-qr-code/?size=100&data=https://qyit.eu.org';
+}
 
-  console.log('[index] script loaded, APP_VERSION:', APP_VERSION);
-  </script>
+window.addEventListener('open-settings',()=>{});
+loadData();
+</script>
 </body>
 </html>
