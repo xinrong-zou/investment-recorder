@@ -106,9 +106,10 @@
           let value = 0, cost = 0;
           dates = []; totalVal = []; totalCost = []; nav = []; cumRet = []; dailyTransfers = {};
           for (const r of sorted) {
-            if (r.action_type === 'transfer_in') { value += Number(r.amount); cost += Number(r.amount); dailyTransfers[r.record_date] = dailyTransfers[r.record_date] || { netIn: 0, netOut: 0 }; dailyTransfers[r.record_date].netIn += Number(r.amount); }
-            else if (r.action_type === 'transfer_out') { value -= Number(r.amount); cost -= Number(r.amount); dailyTransfers[r.record_date] = dailyTransfers[r.record_date] || { netIn: 0, netOut: 0 }; dailyTransfers[r.record_date].netOut += Number(r.amount); }
-            else if (r.action_type === 'revalue') value = Number(r.amount);
+            const amt = Number(r.amount);
+            if (r.action_type === 'transfer_in') { value += amt; cost += amt; if (!dailyTransfers[r.record_date]) dailyTransfers[r.record_date] = { netIn: 0, netOut: 0 }; dailyTransfers[r.record_date].netIn += amt; }
+            else if (r.action_type === 'transfer_out') { value -= amt; cost -= amt; if (!dailyTransfers[r.record_date]) dailyTransfers[r.record_date] = { netIn: 0, netOut: 0 }; dailyTransfers[r.record_date].netOut += amt; }
+            else if (r.action_type === 'revalue') value = amt;
             const navPlot = this.accountType === 'investment' ? (cost > 0 ? value / cost : value) : value;
             dates.push(r.record_date); totalVal.push(value); totalCost.push(cost); nav.push(navPlot); cumRet.push(value - cost);
           }

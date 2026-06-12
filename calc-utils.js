@@ -40,21 +40,16 @@
     const sorted = sortRecords(records);
     let cost = 0, lastRevalue = null;
     sorted.forEach(r => {
-      if (r.action_type === 'transfer_in') {
-        cost += Number(r.amount);
-        if (lastRevalue != null) lastRevalue += Number(r.amount);
-      } else if (r.action_type === 'transfer_out') {
-        cost -= Number(r.amount);
-        if (lastRevalue != null) lastRevalue -= Number(r.amount);
-      } else if (r.action_type === 'revalue') {
-        lastRevalue = Number(r.amount);
-      }
+      const amt = Number(r.amount);
+      if (r.action_type === 'transfer_in') { cost += amt; if (lastRevalue != null) lastRevalue += amt; }
+      else if (r.action_type === 'transfer_out') { cost -= amt; if (lastRevalue != null) lastRevalue -= amt; }
+      else if (r.action_type === 'revalue') { lastRevalue = amt; }
     });
     const isCash = acct.account_type === 'cash';
     const val = isCash ? cost : (lastRevalue != null ? lastRevalue : cost);
     const ret = val - cost;
     const retPct = cost > 0 ? (ret / cost) * 100 : 0;
-    const nav = cost > 0 ? val / cost : 1;
+    const nav = cost > 0 ? val / cost : 1.0;
     return { costBasis: cost, currentValue: val, totalReturn: ret, returnPct: retPct, nav };
   }
 
@@ -121,27 +116,34 @@
       if (Math.abs(dailyTransfers[d].netIn - dailyTransfers[d].netOut) < 0.005) delete dailyTransfers[d];
     }
 
-    // 增量计算
+    // 增量计算（组合级份额法：净值只随 revalue 变化，内部转账不影响份额）
     const acctState = {};
     for (const a of accounts) {
       const recs = sortRecords(allRecords[a.id] || []);
       acctState[a.id] = { ptr: 0, cost: 0, lastRevalue: null, records: recs };
     }
 
+    let totalShares = 0;
+    let portfolioNav = 1.0;
     const totalValArr = [], totalCostArr = [], navArr = [], cumRetArr = [];
     for (const d of dates) {
       for (const a of accounts) {
         const st = acctState[a.id];
         while (st.ptr < st.records.length && st.records[st.ptr].record_date <= d) {
           const r = st.records[st.ptr];
+          const amt = Number(r.amount);
           if (r.action_type === 'transfer_in') {
-            st.cost += Number(r.amount);
-            if (st.lastRevalue != null) st.lastRevalue += Number(r.amount);
+            st.cost += amt;
+            if (st.lastRevalue != null) st.lastRevalue += amt;
+            // 无 paired_id = 外部入金 → 按当前组合净值折算份额
+            if (!r.paired_id) totalShares += amt / (portfolioNav || 1.0);
           } else if (r.action_type === 'transfer_out') {
-            st.cost -= Number(r.amount);
-            if (st.lastRevalue != null) st.lastRevalue -= Number(r.amount);
+            st.cost -= amt;
+            if (st.lastRevalue != null) st.lastRevalue -= amt;
+            // 无 paired_id = 外部出金 → 按当前组合净值赎回份额
+            if (!r.paired_id) totalShares -= amt / (portfolioNav || 1.0);
           } else if (r.action_type === 'revalue') {
-            st.lastRevalue = Number(r.amount);
+            st.lastRevalue = amt;
           }
           st.ptr++;
         }
@@ -153,8 +155,12 @@
         const val = isCash ? st.cost : (st.lastRevalue != null ? st.lastRevalue : st.cost);
         v += val; c += st.cost;
       }
+      if (totalShares > 0) portfolioNav = v / totalShares;
+      else if (c > 0) portfolioNav = v / c;
+      else portfolioNav = 1.0;
       totalValArr.push(v); totalCostArr.push(c);
-      navArr.push(c > 0 ? v / c : 1); cumRetArr.push(v - c);
+      navArr.push(portfolioNav);
+      cumRetArr.push(v - c);
     }
     return { dates, totalVal: totalValArr, totalCost: totalCostArr, nav: navArr, cumRet: cumRetArr, dailyTransfers };
   }
@@ -183,9 +189,10 @@
     let val = 0, cost = 0, peak = 1, peakIdx = 0, ddVal = 0, ddStart = 0, ddEnd = 0;
     for (let i = 0; i < sorted.length; i++) {
       const r = sorted[i];
-      if (r.action_type === 'transfer_in') { val += Number(r.amount); cost += Number(r.amount); }
-      else if (r.action_type === 'transfer_out') { val -= Number(r.amount); cost -= Number(r.amount); }
-      else if (r.action_type === 'revalue') { val = Number(r.amount); }
+      const amt = Number(r.amount);
+      if (r.action_type === 'transfer_in') { val += amt; cost += amt; }
+      else if (r.action_type === 'transfer_out') { val -= amt; cost -= amt; }
+      else if (r.action_type === 'revalue') { val = amt; }
       const nav = acct.account_type === 'investment' ? (cost > 0 ? val / cost : val) : val;
       if (nav > peak) { peak = nav; peakIdx = i; }
       const dd = (nav - peak) / peak;
