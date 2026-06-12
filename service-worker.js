@@ -1,5 +1,5 @@
-// 收益账本 Service Worker v4 — 家庭基金 + 份额占比修复
-const CACHE_NAME = '收益账本-v4';
+// 收益账本 Service Worker v5 — 份额占比修复 + 版本感知更新
+const CACHE_NAME = '收益账本-v5';
 const STATIC_ASSETS = [
   'index.html',
   'style.css',
