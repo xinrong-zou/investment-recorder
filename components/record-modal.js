@@ -157,8 +157,8 @@
             );
             if (srcCalc.currentValue < amtYuan) toast('警告：来源账户在 '+date+' 余额不足（'+window.calcUtils.fmt(srcCalc.currentValue)+'），已保存但建议检查','warning');
             const r1Id = genTempId(), r2Id = genTempId();
-            const r1 = {id:r1Id,account_id:this.srcId,action_type:'transfer_out',amount:amtYuan,record_date:date,note:note||'转至 '+(this.allAccounts.find(a=>a.id===acctId)?.name||'其他账户'),paired_id:null};
-            const r2 = {id:r2Id,account_id:acctId,action_type:'transfer_in',amount:amtYuan,record_date:date,note:note||'来自 '+(this.allAccounts.find(a=>a.id===this.srcId)?.name||'其他账户'),paired_id:null};
+            const r1 = {id:r1Id,account_id:this.srcId,action_type:'transfer_out',amount:amtYuan,record_date:date,note:note||'转至 '+(this.allAccounts.find(a=>a.id===acctId)?.name||'其他账户'),paired_id:r2Id};
+            const r2 = {id:r2Id,account_id:acctId,action_type:'transfer_in',amount:amtYuan,record_date:date,note:note||'来自 '+(this.allAccounts.find(a=>a.id===this.srcId)?.name||'其他账户'),paired_id:r1Id};
             if (!this.store.allRecords[this.srcId]) this.store.allRecords[this.srcId] = [];
             if (!this.store.allRecords[acctId]) this.store.allRecords[acctId] = [];
             this.store.allRecords[this.srcId].push(r1);
@@ -183,8 +183,8 @@
           if (outCalc.currentValue < amtYuan) toast('警告：账户在 '+date+' 余额不足（'+window.calcUtils.fmt(outCalc.currentValue)+'），已保存但建议检查','warning');
           if (this.destId) {
             const r1Id = genTempId(), r2Id = genTempId();
-            const r1 = {id:r1Id,account_id:acctId,action_type:'transfer_out',amount:amtYuan,record_date:date,note:note||'转出',paired_id:null};
-            const r2 = {id:r2Id,account_id:this.destId,action_type:'transfer_in',amount:amtYuan,record_date:date,note:note||'来自 '+(this.allAccounts.find(a=>a.id===acctId)?.name||'其他账户'),paired_id:null};
+            const r1 = {id:r1Id,account_id:acctId,action_type:'transfer_out',amount:amtYuan,record_date:date,note:note||'转出',paired_id:r2Id};
+            const r2 = {id:r2Id,account_id:this.destId,action_type:'transfer_in',amount:amtYuan,record_date:date,note:note||'来自 '+(this.allAccounts.find(a=>a.id===acctId)?.name||'其他账户'),paired_id:r1Id};
             if (!this.store.allRecords[acctId]) this.store.allRecords[acctId] = [];
             if (!this.store.allRecords[this.destId]) this.store.allRecords[this.destId] = [];
             this.store.allRecords[acctId].push(r1);

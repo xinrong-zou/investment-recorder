@@ -454,7 +454,10 @@ function render(){
   let totalVal=0,totalCost=0;
   store.accounts.forEach(a=>{const c=calcAccount(a,store.allRecords[a.id]||[]);totalVal+=c.currentValue;totalCost+=c.costBasis;});
   const totalRet=totalVal-totalCost,totalRetPct=totalCost>0?(totalRet/totalCost)*100:0;
-  const totalNavVal=totalCost>0?(totalVal/totalCost):1;
+  // 组合份额法净值
+  let totalNavVal = 1;
+  const series = window.calcUtils.buildSeries(store.accounts, store.allRecords);
+  if (series && series.nav.length) totalNavVal = series.nav[series.nav.length - 1];
   const {maxDd,ddStart,ddEnd}=window.calcMaxDrawdown();
   store.totalVal=totalVal; store.totalCost=totalCost; store.totalRet=totalRet;
   store.totalRetPct=totalRetPct; store.totalNavVal=totalNavVal;
