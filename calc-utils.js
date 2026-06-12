@@ -38,18 +38,28 @@
   // -------------------------------------------------------------------
   function calcAccount(acct, records) {
     const sorted = sortRecords(records);
-    let cost = 0, lastRevalue = null;
+    let cost = 0, lastRevalue = null, shares = 0;
     sorted.forEach(r => {
       const amt = Number(r.amount);
-      if (r.action_type === 'transfer_in') { cost += amt; if (lastRevalue != null) lastRevalue += amt; }
-      else if (r.action_type === 'transfer_out') { cost -= amt; if (lastRevalue != null) lastRevalue -= amt; }
-      else if (r.action_type === 'revalue') { lastRevalue = amt; }
+      if (r.action_type === 'transfer_in') {
+        const curNav = lastRevalue != null ? (lastRevalue / (shares || 1)) : 1.0;
+        shares += amt / curNav;
+        cost += amt;
+        if (lastRevalue != null) lastRevalue += amt;
+      } else if (r.action_type === 'transfer_out') {
+        const curNav = lastRevalue != null ? (lastRevalue / (shares || 1)) : 1.0;
+        shares -= amt / curNav;
+        cost -= amt;
+        if (lastRevalue != null) lastRevalue -= amt;
+      } else if (r.action_type === 'revalue') {
+        lastRevalue = amt;
+      }
     });
     const isCash = acct.account_type === 'cash';
     const val = isCash ? cost : (lastRevalue != null ? lastRevalue : cost);
     const ret = val - cost;
     const retPct = cost > 0 ? (ret / cost) * 100 : 0;
-    const nav = cost > 0 ? val / cost : 1.0;
+    const nav = isCash ? 1.0 : (shares > 0 ? val / shares : 1.0);
     return { costBasis: cost, currentValue: val, totalReturn: ret, returnPct: retPct, nav };
   }
 
@@ -186,14 +196,24 @@
   function calcDrawerMaxDrawdown(acct, records) {
     const sorted = sortRecords(records);
     if (sorted.length < 2) return { maxDd: 0, ddStart: '', ddEnd: '' };
-    let val = 0, cost = 0, peak = 1, peakIdx = 0, ddVal = 0, ddStart = 0, ddEnd = 0;
+    let val = 0, cost = 0, shares = 0, peak = 1, peakIdx = 0, ddVal = 0, ddStart = 0, ddEnd = 0;
     for (let i = 0; i < sorted.length; i++) {
       const r = sorted[i];
       const amt = Number(r.amount);
-      if (r.action_type === 'transfer_in') { val += amt; cost += amt; }
-      else if (r.action_type === 'transfer_out') { val -= amt; cost -= amt; }
-      else if (r.action_type === 'revalue') { val = amt; }
-      const nav = acct.account_type === 'investment' ? (cost > 0 ? val / cost : val) : val;
+      if (r.action_type === 'transfer_in') {
+        if (acct.account_type === 'investment') {
+          const curNav = shares > 0 ? val / shares : 1.0;
+          shares += amt / curNav;
+        }
+        val += amt; cost += amt;
+      } else if (r.action_type === 'transfer_out') {
+        if (acct.account_type === 'investment') {
+          const curNav = shares > 0 ? val / shares : 1.0;
+          shares -= amt / curNav;
+        }
+        val -= amt; cost -= amt;
+      } else if (r.action_type === 'revalue') { val = amt; }
+      const nav = acct.account_type === 'investment' ? (shares > 0 ? val / shares : val) : val;
       if (nav > peak) { peak = nav; peakIdx = i; }
       const dd = (nav - peak) / peak;
       if (dd < ddVal) { ddVal = dd; ddStart = peakIdx; ddEnd = i; }

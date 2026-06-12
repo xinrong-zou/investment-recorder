@@ -103,14 +103,28 @@
           const sorted = window.calcUtils.sortRecords(this.records);
           if (sorted.length < 2) { this.empty = true; this.disposeChart(); return; }
           this.empty = false;
-          let value = 0, cost = 0;
+          let value = 0, cost = 0, shares = 0;
           dates = []; totalVal = []; totalCost = []; nav = []; cumRet = []; dailyTransfers = {};
           for (const r of sorted) {
             const amt = Number(r.amount);
-            if (r.action_type === 'transfer_in') { value += amt; cost += amt; if (!dailyTransfers[r.record_date]) dailyTransfers[r.record_date] = { netIn: 0, netOut: 0 }; dailyTransfers[r.record_date].netIn += amt; }
-            else if (r.action_type === 'transfer_out') { value -= amt; cost -= amt; if (!dailyTransfers[r.record_date]) dailyTransfers[r.record_date] = { netIn: 0, netOut: 0 }; dailyTransfers[r.record_date].netOut += amt; }
-            else if (r.action_type === 'revalue') value = amt;
-            const navPlot = this.accountType === 'investment' ? (cost > 0 ? value / cost : value) : value;
+            if (r.action_type === 'transfer_in') {
+              if (this.accountType === 'investment') {
+                const curNav = shares > 0 ? value / shares : 1.0;
+                shares += amt / curNav;
+              }
+              value += amt; cost += amt;
+              if (!dailyTransfers[r.record_date]) dailyTransfers[r.record_date] = { netIn: 0, netOut: 0 };
+              dailyTransfers[r.record_date].netIn += amt;
+            } else if (r.action_type === 'transfer_out') {
+              if (this.accountType === 'investment') {
+                const curNav = shares > 0 ? value / shares : 1.0;
+                shares -= amt / curNav;
+              }
+              value -= amt; cost -= amt;
+              if (!dailyTransfers[r.record_date]) dailyTransfers[r.record_date] = { netIn: 0, netOut: 0 };
+              dailyTransfers[r.record_date].netOut += amt;
+            } else if (r.action_type === 'revalue') value = amt;
+            const navPlot = this.accountType === 'investment' ? (shares > 0 ? value / shares : 1.0) : value;
             dates.push(r.record_date); totalVal.push(value); totalCost.push(cost); nav.push(navPlot); cumRet.push(value - cost);
           }
         }
