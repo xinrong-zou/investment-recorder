@@ -1,5 +1,5 @@
-// 收益账本 Service Worker v3 — 家庭基金 + 默认现金账户 + 分场景提示
-const CACHE_NAME = '收益账本-v3';
+// 收益账本 Service Worker v4 — 家庭基金 + 份额占比修复
+const CACHE_NAME = '收益账本-v4';
 const STATIC_ASSETS = [
   'index.html',
   'style.css',
